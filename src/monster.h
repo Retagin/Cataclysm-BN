@@ -31,6 +31,7 @@
 #include "units.h"
 #include "value_ptr.h"
 #include "visitable.h"
+#include "sounds.h"
 
 class Character;
 class JsonIn;
@@ -473,11 +474,11 @@ class monster : public Creature, public location_visitable<monster>
         /**
          * Makes monster react to heard sound
          *
-         * @param source Location of the sound source
-         * @param vol Volume at the center of the sound source
-         * @param distance Distance to sound source (currently just rl_dist)
+         * @param source Sound event of the source sound.
+         * @param heard_vol Volume in mdB spl heard by the creature
+         * @param ambient Ambient volume in mdB spl
          */
-        void hear_sound( const tripoint &source, int vol, int distance );
+        void hear_sound( const sound_event &source, const short heard_vol, const short ambient );
 
         bool is_hallucination() const override;    // true if the monster isn't actually real
 
