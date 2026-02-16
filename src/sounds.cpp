@@ -207,6 +207,7 @@ void map::cull_heard_sounds() {
 // Fear nothing but the consequences of your own poor decisions.
 void map::flood_fill_sound( const sound_event soundevent, const int zlev )
 {
+    ZoneScoped;
     if (zlev > 10 || zlev < -10){ 
         debugmsg( "Sound at %i:%i with description %1s is out of zlevel bounds!", soundevent.origin.x, soundevent.origin.y, soundevent.description );
         return;
@@ -494,6 +495,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
 // Measured in 100ths of a decibel
 bool map::build_absorbtion_cache( const int zlev )
 {
+    ZoneScoped;
 
     auto &map_cache = get_cache( zlev );
     auto &absorbtion_cache = map_cache.absorbtion_cache;

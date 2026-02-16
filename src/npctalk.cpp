@@ -878,6 +878,15 @@ void npc::handle_sound( const short heard_vol, sound_event sound )
     // Only sounds that are marked as being from a monster/npc/the player are passed to handle_sound, so we have a source creature. 
     map &here = get_map();
     const auto &spos = sound.origin;
+
+    // What entity is the source of the sound? We effectively have two logic cases, source is a monster or source is a "player" i.e., the player character or an npc.
+    Creature *const critter = g->critter_at<Creature>( spos );
+    // If we get passed a sound and we have no critter, then its an actual enviornmental sound or said critter is dead. Jump out either way.
+    // If a sound is set to ambient but was played from a creatures tile, we blame it on the creature because we are evil.
+    if(!critter){
+        return;
+    }
+
     const tripoint s_abs_pos = here.getabs( sound.origin );
     const tripoint my_abs_pos = here.getabs( pos() );
     const std::string &description = sound.description.empty() ? _( "a noise" ) : sound.description;
@@ -894,9 +903,6 @@ void npc::handle_sound( const short heard_vol, sound_event sound )
              // Is the player the source of the sound, and is the NPC an ally of the player?
     const bool player_ally = ((source_player || (get_player_character().pos() == sound.origin)) && is_player_ally()) ;
 
-    // What entity is the source of the sound? We effectively have two logic cases, source is a monster or source is a "player" i.e., the player character or an npc.
-    Creature *const critter = g->critter_at<Creature>( sound.origin );
-
     // Only reference this in cases where we know the sound source is either the player or an NPC
     player *npc_critter = dynamic_cast<player *>( critter );
 
@@ -906,10 +912,10 @@ void npc::handle_sound( const short heard_vol, sound_event sound )
     // Is the sound source a monster, and is said monster an ally of the hearing NPC?
     
     // Grab the attitude of our monster or set it to null if it the source is not a monster.
-    const monster_attitude mon_att = (source_monster)? critter->as_monster()->attitude(as_character()) : MATT_NULL;
+    const monster_attitude mon_att = (source_monster)? (critter->as_monster()->attitude(this->as_character())) : MATT_NULL;
 
     // NPCs should generally ignore low priority sounds from non-hostile monsters such as dogs
-    const bool mon_nonhostile = (source_monster)? mon_att != MATT_ATTACK : false;
+    const bool mon_nonhostile = (source_monster)? (mon_att != MATT_ATTACK) : false;
 
     if( ( player_ally || npc_ally ) && sound.category == sounds::sound_t::order ) {
         say( "<acknowledged>" );
