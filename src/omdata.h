@@ -40,7 +40,8 @@ static const overmap_land_use_code_id land_use_code_forest( "forest" );
 static const overmap_land_use_code_id land_use_code_wetland( "wetland" );
 static const overmap_land_use_code_id land_use_code_mining( "mining" );
 static const overmap_land_use_code_id land_use_code_open_land( "open_land" );
-static const overmap_land_use_code_id land_use_code_recreation_participation( "recreation_participation" );
+static const overmap_land_use_code_id
+land_use_code_recreation_participation( "recreation_participation" );
 static const overmap_land_use_code_id land_use_code_recreation_spectator( "recreation_spectator" );
 static const overmap_land_use_code_id land_use_code_recreation_water( "recreation_water" );
 static const overmap_land_use_code_id land_use_code_residential_multi( "residential_multi" );
@@ -56,10 +57,12 @@ static const overmap_land_use_code_id land_use_code_waste_disposal( "waste_dispo
 static const overmap_land_use_code_id land_use_code_water( "water" );
 static const overmap_land_use_code_id land_use_code_cranberry_bog( "cranberry_bog" );
 static const overmap_land_use_code_id land_use_code_powerline_utility( "powerline_utility" );
-static const overmap_land_use_code_id land_use_code_saltwater_sandy_beach( "saltwater_sandy_beach" );
+static const overmap_land_use_code_id
+land_use_code_saltwater_sandy_beach( "saltwater_sandy_beach" );
 static const overmap_land_use_code_id land_use_code_golf_course( "golf_course" );
 static const overmap_land_use_code_id land_use_code_marina( "marina" );
-static const overmap_land_use_code_id land_use_code_urban_public_institutional( "urban_public_institutional" );
+static const overmap_land_use_code_id
+land_use_code_urban_public_institutional( "urban_public_institutional" );
 static const overmap_land_use_code_id land_use_code_cemetery( "cemetery" );
 static const overmap_land_use_code_id land_use_code_orchard( "orchard" );
 static const overmap_land_use_code_id land_use_code_nursery( "nursery" );

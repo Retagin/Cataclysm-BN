@@ -3695,7 +3695,8 @@ void activity_handlers::operation_finish( player_activity *act, player *p )
                 se.origin = autodocs.front();
                 se.volume = 60;
                 se.category = sounds::sound_t::music;
-                se.description = _( "a sad beeping noise: \"Complications detected!  Report to medical personnel immediately!\"" );
+                se.description =
+                    _( "a sad beeping noise: \"Complications detected!  Report to medical personnel immediately!\"" );
                 se.id = "Autodoc";
                 se.variant = "failure";
 

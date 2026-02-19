@@ -536,7 +536,7 @@ struct islot_gun : common_ranged_data {
     std::string reload_noise = translate_marker( "click." );
     /**
      * Volume of the noise made when reloading this weapon.
-     * Base reload volume set to 40dB spl. Below 20dB spl is effectively silent. 
+     * Base reload volume set to 40dB spl. Below 20dB spl is effectively silent.
      */
     int reload_noise_volume = 40;
 

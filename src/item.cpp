@@ -6807,7 +6807,7 @@ bool item::craft_has_charges()
 }
 
 // Get the hearing protection provided by this item.
-// Returns advanced (active) hearing protection if true. 
+// Returns advanced (active) hearing protection if true.
 // Advanced hearing protection does not make it harder for the character to hear other sounds.
 int item::get_hearing_protection( bool advanced ) const
 {

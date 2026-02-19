@@ -876,7 +876,7 @@ static int calc_gun_volume( const item &gun )
     for( const auto mod : parent.gunmods() ) {
         noise += mod->type->gunmod->loudness;
     }
-    
+
 
     noise = std::max( noise, 0 );
     return noise;

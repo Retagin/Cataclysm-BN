@@ -487,7 +487,7 @@ static void damage_targets( const spell &sp, Creature &caster,
             continue;
         }
         if( sp.has_flag( spell_flag::DUPE_SOUND ) || !sound_played ) {
-            sp.make_sound( target,caster );
+            sp.make_sound( target, caster );
             sound_played = true;
         }
         sp.create_field( target );
@@ -755,7 +755,7 @@ void spell_effect::area_pull( const spell &sp, Creature &caster, const tripoint 
 
         spell_move( sp, caster, node.position, node.from );
     }
-    sp.make_sound( caster.pos(),caster );
+    sp.make_sound( caster.pos(), caster );
 }
 
 void spell_effect::area_push( const spell &sp, Creature &caster, const tripoint &center )

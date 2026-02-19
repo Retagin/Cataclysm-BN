@@ -708,10 +708,11 @@ void npc::move()
     } else if( attitude == NPCATT_FLEE_TEMP && !has_effect( effect_npc_flee_player ) ) {
         set_attitude( NPCATT_NULL );
     }
-    if(!ai_cache.warn_about_queue.empty()){
-        // Sound off about sound warnings right before we regenerate the AI cache, but after we apply sounds to NPC AIs. 
-        for (auto &warning_sound : ai_cache.warn_about_queue){
-            warn_about(warning_sound.type, warning_sound.duration, warning_sound.name, warning_sound.range, warning_sound.danger_pos);
+    if( !ai_cache.warn_about_queue.empty() ) {
+        // Sound off about sound warnings right before we regenerate the AI cache, but after we apply sounds to NPC AIs.
+        for( auto &warning_sound : ai_cache.warn_about_queue ) {
+            warn_about( warning_sound.type, warning_sound.duration, warning_sound.name, warning_sound.range,
+                        warning_sound.danger_pos );
         }
     }
     regen_ai_cache();

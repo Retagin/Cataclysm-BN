@@ -301,7 +301,7 @@ void monster::unset_dest()
 // If a louder sound then current wander force is heard, head to that instead.
 void monster::wander_to( const tripoint &p, int f )
 {
- if( f > wandf ) {
+    if( f > wandf ) {
         wander_pos = p;
         wandf = f;
     }

@@ -208,7 +208,7 @@ struct sound_event {
     // Decibels are a relative unit of measurment that expresses the ratio of two values of some quantity on a logarithmic scale.
     // By itself it is unitless, since it is just a ratio. It is used because there is such a vast range of technically audible sounds, 0.00002 Pa to above 101000 Pa
     // Unfortunantly there are three different accoustic quantities that all use some version of dB,
-    // are related to eachother but are very different quantities and are 
+    // are related to eachother but are very different quantities and are
     // mistaken for one another in almost all non-engineering or non-accademic contexts.
     // To make it even worse its still not uncommon to find mix ups in technical sources or to just have all three called dB and expecting you to just know which one they mean.
     // It is very common for audio electronics manufacturers, especially headset or microphone manufacturers, to just call all three properties sound intensity.

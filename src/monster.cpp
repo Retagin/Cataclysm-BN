@@ -3591,7 +3591,8 @@ float monster::get_mountable_weight_ratio() const
     return type->mountable_weight_ratio;
 }
 
-void monster::hear_sound( const sound_event &source, const short heard_vol, const short ambient, const bool reinforce_source, const bool afraid_of_source  )
+void monster::hear_sound( const sound_event &source, const short heard_vol, const short ambient,
+                          const bool reinforce_source, const bool afraid_of_source )
 {
     // Process_sound should normally catch this, but keep this here in case monsters are given the ability to be deafened by noises so that a monster would not hear follow on noises.
     if( !can_hear() ) {
@@ -3651,14 +3652,15 @@ void monster::hear_sound( const sound_event &source, const short heard_vol, cons
     // Allowing for z level error would cause consistant issues with monsters trying to path into solid rock.
 
     // A goodhearing monster will follow a gunshot heard_sound of 100dB for 26 turns.
-    // If we are reinforcing a sound source, we will follow said sound for an additional 30 turns. 
-    const short wander_turns = std::ceil( ( heard_vol * 0.001 ) + ( goodhearing ? 16 : 4 ) ) + (reinforce_source ? 30 : 0);
+    // If we are reinforcing a sound source, we will follow said sound for an additional 30 turns.
+    const short wander_turns = std::ceil( ( heard_vol * 0.001 ) + ( goodhearing ? 16 : 4 ) ) +
+                               ( reinforce_source ? 30 : 0 );
 
     process_trigger( mon_trigger::SOUND, ( heard_vol * 0.001 ) );
-    if( morale >= 0 && anger >= 10  && !afraid_of_source) {
+    if( morale >= 0 && anger >= 10  && !afraid_of_source ) {
 
         wander_to( tripoint( target_x, target_y, source.origin.z ), wander_turns );
-    } else if( morale < 0 || afraid_of_source) {
+    } else if( morale < 0 || afraid_of_source ) {
         // Monsters afraid of sound should not go towards sound
         wander_to( tripoint( 2 * posx() - target_x, 2 * posy() - target_y, 2 * posz() - source.origin.z ),
                    wander_turns );

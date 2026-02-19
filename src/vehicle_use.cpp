@@ -1150,7 +1150,7 @@ bool vehicle::start_engine( const int e )
 
     // Engines always fail to start with faulty fuel pumps
     if( eng.faults().contains( fault_pump ) || eng.faults().contains( fault_diesel ) ) {
-         sound_event se;
+        sound_event se;
         se.origin = pos;
         se.volume = noise;
         se.category = sounds::sound_t::movement;

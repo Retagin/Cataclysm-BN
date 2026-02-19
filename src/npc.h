@@ -510,7 +510,7 @@ struct npc_short_term_cache {
     std::vector<dangerous_sound> sound_alerts;
     // Vector of sounds to warn or complain about on NPC's turn.
     // This is so NPCs complain during their turn not the apply sounds to NPC AI stage
-    // Which can cause other NPCs to complain about the NPC complaining, etc. 
+    // Which can cause other NPCs to complain about the NPC complaining, etc.
     // This is cleared at the end of every turn.
     std::vector<sound_to_warn_about> warn_about_queue;
     // current sound position being investigated

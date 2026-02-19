@@ -477,10 +477,11 @@ class monster : public Creature, public location_visitable<monster>
          * @param source Sound event of the source sound.
          * @param heard_vol Volume in mdB spl heard by the creature
          * @param ambient Ambient volume in mdB spl
-         * @param reinforce_source Is the monster reinforcing the sound source, or should significantly prioritize heading to this sound over others? 
+         * @param reinforce_source Is the monster reinforcing the sound source, or should significantly prioritize heading to this sound over others?
          * @param afraid_of_source Is the monster afraid of the sound source, fleeing it regardless of moral?
          */
-        void hear_sound( const sound_event &source, const short heard_vol, const short ambient, const bool reinforce_source = false, const bool afraid_of_source = false );
+        void hear_sound( const sound_event &source, const short heard_vol, const short ambient,
+                         const bool reinforce_source = false, const bool afraid_of_source = false );
 
         bool is_hallucination() const override;    // true if the monster isn't actually real
 

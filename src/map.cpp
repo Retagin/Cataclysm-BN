@@ -1922,7 +1922,7 @@ bool map::ter_set( const tripoint &p, const ter_id &new_terrain )
         }
     }
 
-    if( new_t.has_flag( "BLOCK_WIND" ) != old_t.has_flag( "BLOCK_WIND" )  ) {
+    if( new_t.has_flag( "BLOCK_WIND" ) != old_t.has_flag( "BLOCK_WIND" ) ) {
         // Changing BLOCK_WIND prompts an absorbtion cache recalc around that tile.
         set_absorbtion_cache_dirty( p );
     }

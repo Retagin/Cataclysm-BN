@@ -304,7 +304,7 @@ struct level_cache {
     level_cache( const level_cache &other ) = default;
 
     std::bitset<MAPSIZE *MAPSIZE> transparency_cache_dirty;
-    // absorbtion_cache_dirty is for tile sound absorbtion checking/rebuild purposes. 
+    // absorbtion_cache_dirty is for tile sound absorbtion checking/rebuild purposes.
     // Should be set for a tile position if the tile in question changes significantly, or if a tile feature that affects sound propagation is added/removed.
     std::bitset<MAPSIZE *MAPSIZE> absorbtion_cache_dirty;
     bool outside_cache_dirty = false;
@@ -457,8 +457,8 @@ class map
         // p is in local coords ("ms")
         void set_transparency_cache_dirty( const tripoint &p );
 
-        // Invalidates a specific location's (p, in local cords "ms") absorbtion_cache and marks it for recalculation. 
-        // Should be called whenever a tile's (or its contents) ability to absorb sound significantly changes. 
+        // Invalidates a specific location's (p, in local cords "ms") absorbtion_cache and marks it for recalculation.
+        // Should be called whenever a tile's (or its contents) ability to absorb sound significantly changes.
         // For example if wind blocking furniture is added or removed, the tile is set to a tile type with wind blocking, if a tile is set to a type with very high absorbtion, etc.
         void set_absorbtion_cache_dirty( const tripoint &p );
 

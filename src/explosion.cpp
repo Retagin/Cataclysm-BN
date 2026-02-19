@@ -1562,7 +1562,7 @@ void explosion_funcs::regular( const queued_explosion &qe )
     // Incendiaries are not as loud.
     // This puts landmines and standard grenades at 170 dB (90 + 80)
     // Cap the max volume to 191dB
-    const int noise = std::min((base_noise + ( ex.fire ? 70 : 90 )),191);
+    const int noise = std::min( ( base_noise + ( ex.fire ? 70 : 90 ) ), 191 );
     sound_event se;
     se.origin = p;
     se.volume = noise;
