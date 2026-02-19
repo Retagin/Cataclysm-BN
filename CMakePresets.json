@@ -25,7 +25,9 @@
         "SOUND": "True",
         "TESTS": "True",
         "JSON_FORMAT": "ON",
-        "CMAKE_INSTALL_MESSAGE": "NEVER"
+        "CMAKE_INSTALL_MESSAGE": "NEVER",
+        "USE_TRACY": "ON",
+        "TRACY_ON_DEMAND": "ON"
       }
     },
     {
