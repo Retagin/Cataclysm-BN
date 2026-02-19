@@ -250,6 +250,7 @@ static void vector_quick_remove( std::vector<C> &source, int index )
 
 static std::vector<centroid> cluster_sounds( std::vector<std::pair<tripoint, int>> input_sounds )
 {
+    ZoneScoped;
     // If there are too many monsters and too many noise sources (which can be monsters, go figure),
     // applying sound events to monsters can dominate processing time for the whole game,
     // so we cluster sounds and apply the centroids of the sounds to the monster AI
@@ -432,6 +433,7 @@ static bool describe_sound( sounds::sound_t category, bool from_player_position 
 
 void sounds::process_sound_markers( Character *who )
 {
+    ZoneScoped;
     bool is_deaf = who->is_deaf();
     const float volume_multiplier = who->hearing_ability();
     const int weather_vol = get_weather().weather_id->sound_attn;
@@ -639,6 +641,7 @@ std::vector<tripoint> sounds::get_footstep_markers()
 
 std::pair<std::vector<tripoint>, std::vector<tripoint>> sounds::get_monster_sounds()
 {
+    ZoneScoped;
     auto sound_clusters = cluster_sounds( recent_sounds );
     std::vector<tripoint> sound_locations;
     sound_locations.reserve( recent_sounds.size() );
