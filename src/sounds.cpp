@@ -290,8 +290,8 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         adjacent_tiles = { { point( p.x - 1, p.y + 1 ), point( p.x, p.y + 1 ), point( p.x + 1, p.y + 1 ), point( p.x + 1, p.y ), point( p.x + 1, p.y - 1 ), point( p.x, p.y - 1 ), point( p.x - 1, p.y + 1 ), point( p.x - 1, p.y - 1 ) } };
     };
     // Determines the distance penalty due to sound propagation direction.
-    
-    
+
+
     // Call AFTER updating adjacent tiles.
     // Takes our source tile and sound direction, and updates the propagation_valid array with this information.
     // Adjacent Walls prevent propagation diaganoly across them, to simulate the effect of corners.
@@ -329,12 +329,13 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                 propagation_valid[0] = false;
             }
         }
-        
+
     };
 
     // Set our initial conditions. We want 100ths of a decibel for the volume
     // We dont apply directional sound propagation penalties at the very start.
-    svol[temp_sound_cache.sound.origin.x][temp_sound_cache.sound.origin.y] =  dBspl_to_mdBspl( temp_sound_cache.sound.volume ) ;
+    svol[temp_sound_cache.sound.origin.x][temp_sound_cache.sound.origin.y] =  dBspl_to_mdBspl(
+                temp_sound_cache.sound.volume ) ;
     sdistance[temp_sound_cache.sound.origin.x][temp_sound_cache.sound.origin.y] = 1;
     sdirection[temp_sound_cache.sound.origin.x][temp_sound_cache.sound.origin.y] = 8;
     get_adjacent_tiles( temp_sound_cache.sound.origin.xy() );
@@ -349,7 +350,9 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
             // Set our initial distance to 2. At the source there is no sound direction distance modifier.
             sdistance[tile.x][tile.y] = 2;
             // And set our tile volume based on the distance.
-            svol[tile.x][tile.y] = std::max( 0, ( svol[temp_sound_cache.sound.origin.x][temp_sound_cache.sound.origin.y] - (dist_vol_loss[sdistance[tile.x][tile.y]] + absorption_cache[tile.x][tile.y] )) );
+            svol[tile.x][tile.y] = std::max( 0,
+                                             ( svol[temp_sound_cache.sound.origin.x][temp_sound_cache.sound.origin.y] -
+                                               ( dist_vol_loss[sdistance[tile.x][tile.y]] + absorption_cache[tile.x][tile.y] ) ) );
             if( svol[tile.x][tile.y] > 0 ) {
                 add_tile_to_update_que( tile );
             }
@@ -369,7 +372,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         tiles_to_check.clear();
 
         // Now we iterate through the list with a for each loop.
-        // We should only be getting tiles that are valid for propagation here, as the tile valid check is handled 
+        // We should only be getting tiles that are valid for propagation here, as the tile valid check is handled
         for( point tile : current_que ) {
 
             // Grab our adjacent tiles, and the values for our center tile.
@@ -384,17 +387,18 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
 
             // Iterate through adjacent tiles.
             for( short i = 0; i < 8; i++ ) {
-    
+
                 auto &adj_tile = adjacent_tiles[i];
                 // Dont check tiles that are not valid for propagation, i.e. behind the direction of sound, around a corner, or out of bounds.
-                if( propagation_valid[i] && inbounds(adj_tile) ) {
-                    
+                if( propagation_valid[i] && inbounds( adj_tile ) ) {
+
                     auto &adj_tile_vol = svol[adj_tile.x][adj_tile.y];
                     auto &adj_tile_dist = sdistance[adj_tile.x][adj_tile.y];
                     auto &adj_tile_dir = sdirection[adj_tile.x][adj_tile.y];
                     auto &adj_tile_absorb = absorption_cache[adj_tile.x][adj_tile.y];
                     // Cap our distance check between 1 and 121
-                    const short dist_for_vol_loss = std::clamp( ( tile_dist + (adj_tile_dist_mod[i]? -1 : 1) ), 1, 121 );
+                    const short dist_for_vol_loss = std::clamp( ( tile_dist + ( adj_tile_dist_mod[i] ? -1 : 1 ) ), 1,
+                                                    121 );
                     const short vol_to_check = tile_vol - ( adj_tile_absorb + dist_vol_loss[dist_for_vol_loss] );
                     // General priority goes loudest volume, then largest distance. Smaller distances loose volume more quickly.
                     // If volumes are equal and directions are one off from eachother, the cardinal direction wins.
@@ -412,7 +416,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                             // Will not update if the adjacent tile is along the map boundry.
                             add_tile_to_update_que( adj_tile );
                         }
-                    } 
+                    }
                     // This section is additional overhead per tile for relatively little gain. If an improvement is found, consider.
                     // else if( ( ( vol_to_check ) == adj_tile_vol ) && ( std::abs( i - static_cast<int>(adj_tile_dir) ) ==  1 ||
                     //          std::abs(  i - static_cast<int>(adj_tile_dir)  ) ==
@@ -700,7 +704,7 @@ std::string enum_to_string<sfx::channel>( sfx::channel chan )
 
 // Static globals tracking sounds events of various kinds.
 // The sound events since the last monster turn.
-// Depreciated, kept as comment for reference 
+// Depreciated, kept as comment for reference
 //static std::vector<std::pair<tripoint, sound_event>> recent_sounds;
 
 // The sound events since the last interactive player turn. (doesn't count sleep etc)
@@ -745,8 +749,11 @@ void sounds::sound( const sound_event &soundevent )
     sound_event temp_sound_event = soundevent;
     if( temp_sound_event.volume < 16 ) {
 
-        add_msg( m_debug, _( "Sound with description [ %1s ] at %i:%i with a volume %i too quiet for propagation." ),temp_sound_event.description, temp_sound_event.origin.x, temp_sound_event.origin.y, temp_sound_event.volume );
-        
+        add_msg( m_debug,
+                 _( "Sound with description [ %1s ] at %i:%i with a volume %i too quiet for propagation." ),
+                 temp_sound_event.description, temp_sound_event.origin.x, temp_sound_event.origin.y,
+                 temp_sound_event.volume );
+
         return;
     }
     // Description is not an optional parameter
@@ -757,17 +764,19 @@ void sounds::sound( const sound_event &soundevent )
     }
     // Check to see if more than one source has been set somehow.
     // More than one source entity will break alot of logic downstream.
-    if( ( temp_sound_event.from_monster + temp_sound_event.from_npc + temp_sound_event.from_player ) > 1 ) {
+    if( ( temp_sound_event.from_monster + temp_sound_event.from_npc + temp_sound_event.from_player ) >
+        1 ) {
         debugmsg( "Sound at %i:%i has too many source entity types!", temp_sound_event.origin.x,
-                    temp_sound_event.origin.y );
+                  temp_sound_event.origin.y );
         return;
     }
     map &map = get_map();
-    
+
     // Maximum possible sound pressure level in atmosphere is 191 dB, cap our volume for sanity.
     // Sound volumes above 191dB are not sound pressure waves, they are supersonic blast/shock waves and should be modeled as damaging explosions.
     // Check above should catch any volumes that are too low or negative.
-    temp_sound_event.volume = std::min( temp_sound_event.volume,mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ) );
+    temp_sound_event.volume = std::min( temp_sound_event.volume,
+                                        mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ) );
 
     if( temp_sound_event.origin.z > 10 || temp_sound_event.origin.z < -10 ) {
         debugmsg( "Attempted to propagate sound outside of zlev bounds after adjustment!" );

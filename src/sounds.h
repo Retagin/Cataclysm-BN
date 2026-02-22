@@ -298,17 +298,18 @@ static constexpr auto dist_vol_loss = std::array<short, 122>
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
 // We have the 9th slot (index 8) for setting initial flood fill conditions and if we somehow check against the source tile of a sound.
-static constexpr auto sound_direction_distance_modifier = std::array<std::array<bool,8> , 9 >
+static constexpr auto sound_direction_distance_modifier = std::array<std::array<bool, 8>, 9 >
 {
-    {{false,false,true,false,false,false,true,false},
-    {false,false,false,true,false,false,false,true},
-    {true,false,false,false,true,false,false,false},
-    {false,true,false,false,false,true,false,false},
-    {false,false,true,false,false,false,true,false},
-    {false,false,false,true,false,false,false,true},
-    {true,false,false,false,true,false,false,false},
-    {false,true,false,false,false,true,false,false},
-    {false,false,false,false,false,false,false,false}}
+    { {false, false, true, false, false, false, true, false},
+        {false, false, false, true, false, false, false, true},
+        {true, false, false, false, true, false, false, false},
+        {false, true, false, false, false, true, false, false},
+        {false, false, true, false, false, false, true, false},
+        {false, false, false, true, false, false, false, true},
+        {true, false, false, false, true, false, false, false},
+        {false, true, false, false, false, true, false, false},
+        {false, false, false, false, false, false, false, false}
+    }
 };
 
 // Given a source tile's sound direction as the index, provides an array of which adjacent tiles are valid to attempt to propagate sound to.
@@ -318,16 +319,17 @@ static constexpr auto sound_direction_distance_modifier = std::array<std::array<
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
 // We have the 9th slot (index 8) for setting initial flood fill conditions and if we somehow check against the source tile of a sound again.
-static constexpr auto sound_direction_propagation_valid = std::array<std::array<bool,8> , 9 >
+static constexpr auto sound_direction_propagation_valid = std::array<std::array<bool, 8>, 9 >
 {
-    {{true, true, true, false, false, false, true, true},
-    {true, true, true, true, false, false, false, true},
-    {true, true, true, true, true, false, false, false},
-    {false, true, true, true, true, true, false, false},
-    {false, false, true, true, true, true, true, false},
-    {false, false, false, true, true, true, true, true},
-    {true, false, false, false, true, true, true, true},
-    {true, true, false, false, false, true, true, true},
-    {true, true, true, true, true, true, true, true}}
+    { {true, true, true, false, false, false, true, true},
+        {true, true, true, true, false, false, false, true},
+        {true, true, true, true, true, false, false, false},
+        {false, true, true, true, true, true, false, false},
+        {false, false, true, true, true, true, true, false},
+        {false, false, false, true, true, true, true, true},
+        {true, false, false, false, true, true, true, true},
+        {true, true, false, false, false, true, true, true},
+        {true, true, true, true, true, true, true, true}
+    }
 };
 
