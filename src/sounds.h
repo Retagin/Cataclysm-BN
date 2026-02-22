@@ -282,7 +282,7 @@ struct sound_event {
 // Doing the calc out every time for those would bog things down.
 // With this, we should be able to do everything with addition/subtraction.
 // Distance 1 only happens at the source of a sound, i.e., the reference volume.
-constexpr auto dist_vol_loss = std::array<short, 122>
+static constexpr auto dist_vol_loss = std::array<short, 122>
 {
     0, 1500, 602, 352, 250, 194, 158, 134, 116, 102, 92, 83, 76, 70, 64, 60, 56, 53, 50, 47, 45, 42, 40,
     39, 37, 35, 34, 33, 32, 30, 29, 28, 28, 27, 26, 25, 24, 24, 23, 23, 22, 21, 21, 20, 20, 20, 19, 19,
@@ -290,3 +290,44 @@ constexpr auto dist_vol_loss = std::array<short, 122>
     12, 12, 12, 12, 11, 11, 11, 11, 11, 11, 11, 10, 10, 10, 10, 10, 10, 10, 10, 9, 9, 9, 9, 9, 9, 9, 9,
     9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7, 7
 };
+
+// Given a source tile's sound direction as the index, provides an array of which adjacent tiles should have a propagation distance penalty.
+// Store this as we reference it every time we check a tile's neighboors for update, for potentially hundreds of tiles per sound.
+// Doing the boolean logic to find this in the code otherwise is slightly slower, but every little bit helps with how many tiles are checked.
+// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
+// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
+// [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
+// We have the 9th slot (index 8) for setting initial flood fill conditions and if we somehow check against the source tile of a sound.
+static constexpr auto sound_direction_distance_modifier = std::array<std::array<bool,8> , 9 >
+{
+    {{false,false,true,false,false,false,true,false},
+    {false,false,false,true,false,false,false,true},
+    {true,false,false,false,true,false,false,false},
+    {false,true,false,false,false,true,false,false},
+    {false,false,true,false,false,false,true,false},
+    {false,false,false,true,false,false,false,true},
+    {true,false,false,false,true,false,false,false},
+    {false,true,false,false,false,true,false,false},
+    {false,false,false,false,false,false,false,false}}
+};
+
+// Given a source tile's sound direction as the index, provides an array of which adjacent tiles are valid to attempt to propagate sound to.
+// Store this as we reference it every time we check a tile's neighboors for update, for potentially hundreds of tiles per sound.
+// We do additional map checking to check for corner invalidation due to walls, but having this stored still helps speed things up.
+// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
+// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
+// [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
+// We have the 9th slot (index 8) for setting initial flood fill conditions and if we somehow check against the source tile of a sound again.
+static constexpr auto sound_direction_propagation_valid = std::array<std::array<bool,8> , 9 >
+{
+    {{true, true, true, false, false, false, true, true},
+    {true, true, true, true, false, false, false, true},
+    {true, true, true, true, true, false, false, false},
+    {false, true, true, true, true, true, false, false},
+    {false, false, true, true, true, true, true, false},
+    {false, false, false, true, true, true, true, true},
+    {true, false, false, false, true, true, true, true},
+    {true, true, false, false, false, true, true, true},
+    {true, true, true, true, true, true, true, true}}
+};
+

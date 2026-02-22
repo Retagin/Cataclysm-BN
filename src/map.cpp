@@ -218,8 +218,8 @@ void map::set_transparency_cache_dirty( const int zlev )
 {
     if( inbounds_z( zlev ) ) {
         get_cache( zlev ).transparency_cache_dirty.set();
-        // If we are invalidating the entire transparency cache for this zlevel, the sound absorbtion cache will also be invalidated.
-        get_cache( zlev ).absorbtion_cache_dirty.set();
+        // If we are invalidating the entire transparency cache for this zlevel, the sound absorption cache will also be invalidated.
+        get_cache( zlev ).absorption_cache_dirty.set();
     }
 }
 
@@ -274,11 +274,11 @@ void map::set_transparency_cache_dirty( const tripoint &p )
     }
 }
 
-void map::set_absorbtion_cache_dirty( const tripoint &p )
+void map::set_absorption_cache_dirty( const tripoint &p )
 {
     if( inbounds( p ) ) {
         const tripoint smp = ms_to_sm_copy( p );
-        get_cache( smp.z ).absorbtion_cache_dirty.set( smp.x * MAPSIZE + smp.y );
+        get_cache( smp.z ).absorption_cache_dirty.set( smp.x * MAPSIZE + smp.y );
     }
 }
 
@@ -1894,8 +1894,8 @@ bool map::ter_set( const tripoint &p, const ter_id &new_terrain )
 
     if( old_t.has_flag( TFLAG_INDOORS ) != new_t.has_flag( TFLAG_INDOORS ) ) {
         set_outside_cache_dirty( p.z );
-        // Adding or removing a roof prompts a recalc of the absorbtion value of that tile.
-        set_absorbtion_cache_dirty( p );
+        // Adding or removing a roof prompts a recalc of the absorption value of that tile.
+        set_absorption_cache_dirty( p );
     }
 
     if( new_t.has_flag( TFLAG_NO_FLOOR ) != old_t.has_flag( TFLAG_NO_FLOOR ) ) {
@@ -1923,13 +1923,13 @@ bool map::ter_set( const tripoint &p, const ter_id &new_terrain )
     }
 
     if( new_t.has_flag( "BLOCK_WIND" ) != old_t.has_flag( "BLOCK_WIND" ) ) {
-        // Changing BLOCK_WIND prompts an absorbtion cache recalc around that tile.
-        set_absorbtion_cache_dirty( p );
+        // Changing BLOCK_WIND prompts an absorption cache recalc around that tile.
+        set_absorption_cache_dirty( p );
     }
 
     if( new_t.has_flag( "CONNECT_TO_WALL" ) != old_t.has_flag( "CONNECT_TO_WALL" ) ) {
-        // Changing CONNECT_TO_WALL prompts an absorbtion cache recalc around that tile to see if a structure blocks sounds.
-        set_absorbtion_cache_dirty( p );
+        // Changing CONNECT_TO_WALL prompts an absorption cache recalc around that tile to see if a structure blocks sounds.
+        set_absorption_cache_dirty( p );
     }
 
     invalidate_max_populated_zlev( p.z );
@@ -8929,7 +8929,7 @@ void map::build_map_cache( const int zlev, bool skip_lightmap )
         build_outside_cache( z );
         build_transparency_cache( z );
         update_suspension_cache( z );
-        build_absorbtion_cache( z );
+        build_absorption_cache( z );
         seen_cache_dirty |= ( build_floor_cache( z ) && affects_seen_cache );
         const bool level_seen_dirty = get_cache( z ).seen_cache_dirty;
         seen_cache_dirty |= level_seen_dirty;
@@ -9515,7 +9515,7 @@ level_cache::level_cache()
 {
     const int map_dimensions = MAPSIZE_X * MAPSIZE_Y;
     transparency_cache_dirty.set();
-    absorbtion_cache_dirty.set();
+    absorption_cache_dirty.set();
     outside_cache_dirty = true;
     floor_cache_dirty = false;
     constexpr four_quadrants four_zeros( 0.0f );
@@ -9533,7 +9533,7 @@ level_cache::level_cache()
     std::fill_n( &visibility_cache[0][0], map_dimensions, lit_level::DARK );
     veh_in_active_range = false;
     std::fill_n( &veh_exists_at[0][0], map_dimensions, false );
-    std::fill_n( &absorbtion_cache[0][0], map_dimensions, 0 );
+    std::fill_n( &absorption_cache[0][0], map_dimensions, 0 );
 }
 
 pathfinding_cache::pathfinding_cache()
@@ -9579,7 +9579,7 @@ void map::invalidate_map_cache( const int zlev )
         level_cache &ch = get_cache( zlev );
         ch.floor_cache_dirty = true;
         ch.transparency_cache_dirty.set();
-        ch.absorbtion_cache_dirty.set();
+        ch.absorption_cache_dirty.set();
         ch.seen_cache_dirty = true;
         ch.outside_cache_dirty = true;
         ch.suspension_cache_dirty = true;

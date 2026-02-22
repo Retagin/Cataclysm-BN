@@ -304,9 +304,9 @@ struct level_cache {
     level_cache( const level_cache &other ) = default;
 
     std::bitset<MAPSIZE *MAPSIZE> transparency_cache_dirty;
-    // absorbtion_cache_dirty is for tile sound absorbtion checking/rebuild purposes.
+    // absorption_cache_dirty is for tile sound absorption checking/rebuild purposes.
     // Should be set for a tile position if the tile in question changes significantly, or if a tile feature that affects sound propagation is added/removed.
-    std::bitset<MAPSIZE *MAPSIZE> absorbtion_cache_dirty;
+    std::bitset<MAPSIZE *MAPSIZE> absorption_cache_dirty;
     bool outside_cache_dirty = false;
     bool floor_cache_dirty = false;
     bool seen_cache_dirty = false;
@@ -360,11 +360,11 @@ struct level_cache {
     std::set<vehicle *> vehicle_list;
     std::set<vehicle *> zone_vehicles;
 
-    // stores cached sound absorbtion amounts of tiles
+    // stores cached sound absorption amounts of tiles
     // In 100ths of decibels
     // This is in level_cache instead of sound cache as this is a function of terrain,
     // and we dont want to regenerate this for every single sound.
-    short absorbtion_cache[MAPSIZE_X][MAPSIZE_Y];
+    short absorption_cache[MAPSIZE_X][MAPSIZE_Y];
 };
 
 // Use the vector sounds_caches for most purposes when working with sounds in reference to a specific position or checking multiple sounds.
@@ -449,7 +449,7 @@ class map
          */
         /*@{*/
 
-        // This will also set the z_levels sound absorbtion cache to dirty as is almost certainly invalidated as well.
+        // This will also set the z_levels sound absorption cache to dirty as is almost certainly invalidated as well.
         void set_transparency_cache_dirty( const int zlev );
 
         // more granular version of the transparency cache invalidation
@@ -457,10 +457,10 @@ class map
         // p is in local coords ("ms")
         void set_transparency_cache_dirty( const tripoint &p );
 
-        // Invalidates a specific location's (p, in local cords "ms") absorbtion_cache and marks it for recalculation.
+        // Invalidates a specific location's (p, in local cords "ms") absorption_cache and marks it for recalculation.
         // Should be called whenever a tile's (or its contents) ability to absorb sound significantly changes.
-        // For example if wind blocking furniture is added or removed, the tile is set to a tile type with wind blocking, if a tile is set to a type with very high absorbtion, etc.
-        void set_absorbtion_cache_dirty( const tripoint &p );
+        // For example if wind blocking furniture is added or removed, the tile is set to a tile type with wind blocking, if a tile is set to a type with very high absorption, etc.
+        void set_absorption_cache_dirty( const tripoint &p );
 
         // invalidates seen cache for the whole zlevel unconditionally
 
@@ -1912,10 +1912,10 @@ class map
         void build_floor_caches();
         // Checks all suspended tiles on a z level and adds those that are invalid to the support_dirty_cache */
         void update_suspension_cache( const int &z );
-        // Builds a sound absorbtion cache and returns true if the cache was invalidated.
-        // If true, update the absorbtion cache. We want this built after the other caches, but before sounds are calced.
+        // Builds a sound absorption cache and returns true if the cache was invalidated.
+        // If true, update the absorption cache. We want this built after the other caches, but before sounds are calced.
         // Function logic located in sounds.cpp
-        bool build_absorbtion_cache( const int zlev );
+        bool build_absorption_cache( const int zlev );
         // Builds a sound_cache by flood filling from a given sound event.
         // Function logic located in sounds.cpp
         void flood_fill_sound( const sound_event soundevent, int zlev );

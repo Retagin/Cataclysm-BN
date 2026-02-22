@@ -3651,7 +3651,8 @@ void monster::hear_sound( const sound_event &source, const short heard_vol, cons
     int target_y = source.origin.y + rng( -max_error, max_error );
     // Allowing for z level error would cause consistant issues with monsters trying to path into solid rock.
 
-    // A goodhearing monster will follow a gunshot heard_sound of 100dB for 26 turns.
+    // A goodhearing monster will follow a heard_sound of 100dB for 26 turns (10 + 16).
+    // We take in mdB, 100ths of a decibel and divide by 1000 to get our follow for turn value.
     // If we are reinforcing a sound source, we will follow said sound for an additional 30 turns.
     const short wander_turns = std::ceil( ( heard_vol * 0.001 ) + ( goodhearing ? 16 : 4 ) ) +
                                ( reinforce_source ? 30 : 0 );
