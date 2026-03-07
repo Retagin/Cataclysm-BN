@@ -124,6 +124,8 @@ static constexpr short AMBIENT_VOLUME_UNDERGROUND = 3500;
 // The base "unit" is the Bel, 10 decibels to the bel, 100 centibels to the bell, 1000 millibels to the belm and finially 100 millibels to the decibel.
 static constexpr short dBspl_to_mdBspl_coeff = 100;
 static constexpr double mdBspl_to_dBspl_coeff = 0.01;
+// Sounds cease propagating when they go below this volume.
+static constexpr short SOUND_MINIMUM_VOLUME_FOR_PROPAGATION = 1600;
 
 // Converts decibels sound pressure level to milli-decibels sound pressure level.
 // We do this often enough its worth it to have a constexpr even though its just *100
@@ -447,6 +449,8 @@ void map::batch_flood_fill_sounds()
     // Our que of sound events to flood fill
     auto &batch_que = sound_batch_floodfill_que;
 
+    add_msg(m_debug, _("Attempting to batch flood fill %i sounds."), batch_que.size() );
+
     const weather_manager &weather = get_weather();
     const short weather_vol = dBspl_to_mdBspl( weather.weather_id->sound_attn );
     const short wind_volume = dBspl_to_mdBspl( std::min( 150, weather.windspeed ) );
@@ -496,15 +500,15 @@ void map::batch_flood_fill_sounds()
     
     
     // Now we step through our zlevels
-    for (int zlev = -10; zlev > 11; zlev++){
+    for (int zlev = -10; zlev < 11; zlev++){
 
         const auto &map_cache = get_cache( zlev );
         const auto &absorption_cache = map_cache.absorption_cache;
         const auto &outside_cache = map_cache.outside_cache;
         const short ambient_indoors = (zlev < 0)? AMBIENT_VOLUME_UNDERGROUND : AMBIENT_VOLUME_ABOVEGROUND + (weather_vol * 2);
         const short ambient_outside = (zlev < 0)? AMBIENT_VOLUME_UNDERGROUND : AMBIENT_VOLUME_ABOVEGROUND + (weather_vol + wind_volume);
-        const short minvol_indoors = std::max(1600, ambient_indoors - 3000);
-        const short minvol_outside = std::max(1600, ambient_outside - 3000);
+        const short minvol_indoors = std::max(SOUND_MINIMUM_VOLUME_FOR_PROPAGATION, static_cast<short>(ambient_indoors - 3000));
+        const short minvol_outside = std::max(SOUND_MINIMUM_VOLUME_FOR_PROPAGATION, static_cast<short>(ambient_outside - 3000));
 
         // Call AFTER updating adjacent tiles.
         // Takes our source tile and sound direction, and updates the propagation_valid array with this information.
@@ -978,12 +982,12 @@ void sounds::sound( const sound_event &soundevent )
     // Most sounds intended to be quiet but still audible to the player, and maybe to creatures very close, is 35-45dB.
     // Ambient volume minimum is usually between 35 and 50dB in game. A player with normal hearing can notice sounds 20dB below ambient.
     sound_event temp_sound_event = soundevent;
-    if( temp_sound_event.volume < 16 ) {
+    if( temp_sound_event.volume < mdBspl_to_dBspl(SOUND_MINIMUM_VOLUME_FOR_PROPAGATION) ) {
 
         add_msg( m_debug, _( "Sound with description [ %1s ] at %i:%i with a volume %i too quiet for propagation." ),temp_sound_event.description, temp_sound_event.origin.x, temp_sound_event.origin.y, temp_sound_event.volume );
 
         return;
-    }else if(temp_sound_event.volume < ((temp_sound_event.origin.z < 0) ? AMBIENT_VOLUME_UNDERGROUND : AMBIENT_VOLUME_ABOVEGROUND + get_weather().weather_id->sound_attn ) - 19){
+    }else if(temp_sound_event.volume < ((temp_sound_event.origin.z < 0) ? mdBspl_to_dBspl(AMBIENT_VOLUME_UNDERGROUND) : mdBspl_to_dBspl(AMBIENT_VOLUME_ABOVEGROUND) + get_weather().weather_id->sound_attn ) - 19){
         // Dont propagate sounds that are too quiet to be heard.
         return;
     }
@@ -1011,7 +1015,7 @@ void sounds::sound( const sound_event &soundevent )
 
     // We flood fill sounds from monsters and NPCs for performance and efficiency reasons.
     if (soundevent.from_monster || soundevent.from_npc){
-        sound_batch_floodfill_que.push_back(soundevent);
+        sound_batch_floodfill_que.push_back(temp_sound_event);
     }else{
         map.flood_fill_sound( temp_sound_event, temp_sound_event.origin.z );    
     }
