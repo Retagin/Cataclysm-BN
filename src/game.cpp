@@ -4305,6 +4305,8 @@ void game::monmove()
     if( !soundperf ) {
         // Cull any noises that have already been heard by everyone. This should generally cull all sounds made by monsters on the prior turn.
         m.cull_heard_sounds();
+        // Batch floodfill sounds made by monsters or other qued sources.
+        m.batch_flood_fill_sounds();
         // Apply remaining sounds to NPC AI here so that they are reacting to the most recent monster noises and player noises, not recent player noises and prior turn monster noises.
         sounds::process_sounds_npc();
     }

@@ -508,6 +508,10 @@ class monster : public Creature, public location_visitable<monster>
         units::volume get_carried_volume() const;
 
         // DEFINING VALUES
+        // Is the monster friendly to the player. 
+        // 0 = hostile
+        // -1 = Permanantly friendly/pet/allied
+        // >0 = freindly for x turns
         int friendly;
         int anger = 0;
         int morale = 0;

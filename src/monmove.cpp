@@ -1296,7 +1296,7 @@ void monster::nursebot_operate( player *dragged_foe )
 
 // footsteps will determine how loud a monster's normal movement is
 // and create a sound in the monsters location when they move
-// // Values converted from tiles to dB
+// Values converted from tiles to dB
 void monster::footsteps( const tripoint &p )
 {
     if( made_footstep ) {

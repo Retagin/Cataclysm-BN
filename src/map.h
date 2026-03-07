@@ -1919,6 +1919,9 @@ class map
         // Builds a sound_cache by flood filling from a given sound event.
         // Function logic located in sounds.cpp
         void flood_fill_sound( const sound_event soundevent, int zlev );
+        // Batch builds a set of sound caches from std::vector<sound_event> sound_batch_floodfill_que
+        // Similar to flood_fill_sound, used for monster sounds for performance.
+        void batch_flood_fill_sounds();
         // Checks and culls sound_caches from the sound_caches vector.
         // Sounds that have been heard by monsters and by the player are culled so they are not re-heard.
         void cull_heard_sounds();
