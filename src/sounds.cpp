@@ -160,7 +160,7 @@ struct sound_details {
     uint8_t direction[MAPSIZE_X][MAPSIZE_Y] = {{0}};
 };
 // Vector of sound events qued for batch floodfilling for efficiency. By default all monster and NPC sounds are batch floodfilled.
-std::vector<sound_event> sound_batch_floodfill_que;
+static std::vector<sound_event> sound_batch_floodfill_que;
 
 // Returns the reduction in dB due to terrain in mdB (100ths of a decibel) for a given terrain
 // If horde signal is true, returns reducion due to terrain at a distance of ~312m
