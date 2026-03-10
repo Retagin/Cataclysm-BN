@@ -401,8 +401,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                     auto &adj_tile_dir = sdirection[adj_tile.x][adj_tile.y];
                     auto &adj_tile_absorb = absorption_cache[adj_tile.x][adj_tile.y];
                     // Cap our distance check between 1 and 121
-                    const short dist_for_vol_loss = std::clamp( ( tile_dist + ( adj_tile_dist_mod[i] ? -1 : 1 ) ), 1,
-                                                    121 );
+                    const short dist_for_vol_loss = get_distance_for_volume_loss(tile_dist, adj_tile_dist_mod[i] );
                     const short vol_to_check = tile_vol - ( adj_tile_absorb + dist_vol_loss[dist_for_vol_loss] );
                     // General priority goes loudest volume, then largest distance. Smaller distances loose volume more quickly.
                     // If volumes are equal and directions are one off from eachother, the cardinal direction wins.
@@ -415,7 +414,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                         // as the change in distance loss values past this point are negligible for gameplay scale.
                         adj_tile_dist = dist_for_vol_loss;
                         adj_tile_dir = i;
-                        if( adj_tile_vol > 2000 ) {
+                        if( adj_tile_vol > SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) {
                             // If the tiles new volume is greater than 20dB, mark it for update.
                             // Will not update if the adjacent tile is along the map boundry.
                             add_tile_to_update_que( adj_tile );
@@ -454,7 +453,12 @@ void map::batch_flood_fill_sounds()
     const weather_manager &weather = get_weather();
     const short weather_vol = dBspl_to_mdBspl( weather.weather_id->sound_attn );
     const short wind_volume = dBspl_to_mdBspl( std::min( 150, weather.windspeed ) );
+
     const int map_dimensions = MAPSIZE_X * MAPSIZE_Y;
+    const uint8_t unsigned_zero = 0;
+    // How many sounds did we actually process?
+    short num_processed_sounds = 0;
+    short num_invalidated_sounds = 0;
 
     // Sound details struct that we will zero between flood fills.
     sound_details tile_sound;
@@ -494,19 +498,19 @@ void map::batch_flood_fill_sounds()
 
     auto zero_sound_details = [&]()
     {
-        std::fill_n( &tile_sound.direction[0][0], map_dimensions, 0 );
-        std::fill_n( &tile_sound.distance[0][0], map_dimensions, 0 );
+        std::fill_n( &tile_sound.direction[0][0], map_dimensions, unsigned_zero );
+        std::fill_n( &tile_sound.distance[0][0], map_dimensions, unsigned_zero );
     };
     
     
     // Now we step through our zlevels
-    for (int zlev = -10; zlev < 11; zlev++){
+    for (int z = -OVERMAP_DEPTH; z <= OVERMAP_HEIGHT; z++){
 
-        const auto &map_cache = get_cache( zlev );
+        const auto &map_cache = get_cache( z );
         const auto &absorption_cache = map_cache.absorption_cache;
         const auto &outside_cache = map_cache.outside_cache;
-        const short ambient_indoors = (zlev < 0)? AMBIENT_VOLUME_UNDERGROUND : AMBIENT_VOLUME_ABOVEGROUND + (weather_vol * 2);
-        const short ambient_outside = (zlev < 0)? AMBIENT_VOLUME_UNDERGROUND : AMBIENT_VOLUME_ABOVEGROUND + (weather_vol + wind_volume);
+        const short ambient_indoors = (z < 0)? AMBIENT_VOLUME_UNDERGROUND : AMBIENT_VOLUME_ABOVEGROUND + (weather_vol * 2);
+        const short ambient_outside = (z < 0)? AMBIENT_VOLUME_UNDERGROUND : AMBIENT_VOLUME_ABOVEGROUND + (weather_vol + wind_volume);
         const short minvol_indoors = std::max(SOUND_MINIMUM_VOLUME_FOR_PROPAGATION, static_cast<short>(ambient_indoors - 3000));
         const short minvol_outside = std::max(SOUND_MINIMUM_VOLUME_FOR_PROPAGATION, static_cast<short>(ambient_outside - 3000));
 
@@ -551,9 +555,12 @@ void map::batch_flood_fill_sounds()
         };
 
         // We cycle through all the sounds in the batch que
-        for(sound_event flooded_sound : sound_batch_floodfill_que){
+        for( sound_event flooded_sound : batch_que ){
             // Skip all sounds that do not originate from our zlevel, or that are too far below our ambient volume.
-            if(flooded_sound.origin.z != zlev || dBspl_to_mdBspl(flooded_sound.volume) < (outside_cache[flooded_sound.origin.x][flooded_sound.origin.y])? minvol_outside: minvol_indoors ){
+            if(flooded_sound.origin.z != z || dBspl_to_mdBspl(flooded_sound.volume) < ((outside_cache[flooded_sound.origin.x][flooded_sound.origin.y])? minvol_outside: minvol_indoors) ){
+                if( z == flooded_sound.origin.z && (dBspl_to_mdBspl(flooded_sound.volume) < ((outside_cache[flooded_sound.origin.x][flooded_sound.origin.y])? minvol_outside: minvol_indoors)) ){
+                    num_invalidated_sounds++;
+                }
                 continue;
             }
             // reset our sound details to all zeros.
@@ -667,9 +674,11 @@ void map::batch_flood_fill_sounds()
             // add_msg(m_debug, _("Attempting to add sound_cache with origin %i x: %i y: %i z and source volume %i to sound_caches vector ."), temp_sound_cache.sound.origin.x, temp_sound_cache.sound.origin.y, temp_sound_cache.sound.origin.z, temp_sound_cache.sound.volume );
             sound_caches.push_back( temp_sound_cache );
             // add_msg(m_debug, _("Sound cache added to vector"));
+            num_processed_sounds++;
         }
     }
     batch_que.clear();
+    add_msg(m_debug, _("Batch flood filled %i sounds, %i sounds invalidated during batch processing."), num_processed_sounds, num_invalidated_sounds );
 }
 
 
