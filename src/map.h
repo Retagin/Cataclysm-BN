@@ -307,6 +307,8 @@ struct level_cache {
     // absorption_cache_dirty is for tile sound absorption checking/rebuild purposes.
     // Should be set for a tile position if the tile in question changes significantly, or if a tile feature that affects sound propagation is added/removed.
     std::bitset<MAPSIZE *MAPSIZE> absorption_cache_dirty;
+    // sound_wall_cache is set alongside the absorption cache, and is used during the process for floodfilling sounds.
+    std::bitset<MAPSIZE_X *MAPSIZE_Y> sound_wall_cache;
     bool outside_cache_dirty = false;
     bool floor_cache_dirty = false;
     bool seen_cache_dirty = false;
@@ -461,6 +463,10 @@ class map
         // Should be called whenever a tile's (or its contents) ability to absorb sound significantly changes.
         // For example if wind blocking furniture is added or removed, the tile is set to a tile type with wind blocking, if a tile is set to a type with very high absorption, etc.
         void set_absorption_cache_dirty( const tripoint &p );
+
+        // Sets a tile's sound corner cache to true. The sound_corner cache is used while floodfilling sounds.
+        // We precalculate and cache this as it checked potentially tens of thousands of times for a single sound if it is maximum volume in a complicated area. 
+        void set_sound_wall_cache( const tripoint &p);
 
         // invalidates seen cache for the whole zlevel unconditionally
 

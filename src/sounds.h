@@ -193,7 +193,7 @@ struct enum_traits<sfx::channel> {
 struct sound_event {
     // How loud a sound is at 1 meter away (or how loud an ambient sound is), in Decibels Sound Pressure Level (dB spl, or just dB from now on), 0 - 191
     //
-    // As a general rule, 0-40 dB is very quiet to quiet, 60-80 dB is noisy, 100 dB is very noisy,
+    // As a general rule, 0-40 dB is almost perfectly silent to very quiet, 40-60 is quiet, 60-80 dB is noisy, 100 dB is very noisy,
     // 120 dB is intolerable and is the low threshold for instantaneous hearing loss and pain, 140 dB is the high threshold for pain, 150 dB is garunteed temporary hearing loss, 160 dB is a general ballpark for how loud unsuppressed gunfire is for the shooter, 180+ dB will start to knock humans unconscious and cause injury.
     // Above 191 dB a pressure wave is a supersonic shockwave, and does not get to be a "sound wave" until it ceases being supersonic. Outside of good conditions humans generally will not notice sounds below 20 dB. The ambient noise level of a quiet room is around 40 dB, a quiet street is around 50 dB.
     // For a more detailed example list, see https://www.engineeringtoolbox.com/sound-pressure-d_711.html

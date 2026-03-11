@@ -48,6 +48,7 @@
 #include "fragment_cloud.h"
 #include "fungal_effects.h"
 #include "game.h"
+#include "game_constants.h"
 #include "harvest.h"
 #include "iexamine.h"
 #include "input.h"
@@ -81,6 +82,7 @@
 #include "overmapbuffer.h"
 #include "legacy_pathfinding.h"
 #include "player.h"
+#include "point.h"
 #include "point_float.h"
 #include "projectile.h"
 #include "profile.h"
@@ -279,6 +281,13 @@ void map::set_absorption_cache_dirty( const tripoint &p )
     if( inbounds( p ) ) {
         const tripoint smp = ms_to_sm_copy( p );
         get_cache( smp.z ).absorption_cache_dirty.set( smp.x * MAPSIZE + smp.y );
+    }
+}
+
+void map::set_sound_wall_cache( const tripoint &p)
+{
+    if( inbounds( p ) ) {
+        get_cache( p.z ).sound_wall_cache.set( p.x * MAPSIZE_X + p.y );
     }
 }
 
@@ -9516,6 +9525,7 @@ level_cache::level_cache()
     const int map_dimensions = MAPSIZE_X * MAPSIZE_Y;
     transparency_cache_dirty.set();
     absorption_cache_dirty.set();
+    sound_wall_cache.reset();
     outside_cache_dirty = true;
     floor_cache_dirty = false;
     constexpr four_quadrants four_zeros( 0.0f );
@@ -9580,6 +9590,7 @@ void map::invalidate_map_cache( const int zlev )
         ch.floor_cache_dirty = true;
         ch.transparency_cache_dirty.set();
         ch.absorption_cache_dirty.set();
+        ch.sound_wall_cache.reset();
         ch.seen_cache_dirty = true;
         ch.outside_cache_dirty = true;
         ch.suspension_cache_dirty = true;
