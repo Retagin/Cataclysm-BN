@@ -581,8 +581,8 @@ void map::batch_flood_fill_sounds()
                 // Adj tiles are 0-7
                 for( short i = 0; i < 8; i++ ) {
                     auto &tile = adjacent_tiles[i];
-                    // We should already have caught any sounds that attempt to propagate from an out of bounds location, so now we can just concern ourselves with the map borders.
-                    if( !tile_along_map_border( tile ) ) {
+                    // Lets make sure that we only propagate inbounds, and not along the map border. After this we can just check !tile_along_map_border
+                    if( !tile_along_map_border( tile ) && inbounds( tile ) ) {
                         // Set our initial distance to 2. At the source there is no sound direction distance modifier.
                         sdistance[tile.x][tile.y] = 2;
                         // And set our tile volume based on the distance. We know that the sound origin is atleast 1600mdB.
