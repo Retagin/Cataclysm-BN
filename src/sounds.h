@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
@@ -332,4 +333,61 @@ static constexpr auto sound_direction_propagation_valid = std::array<std::array<
         {true, true, true, true, true, true, true, true}
     }
 };
+// Given a source tile's sound direction as the index, provides an array of which directions are valid to propagate sound to.
+// Member entries a listed in clockwise order. First and last members are subject to a distance penalty.
+// Direction index and adjacent tile index are set such that direction 0 refers to adjacent tile 0, etc.
+// If a tile's direction is set to 8 for any reason, it is invalid to propagate to. 
+// Store this as we iterate through it every time we check a tile's neighboors for update, for potentially hundreds of tiles per sound.
+// We do additional map checking to check for corner invalidation due to walls, but having this stored still helps speed things up.
+// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
+// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
+// [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
+static constexpr auto spropagation_tiles_by_sdirection = std::array<std::array<uint8_t, 5>, 8 >
+{
+    { {6,7,0,1,2},  //Direction "0"
+        {7,0,1,2,3},//Direction "1"
+        {0,1,2,3,4},//Direction "2"
+        {1,2,3,4,5},//Direction "3"
+        {2,3,4,5,6},//Direction "4"
+        {3,4,5,6,7},//Direction "5"
+        {4,5,6,7,0},//Direction "6"
+        {5,6,7,0,1} //Direction "7"
+    }
+};
 
+// Given a direction index, provides which adjacent tile indexes to check for walls. 
+// Only odd direction/adjacent tile indexes are checked for walls, walls directly in the path of travel are not checked for.
+// This means that only two walls are checked for per direction. Walls prevent diagonal sound propagation.
+// Member entries a listed in clockwise order. Direction index and adjacent tile index are set such that direction 0 refers to adjacent tile 0, etc.
+// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
+// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
+// [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
+static constexpr auto wall_check_by_sdirection = std::array<std::pair<uint8_t,uint8_t >, 8>
+{
+    { {7,1},  //Direction "0"
+        {7,3},//Direction "1"
+        {1,3},//Direction "2"
+        {1,5},//Direction "3"
+        {3,5},//Direction "4"
+        {3,7},//Direction "5"
+        {5,7},//Direction "6"
+        {5,1} //Direction "7"
+    }
+};
+// Conversevly, A wall at the given adjacent tile/direction index invalidates propagation through the listed direction index
+// Only cardinal direction walls apply this behavior, but we keep the array the same size for compatability.
+// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
+// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
+// [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
+static constexpr auto wall_sdir_invalidation = std::array<std::pair<uint8_t,uint8_t >, 8>
+{
+    { {7,1},  //Direction "0"
+        {0,2},//Direction "1"
+        {1,3},//Direction "2"
+        {2,4},//Direction "3"
+        {3,5},//Direction "4"
+        {4,6},//Direction "5"
+        {5,7},//Direction "6"
+        {6,0} //Direction "7"
+    }
+};
