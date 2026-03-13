@@ -1599,7 +1599,7 @@ bool game::do_turn()
     // Player is special in that they are immediatly informed of the sounds they made on their turn for displayed sound marker purposes
     // Each sound block is generally a map::cull_heard_sounds(), feeding the AI in question remaining sounds, and then moving said AI.
     if( !soundperf ) {
-        // Cull stale sounds that have been heard by all parties, we need to do this three times per cycle. 
+        // Cull stale sounds that have been heard by all parties, we need to do this three times per cycle.
         // We do this before each respective party's turn to hear noise.
         // This block should catch stale sounds from NPCs.
         m.cull_heard_sounds();
@@ -1707,7 +1707,7 @@ bool game::do_turn()
         // process_sounds_npc also marks all sounds present in the vector as heard by npcs.
         sounds::process_sounds_npc();
     }
-    
+
     if( !npcperf ) {
         npcmove();
     } else {
@@ -4802,7 +4802,7 @@ void game::monmove()
 
 void game::npcmove()
 {
-    
+
     // Active NPC processing.  Extracted from monmove() so it can be
     // individually controlled by SLEEP_SKIP_NPC without affecting monsters.
     for( npc &guy : g->all_npcs() ) {
