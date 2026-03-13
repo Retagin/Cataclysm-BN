@@ -160,28 +160,28 @@ template<>
 struct enum_traits<sfx::channel> {
     static constexpr auto last = sfx::channel::MAX_CHANNEL;
 };
-/** 
-* sound_event to pass to the sounds::sound() to flood fill out the sound or pass ambient noise to the player. 
-* How loud a sound is at the source tile (or how loud an ambient sound is), in Decibels Sound Pressure Level (dB spl, or dB) at a reference distance of 1 meter from the sound source. 
-* Valid input is 0-191. volume must be atleast 20dB to propagate, volumes louder than 191dB will be reduced to 191dB. 
-* See the wall of text below for more context, physics and proper usage if desired. 
-* @param volume 
+/**
+* sound_event to pass to the sounds::sound() to flood fill out the sound or pass ambient noise to the player.
+* How loud a sound is at the source tile (or how loud an ambient sound is), in Decibels Sound Pressure Level (dB spl, or dB) at a reference distance of 1 meter from the sound source.
+* Valid input is 0-191. volume must be atleast 20dB to propagate, volumes louder than 191dB will be reduced to 191dB.
+* See the wall of text below for more context, physics and proper usage if desired.
+* @param volume
 * What is the tripoint position of the sound source?
-* @param origin 
+* @param origin
 * What enum sound category is this?
-* @param category 
+* @param category
 * String description of the sound.
-* @param description 
+* @param description
 * Is this sound from movement?
-* @param movement_noise 
+* @param movement_noise
 * If all three from_xxxx bools are false, a sound qualifies to be ambient noise.
 * Did the player make this noise?
-* @param from_player 
+* @param from_player
 * Did a monster make this noise?
 * @param from_monster
 * Did an NPC make this noise?
 * @param from_npc
-* ID and variant are used to select what SFX audio to play 
+* ID and variant are used to select what SFX audio to play
 * @param id
 * @param variant
 * faction and monfaction are the source creature's NPC and monster factions respectively. Do not set for sounds that are not from a creature.
@@ -193,16 +193,16 @@ struct sound_event {
     // In real life if the volume of a sound is expressed in dB, it almost certainly is refering to dB spl or its a speaker manufacturer trying to impress with similarly named but unapplicable units.
     //
     // 0 dB spl reference is 2x10^-5 Pascals, which is an accademic and industry standard. This is the threshold of human hearing at 1kHz.
-    // As a general rule, 0-40 dB is almost perfectly silent to very quiet, 
-    // 40-60 is quiet, 
-    // 60-80 dB is noisy, 
+    // As a general rule, 0-40 dB is almost perfectly silent to very quiet,
+    // 40-60 is quiet,
+    // 60-80 dB is noisy,
     // 100 dB is very noisy,
-    // 120 dB is intolerable and is the low threshold for instantaneous hearing loss and pain, 
-    // 140 dB is the high threshold for pain, 
-    // 150 dB is garunteed temporary hearing loss, 
-    // 160 dB is a general ballpark for how loud unsuppressed gunfire is for the shooter, 
+    // 120 dB is intolerable and is the low threshold for instantaneous hearing loss and pain,
+    // 140 dB is the high threshold for pain,
+    // 150 dB is garunteed temporary hearing loss,
+    // 160 dB is a general ballpark for how loud unsuppressed gunfire is for the shooter,
     // 180+ dB will start to knock humans unconscious and cause injury.
-    // Above 191 dB a pressure wave is a supersonic shockwave, and does not get to be a "sound wave" until it ceases being supersonic. 
+    // Above 191 dB a pressure wave is a supersonic shockwave, and does not get to be a "sound wave" until it ceases being supersonic.
     // Outside of good conditions humans generally will not notice sounds below 20 dB. The ambient noise level of a quiet room is around 40 dB, a quiet street is around 50 dB.
     // For a more detailed example list, see https://www.engineeringtoolbox.com/sound-pressure-d_711.html
     //
@@ -304,7 +304,7 @@ static constexpr auto dist_vol_loss = std::array<short, 122>
 // Given a source tile's sound direction as the index, provides an array of which directions are valid to propagate sound to.
 // Member entries a listed in clockwise order. First and last members are subject to a distance penalty.
 // Direction index and adjacent tile index are set such that direction 0 refers to adjacent tile 0, etc.
-// If a tile's direction is set to 8 for any reason, it is invalid to propagate to. 
+// If a tile's direction is set to 8 for any reason, it is invalid to propagate to.
 // Store this as we iterate through it every time we check a tile's neighboors for update, for potentially hundreds of tiles per sound.
 // We do additional map checking to check for corner invalidation due to walls, but having this stored still helps speed things up.
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
@@ -312,34 +312,34 @@ static constexpr auto dist_vol_loss = std::array<short, 122>
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
 static constexpr auto spropagation_tiles_by_sdirection = std::array<std::array<uint8_t, 5>, 8 >
 {
-    { {6,7,0,1,2},  //Direction "0"
-        {7,0,1,2,3},//Direction "1"
-        {0,1,2,3,4},//Direction "2"
-        {1,2,3,4,5},//Direction "3"
-        {2,3,4,5,6},//Direction "4"
-        {3,4,5,6,7},//Direction "5"
-        {4,5,6,7,0},//Direction "6"
-        {5,6,7,0,1} //Direction "7"
+    { {6, 7, 0, 1, 2}, //Direction "0"
+        {7, 0, 1, 2, 3}, //Direction "1"
+        {0, 1, 2, 3, 4}, //Direction "2"
+        {1, 2, 3, 4, 5}, //Direction "3"
+        {2, 3, 4, 5, 6}, //Direction "4"
+        {3, 4, 5, 6, 7}, //Direction "5"
+        {4, 5, 6, 7, 0}, //Direction "6"
+        {5, 6, 7, 0, 1} //Direction "7"
     }
 };
 
-// Given a direction index, provides which adjacent tile indexes to check for walls. 
+// Given a direction index, provides which adjacent tile indexes to check for walls.
 // Only odd direction/adjacent tile indexes are checked for walls, walls directly in the path of travel are not checked for.
 // This means that only two walls are checked for per direction. Walls prevent diagonal sound propagation.
 // Member entries a listed in clockwise order. Direction index and adjacent tile index are set such that direction 0 refers to adjacent tile 0, etc.
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
-static constexpr auto wall_check_by_sdirection = std::array<std::pair<uint8_t,uint8_t >, 8>
+static constexpr auto wall_check_by_sdirection = std::array<std::pair<uint8_t, uint8_t >, 8>
 {
-    { {7,1},  //Direction "0"
-        {7,3},//Direction "1"
-        {1,3},//Direction "2"
-        {1,5},//Direction "3"
-        {3,5},//Direction "4"
-        {3,7},//Direction "5"
-        {5,7},//Direction "6"
-        {5,1} //Direction "7"
+    { {7, 1}, //Direction "0"
+        {7, 3}, //Direction "1"
+        {1, 3}, //Direction "2"
+        {1, 5}, //Direction "3"
+        {3, 5}, //Direction "4"
+        {3, 7}, //Direction "5"
+        {5, 7}, //Direction "6"
+        {5, 1} //Direction "7"
     }
 };
 // Conversevly, A wall at the given adjacent tile/direction index invalidates propagation through the listed direction index
@@ -347,15 +347,15 @@ static constexpr auto wall_check_by_sdirection = std::array<std::pair<uint8_t,ui
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
-static constexpr auto wall_sdir_invalidation = std::array<std::pair<uint8_t,uint8_t >, 8>
+static constexpr auto wall_sdir_invalidation = std::array<std::pair<uint8_t, uint8_t >, 8>
 {
-    { {7,1},  //Direction "0"
-        {0,2},//Direction "1"
-        {1,3},//Direction "2"
-        {2,4},//Direction "3"
-        {3,5},//Direction "4"
-        {4,6},//Direction "5"
-        {5,7},//Direction "6"
-        {6,0} //Direction "7"
+    { {7, 1}, //Direction "0"
+        {0, 2}, //Direction "1"
+        {1, 3}, //Direction "2"
+        {2, 4}, //Direction "3"
+        {3, 5}, //Direction "4"
+        {4, 6}, //Direction "5"
+        {5, 7}, //Direction "6"
+        {6, 0} //Direction "7"
     }
 };

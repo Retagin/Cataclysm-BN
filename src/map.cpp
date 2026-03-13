@@ -289,7 +289,7 @@ void map::set_absorption_cache_dirty( const tripoint &p )
     }
 }
 
-void map::set_sound_wall_cache( const tripoint &p)
+void map::set_sound_wall_cache( const tripoint &p )
 {
     if( inbounds( p ) ) {
         get_cache( p.z ).sound_wall_cache.set( p.x * MAPSIZE_X + p.y );

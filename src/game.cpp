@@ -4816,7 +4816,7 @@ void game::monmove()
 
 void game::npcmove()
 {
-  if( !soundperf ) {
+    if( !soundperf ) {
         // Apply remaining sounds to NPC AI here so that they are reacting to the most recent monster noises and player noises, not recent player noises and prior turn monster noises.
         sounds::process_sounds_npc();
     }

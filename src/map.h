@@ -467,8 +467,8 @@ class map
         void set_absorption_cache_dirty( const tripoint &p );
 
         // Sets a tile's sound corner cache to true. The sound_corner cache is used while floodfilling sounds.
-        // We precalculate and cache this as it checked potentially tens of thousands of times for a single sound if it is maximum volume in a complicated area. 
-        void set_sound_wall_cache( const tripoint &p);
+        // We precalculate and cache this as it checked potentially tens of thousands of times for a single sound if it is maximum volume in a complicated area.
+        void set_sound_wall_cache( const tripoint &p );
 
         // invalidates seen cache for the whole zlevel unconditionally
 
