@@ -81,11 +81,11 @@
         "-+-------GggggG-------+-",
         ".......................-",
         ".......................-",
-        ".CCCCxxxxx....xCCxxCCCx-",
+        ".CCCCxxxxA....ACCxxCCCx-",
         "........................"
       ],
       "palettes": [ "lab_palette", "lab_loot_research" ],
-      "furniture": { "R": "f_rack", "D": "f_desk" },
+      "furniture": { "R": "f_rack", "D": "f_desk", "A": "f_artifact_analyzer_console" },
       "fields": { "Q": { "field": "fd_fatigue", "intensity": 3 } },
       "mapping": {
         "R": { "item": [ { "item": "dimensional_anchor" }, { "item": "phase_immersion_suit" } ] },
@@ -289,9 +289,9 @@
       "mapping": {
         "r": { "item": [ { "item": "plut_cell", "chance": 100, "repeat": [ 3, 8 ] } ] },
         "R": {
-          "item": [
+          "items": [
+            { "item": "ammo_heavy_batteries_full", "chance": 100 },
             { "item": "UPS_off", "chance": 100 },
-            { "item": "heavy_battery_cell", "chance": 100 },
             { "item": "v29", "chance": 100 },
             { "item": "laser_rifle", "chance": 100 },
             { "item": "plasma_gun", "chance": 100 },

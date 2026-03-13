@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <fstream>
 
 #include "action.h"
 #include "artifact.h"
@@ -32,6 +33,8 @@
 #include "cata_utility.h"
 #include "catacharset.h"
 #include "catalua.h"
+#include "catalua_hooks.h"
+#include "catalua_sol.h"
 #include "character.h"
 #include "character_display.h"
 #include "character_id.h"
@@ -78,6 +81,7 @@
 #include "overmap.h"
 #include "overmap_ui.h"
 #include "overmapbuffer.h"
+#include "path_info.h"
 #include "pimpl.h"
 #include "player.h"
 #include "pldata.h"
@@ -1550,6 +1554,12 @@ void debug()
             faction *new_solo_fac = g->faction_manager_ptr->add_new_faction( temp->name,
                                     faction_id( new_fac_id ), faction_id( "no_faction" ) );
             temp->set_fac( new_solo_fac ? new_solo_fac->id : faction_id( "no_faction" ) );
+            cata::run_hooks( "on_creature_spawn", [&]( sol::table & params ) {
+                params["creature"] = temp.get();
+            } );
+            cata::run_hooks( "on_npc_spawn", [&]( sol::table & params ) {
+                params["npc"] = temp.get();
+            } );
             g->load_npcs();
         }
         break;
@@ -2255,21 +2265,15 @@ void debug()
                 break;
             }
             const vehicle &veh = v_part_pos->vehicle();
-            std::stringstream ss;
+            auto ss = std::ofstream( PATH_INFO::config_dir() + veh.name + ".json" );
             JsonOut json( ss, true );
+            json.start_array();
             json_export::vehicle( json, veh );
+            json.end_array();
 
             // write to log
-            DebugLog( DL::Info, DC::Main ) << " JSON TEMPLATE EXPORT:\n" << ss.str();
-            std::string popup_msg = _( "JSON template written to debug.log" );
-#if defined(TILES)
-            // copy to clipboard
-            const int clipboard_result = SDL_SetClipboardText( ss.str().c_str() );
-            printErrorIf( clipboard_result != 0, "Error while exporting JSON to the clipboard." );
-            if( clipboard_result == 0 ) {
-                popup_msg += _( " and to the clipboard." );
-            }
-#endif
+            ss.close();
+            std::string popup_msg = _( "JSON template written to " + veh.name + ".json" );
             popup( popup_msg );
             break;
         }
