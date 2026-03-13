@@ -1599,25 +1599,17 @@ bool game::do_turn()
     // Player is special in that they are immediatly informed of the sounds they made on their turn for displayed sound marker purposes
     // Each sound block is generally a map::cull_heard_sounds(), feeding the AI in question remaining sounds, and then moving said AI.
     if( !soundperf ) {
-        // Process NPC sound events from the prior turn before they move or they hear themselves talking,
-        // to prevent an infinite react to sound loop as npcs can react and announce that they hear another npc, who was react-announcing that they heard another npc talking, etc. etc.
-        // NPCs check map::sound_caches for the relative volumes of sound_event(s) in their tile instead of referencing sound markers.
-        // for( npc &guy : all_npcs() ) {
-        //     if( rl_dist( guy.pos(), u.pos() ) < MAX_VIEW_DISTANCE ) {
-        //         sounds::process_sounds_npc( &guy );
-        //     }
-        // }
-
-        // Cull sounds that have been heard by . we need to do this three times per cycle, one instance is invoked in monmove()
+        // Cull stale sounds that have been heard by all parties, we need to do this three times per cycle. 
+        // We do this before each respective party's turn to hear noise.
+        // This block should catch stale sounds from NPCs.
         m.cull_heard_sounds();
+        // Process sound events into sound markers for display to the player.
         sounds::process_sound_markers( &u );
 
         if( u.is_deaf() ) {
             sfx::do_hearing_loss();
         }
     }
-
-    // Process sound events into sound markers for display to the player.
 
     if( !u.has_effect( effect_sleep ) || uquit == QUIT_WATCH ) {
         if( u.moves > 0 || uquit == QUIT_WATCH ) {
@@ -1626,12 +1618,6 @@ bool game::do_turn()
                 mon_info_update();
                 // Process any new sounds the player caused during their turn.
                 if( !soundperf ) {
-                    // NPCs get to hear sounds just before their turn, not twice.
-                    // for( npc &guy : all_npcs() ) {
-                    //     if( rl_dist( guy.pos(), u.pos() ) < MAX_VIEW_DISTANCE ) {
-                    //         sounds::process_sound_markers( &guy );
-                    //     }
-                    // }
                     sounds::process_sound_markers( &u );
                 }
                 if( !u.activity && !u.has_distant_destination() && uquit != QUIT_WATCH && wait_popup ) {
@@ -1698,18 +1684,30 @@ bool game::do_turn()
     grid_tracker_ptr->update( calendar::turn );
     fluid_grid::update( calendar::turn );
 
-    // Cull sounds that have been heard by all AIs. Should nominally catch all sounds made by the player on the prior turn.
-    m.cull_heard_sounds();
-    // Apply sounds from previous turn to monster AI.
-    // Because of turn order wierdness, we apply active sounds to NPC AI as part of monmove() just before NPCs act so that they can respond to sounds that monsters make .
-    // Process sounds marks all sounds in the sound_caches vector as heard by monsters.
-    sounds::process_sounds();
-    // Update vision caches for monsters. If this turns out to be expensive,
-    // consider a stripped down cache just for monsters.
     m.build_map_cache( get_levz(), true );
+
+    if( !soundperf ) {
+        // Cull stale sounds that have been heard by everyone. Should nominally catch all stale sounds made by the player on the prior turn.
+        m.cull_heard_sounds();
+        // Apply sounds from previous turn to monster AI.
+        // Process sounds marks all sounds in the sound_caches vector as heard by monsters.
+        sounds::process_sounds();
+    }
+
     if( !monperf ) {
         monmove();
     }
+
+    if( !soundperf ) {
+        // Cull any noises that have already been heard by everyone. This should generally cull all stale sounds made by monsters on the prior turn.
+        m.cull_heard_sounds();
+        // Batch floodfill sounds made by monsters or other qued sources.
+        m.batch_flood_fill_sounds();
+        // Apply remaining sounds to NPC AI here so that they are reacting to the most recent monster noises and player noises, not recent player noises and prior turn monster noises.
+        // process_sounds_npc also marks all sounds present in the vector as heard by npcs.
+        sounds::process_sounds_npc();
+    }
+    
     if( !npcperf ) {
         npcmove();
     } else {
@@ -4454,9 +4452,6 @@ void game::monmove()
 {
     ZoneScoped;
     cleanup_dead();
-    // we need this for the sound logic for NPCs.
-    const bool asleep = u.in_sleep_state();
-    const auto soundperf = asleep && get_option<bool>( "SLEEP_SKIP_SOUND" );
 
     // P-8: clear the per-turn sight cache at the top of every monmove() call
     // so results from the previous turn are not reused.
@@ -4802,24 +4797,12 @@ void game::monmove()
             despawn_monster( critter );
         }
     }
-
-    if( !soundperf ) {
-        // Cull any noises that have already been heard by everyone. This should generally cull all sounds made by monsters on the prior turn.
-        m.cull_heard_sounds();
-        // Batch floodfill sounds made by monsters or other qued sources.
-        m.batch_flood_fill_sounds();
-    }
-
-    // Now, do active NPCs.
     cleanup_dead();
 }
 
 void game::npcmove()
 {
-    if( !soundperf ) {
-        // Apply remaining sounds to NPC AI here so that they are reacting to the most recent monster noises and player noises, not recent player noises and prior turn monster noises.
-        sounds::process_sounds_npc();
-    }
+    
     // Active NPC processing.  Extracted from monmove() so it can be
     // individually controlled by SLEEP_SKIP_NPC without affecting monsters.
     for( npc &guy : g->all_npcs() ) {
