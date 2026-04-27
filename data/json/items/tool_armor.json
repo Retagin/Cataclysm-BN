@@ -69,7 +69,8 @@
     "color": "light_gray",
     "coverage": 1,
     "material_thickness": 1,
-    "flags": [ "DEAF", "OVERSIZE", "POWERARMOR_COMPATIBLE" ]
+    "hearing_protection": 12,
+    "flags": [ "OVERSIZE", "POWERARMOR_COMPATIBLE" ]
   },
   {
     "id": "gobag",
@@ -2608,7 +2609,7 @@
     "color": "blue",
     "name": { "str_sp": "shooter's earmuffs" },
     "description": "A pair of earmuffs favored by shooters.  Without batteries or when turned off they function like normal earmuffs and block all sound.  They will block sounds over a certain decibel amount when turned on.  The earmuffs are currently off.",
-    "flags": [ "DEAF", "OVERSIZE", "BELTED", "ALLOWS_NATURAL_ATTACKS", "COMBAT_NPC_USE" ],
+    "flags": [ "OVERSIZE", "BELTED", "ALLOWS_NATURAL_ATTACKS", "COMBAT_NPC_USE" ],
     "price": "125 USD",
     "price_postapoc": "750 cent",
     "material": [ "plastic" ],
@@ -2629,6 +2630,7 @@
     "encumbrance": 5,
     "coverage": 10,
     "material_thickness": 2,
+    "hearing_protection": 12,
     "magazines": [
       [
         "battery",
@@ -2657,7 +2659,8 @@
     "revert_to": "powered_earmuffs",
     "use_action": { "type": "transform", "menu_text": "Turn off", "msg": "The %s flicks off.", "target": "powered_earmuffs" },
     "extend": { "flags": [ "PARTIAL_DEAF", "COMBAT_NPC_ON" ] },
-    "delete": { "flags": [ "DEAF" ] }
+    "hearing_protection": 6,
+    "adv_hearing_protection": 20
   },
   {
     "id": "stethoscope",
@@ -3032,7 +3035,8 @@
       "target": "attached_ear_plugs_off",
       "menu_text": "Unplug",
       "need_worn": true
-    }
+    },
+    "hearing_protection": 12
   },
   {
     "id": "attached_ear_plugs_off",
@@ -3048,7 +3052,7 @@
       "menu_text": "Plug in",
       "need_worn": true
     },
-    "delete": { "flags": [ "DEAF" ] }
+    "hearing_protection": 0
   },
   {
     "id": "mask_halfsurvivor",
