@@ -203,16 +203,11 @@
     },
     {
       "name": "osx-arm-dist",
-      "inherits": ["osx-arm-slim"],
+      "inherits": [ "osx-arm-slim" ],
       "binaryDir": "${sourceDir}/build",
       "displayName": "macOS ARM Distribution (Tiles, Sounds, Languages)",
       "description": "For creating portable macOS ARM distribution packages with tiles and sound.",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "LANGUAGES": "all",
-        "BACKTRACE": "ON",
-        "JSON_FORMAT": "ON"
-      }
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "LANGUAGES": "all", "BACKTRACE": "ON", "JSON_FORMAT": "ON" }
     },
     {
       "name": "lint",
@@ -284,10 +279,25 @@
   ],
   "buildPresets": [
     {
-      "name": "windows-msvc-build",
+      "name": "windows-msvc-debug",
       "configurePreset": "windows-tiles-sounds-x64-msvc",
+      "configuration": "Debug",
       "targets": [ "cataclysm-bn-tiles", "cata_test-tiles", "json_formatter", "translations" ],
-      "description": "Build for Windows with tiles and sounds using MSVC."
+      "description": "Debug build for Windows with tiles and sounds using MSVC."
+    },
+    {
+      "name": "windows-msvc-release",
+      "configurePreset": "windows-tiles-sounds-x64-msvc",
+      "configuration": "Release",
+      "targets": [ "cataclysm-bn-tiles", "cata_test-tiles", "json_formatter", "translations" ],
+      "description": "Release build for Windows with tiles and sounds using MSVC."
+    },
+    {
+      "name": "windows-msvc-relwithdebinfo",
+      "configurePreset": "windows-tiles-sounds-x64-msvc",
+      "configuration": "RelWithDebInfo",
+      "targets": [ "cataclysm-bn-tiles", "cata_test-tiles", "json_formatter", "translations" ],
+      "description": "Release build with debug symbols for Windows with tiles and sounds using MSVC."
     },
     {
       "name": "linux-curses",
@@ -334,7 +344,7 @@
     {
       "name": "osx-arm-dist",
       "configurePreset": "osx-arm-dist",
-      "targets": ["cataclysm-bn-tiles", "json_formatter", "translations"],
+      "targets": [ "cataclysm-bn-tiles", "json_formatter", "translations" ],
       "description": "Build for macOS ARM tiles distribution."
     },
     {

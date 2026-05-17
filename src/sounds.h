@@ -54,6 +54,7 @@ void sound( const sound_event &soundevent );
 
 /* Make sure the sounds are all reset when we start a new game. */
 void reset_sounds();
+/* Reset the sound markers in the player UI so sounds do not blot out everything else. Call this after processing player input, not at the end of every turn. */
 void reset_markers();
 
 // Methods for processing sound events

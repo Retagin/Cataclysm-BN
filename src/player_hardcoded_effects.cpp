@@ -266,8 +266,8 @@ static void eff_fun_hallu( player &u, effect &it )
 
             ///\EFFECT_INT_NPC decreases volume of hallucination sounds
             int loudness = 60 + u.str_cur - u.int_cur;
-            loudness = ( loudness > 30 ? loudness : 30 );
-            loudness = ( loudness < 90 ? loudness : 90 );
+            loudness = std::min(90, std::max(30, loudness));
+
             sound_event se;
             se.origin = u.pos();
             se.volume = loudness;
@@ -634,7 +634,7 @@ void Character::hardcoded_effects( effect &it )
                 if( has_psy_protection( *this, 4 ) ) {
                     add_msg_if_player( m_bad, _( "You feel something probing your mind, but it is rebuffed!" ) );
                 } else {
-                    add_msg_if_player( m_bad, _( "A terrifying image in the back out your mind paralyzes you." ) );
+                    add_msg_if_player( m_bad, _( "A terrifying image in the back of your mind paralyzes you." ) );
                     add_effect( effect_fearparalyze, 5_turns );
                     moves -= 4 * get_speed();
                 }
@@ -794,9 +794,9 @@ void Character::hardcoded_effects( effect &it )
         if( one_in( 5000 ) ) {
             add_msg_if_player( m_bad, _( "A strange sound reverberates around the edges of reality." ) );
             // Comparable to the humming anomaly trap, with a narrower range
-            int volume = rng( 25, 150 );
+            int volume = rng( 40, 125);
             std::string sfx;
-            if( volume <= 50 ) {
+            if( volume <= 60 ) {
                 sfx = _( "hrmmm" );
             } else if( volume <= 100 ) {
                 sfx = _( "HRMMM" );

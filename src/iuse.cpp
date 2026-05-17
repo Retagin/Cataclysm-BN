@@ -121,6 +121,7 @@
 #include "vehicle_part.h"
 #include "vehicle_selector.h"
 #include "visitable.h"
+#include "skill.h"
 #include "vpart_position.h"
 #include "vpart_range.h"
 #include "weather.h"
@@ -341,6 +342,7 @@ static const mongroup_id GROUP_FISH( "GROUP_FISH" );
 static const mtype_id mon_bee( "mon_bee" );
 static const mtype_id mon_blob( "mon_blob" );
 static const mtype_id mon_dog_thing( "mon_dog_thing" );
+static const mtype_id mon_duck( "mon_duck" );
 static const mtype_id mon_fly( "mon_fly" );
 static const mtype_id mon_hologram( "mon_hologram" );
 static const mtype_id mon_shadow( "mon_shadow" );
@@ -1686,7 +1688,8 @@ int iuse::good_fishing_spot( tripoint pos )
     int fishable_locations = g->get_fishable_locations( 60, pos ).size();
     map &here = get_map();
     const oter_id &cur_omt =
-        overmap_buffer.ter( tripoint_abs_omt( ms_to_omt_copy( here.getabs( pos ) ) ) );
+        get_overmapbuffer( get_map().get_bound_dimension() ).ter( tripoint_abs_omt( ms_to_omt_copy(
+                    here.getabs( pos ) ) ) );
     std::string om_id = cur_omt.id().c_str();
     if( fishable_locations < 100 && !g->m.has_flag( "CURRENT", pos ) &&
         om_id.find( "river_" ) == std::string::npos && !cur_omt->is_lake() &&
@@ -2064,7 +2067,7 @@ int iuse::directional_antenna( player *p, item *it, bool, const tripoint & )
     }
     const item &radio = *radios.front();
     // Find the radio station its tuned to (if any)
-    const auto tref = overmap_buffer.find_radio_station( radio.frequency );
+    const auto tref = get_overmapbuffer( p->get_dimension() ).find_radio_station( radio.frequency );
     if( !tref ) {
         p->add_msg_if_player( m_info, _( "You can't find the direction if your radio isn't tuned." ) );
         return 0;
@@ -2082,7 +2085,7 @@ int iuse::radio_on( player *p, item *it, bool t, const tripoint &pos )
     if( t ) {
         // Normal use
         std::string message = _( "Radio: Kssssssssssssh." );
-        const auto tref = overmap_buffer.find_radio_station( it->frequency );
+        const auto tref = get_overmapbuffer( p->get_dimension() ).find_radio_station( it->frequency );
         if( tref ) {
             const auto selected_tower = tref.tower;
             if( selected_tower->type == radio_type::MESSAGE_BROADCAST ) {
@@ -2138,7 +2141,7 @@ int iuse::radio_on( player *p, item *it, bool t, const tripoint &pos )
                 const int old_frequency = it->frequency;
                 const radio_tower *lowest_tower = nullptr;
                 const radio_tower *lowest_larger_tower = nullptr;
-                for( auto &tref : overmap_buffer.find_all_radio_stations() ) {
+                for( auto &tref : get_overmapbuffer( p->get_dimension() ).find_all_radio_stations() ) {
                     const auto new_frequency = tref.tower->frequency;
                     if( new_frequency == old_frequency ) {
                         continue;
@@ -3275,6 +3278,28 @@ int iuse::throwable_extinguisher_act( player *, item *it, bool, const tripoint &
     return 0;
 }
 
+/// Apply a debug grenade skill buff or nerf to a random valid skill.
+enum class debug_grenade_skill_modifier_type {
+    buff,
+    nerf
+};
+static auto apply_debug_grenade_skill_modifier( Character &ch,
+        const debug_grenade_skill_modifier_type mode ) -> void
+{
+    const skill_id skill = Skill::random_skill();
+    if( !skill ) {
+        return;
+    }
+    const bool buff = ( mode == debug_grenade_skill_modifier_type::buff );
+    const int current_level = ch.get_skill_level( skill );
+    const int cap = buff ? MAX_SKILL - current_level : current_level;
+    if( cap <= 0 ) {
+        return;
+    }
+    const int change = 1;
+    ch.mod_skill_level( skill, buff ? change : -change );
+}
+
 int iuse::debug_grenade( player *p, item *it, bool, const tripoint & )
 {
     p->add_msg_if_player( _( "You pull the pin on the %s." ), it->tname() );
@@ -3307,10 +3332,10 @@ int iuse::debug_grenade_act( player *p, item *it, bool t, const tripoint &pos )
 
     if( it->charges == 0 ) { // When that timer runs down...
         int explosion_radius = 3;
-        int effect_roll = rng( 1, 5 );
+        int effect_roll = rng( 1, 6 );
         auto buff_stat = [&]( int &current_stat, int modify_by ) {
-            auto modified_stat = current_stat + modify_by;
-            current_stat = std::max( current_stat, std::min( 15, modified_stat ) );
+            const auto modified_stat = current_stat + modify_by;
+            current_stat = std::max( current_stat, modified_stat );
         };
         sound_event se;
         se.origin = pos;
@@ -3342,22 +3367,23 @@ int iuse::debug_grenade_act( player *p, item *it, bool t, const tripoint &pos )
                             critter.get_speed_base() * rng_float( 1.1, 2.0 ) );
                         critter.set_hp( critter.get_hp() * rng_float( 1.1, 2.0 ) );
                     } else if( npc *const person = g->critter_at<npc>( dest ) ) {
-                        /** @EFFECT_STR_MAX increases possible granade str buff for NPCs */
+                        /** @EFFECT_STR_MAX increases possible str buff for NPCs */
                         buff_stat( person->str_max, rng( 0, person->str_max / 2 ) );
-                        /** @EFFECT_DEX_MAX increases possible granade dex buff for NPCs */
+                        /** @EFFECT_DEX_MAX increases possible dex buff for NPCs */
                         buff_stat( person->dex_max, rng( 0, person->dex_max / 2 ) );
-                        /** @EFFECT_INT_MAX increases possible granade int buff for NPCs */
+                        /** @EFFECT_INT_MAX increases possible int buff for NPCs */
                         buff_stat( person->int_max, rng( 0, person->int_max / 2 ) );
-                        /** @EFFECT_PER_MAX increases possible granade per buff for NPCs */
+                        /** @EFFECT_PER_MAX increases possible per buff for NPCs */
                         buff_stat( person->per_max, rng( 0, person->per_max / 2 ) );
+                        apply_debug_grenade_skill_modifier( *person, debug_grenade_skill_modifier_type::buff );
                     } else if( g->u.pos() == dest ) {
-                        /** @EFFECT_STR_MAX increases possible granade str buff */
+                        /** @EFFECT_STR_MAX increases possible str buff */
                         buff_stat( g->u.str_max, rng( 0, g->u.str_max / 2 ) );
-                        /** @EFFECT_DEX_MAX increases possible granade dex buff */
+                        /** @EFFECT_DEX_MAX increases possible dex buff */
                         buff_stat( g->u.dex_max, rng( 0, g->u.dex_max / 2 ) );
-                        /** @EFFECT_INT_MAX increases possible granade int buff */
+                        /** @EFFECT_INT_MAX increases possible int buff */
                         buff_stat( g->u.int_max, rng( 0, g->u.int_max / 2 ) );
-                        /** @EFFECT_PER_MAX increases possible granade per buff */
+                        /** @EFFECT_PER_MAX increases possible per buff */
                         buff_stat( g->u.per_max, rng( 0, g->u.per_max / 2 ) );
                         g->u.recalc_hp();
                         for( const bodypart_id &bp : g->u.get_all_body_parts() ) {
@@ -3367,6 +3393,7 @@ int iuse::debug_grenade_act( player *p, item *it, bool t, const tripoint &pos )
                                 g->u.set_part_hp_cur( bp, hp_max );
                             }
                         }
+                        apply_debug_grenade_skill_modifier( g->u, debug_grenade_skill_modifier_type::buff );
                     }
                 }
                 break;
@@ -3382,22 +3409,23 @@ int iuse::debug_grenade_act( player *p, item *it, bool t, const tripoint &pos )
                             rng( 0, critter.get_speed_base() ) );
                         critter.set_hp( rng( 1, critter.get_hp() ) );
                     } else if( npc *const person = g->critter_at<npc>( dest ) ) {
-                        /** @EFFECT_STR_MAX increases possible granade str debuff for NPCs (NEGATIVE) */
+                        /** @EFFECT_STR_MAX increases possible str debuff for NPCs (NEGATIVE) */
                         person->str_max -= rng( 0, person->str_max / 2 );
-                        /** @EFFECT_DEX_MAX increases possible granade dex debuff for NPCs (NEGATIVE) */
+                        /** @EFFECT_DEX_MAX increases possible dex debuff for NPCs (NEGATIVE) */
                         person->dex_max -= rng( 0, person->dex_max / 2 );
-                        /** @EFFECT_INT_MAX increases possible granade int debuff for NPCs (NEGATIVE) */
+                        /** @EFFECT_INT_MAX increases possible int debuff for NPCs (NEGATIVE) */
                         person->int_max -= rng( 0, person->int_max / 2 );
-                        /** @EFFECT_PER_MAX increases possible granade per debuff for NPCs (NEGATIVE) */
+                        /** @EFFECT_PER_MAX increases possible per debuff for NPCs (NEGATIVE) */
                         person->per_max -= rng( 0, person->per_max / 2 );
+                        apply_debug_grenade_skill_modifier( *person, debug_grenade_skill_modifier_type::nerf );
                     } else if( g->u.pos() == dest ) {
-                        /** @EFFECT_STR_MAX increases possible granade str debuff (NEGATIVE) */
+                        /** @EFFECT_STR_MAX increases possible str debuff (NEGATIVE) */
                         g->u.str_max -= rng( 0, g->u.str_max / 2 );
-                        /** @EFFECT_DEX_MAX increases possible granade dex debuff (NEGATIVE) */
+                        /** @EFFECT_DEX_MAX increases possible dex debuff (NEGATIVE) */
                         g->u.dex_max -= rng( 0, g->u.dex_max / 2 );
-                        /** @EFFECT_INT_MAX increases possible granade int debuff (NEGATIVE) */
+                        /** @EFFECT_INT_MAX increases possible int debuff (NEGATIVE) */
                         g->u.int_max -= rng( 0, g->u.int_max / 2 );
-                        /** @EFFECT_PER_MAX increases possible granade per debuff (NEGATIVE) */
+                        /** @EFFECT_PER_MAX increases possible per debuff (NEGATIVE) */
                         g->u.per_max -= rng( 0, g->u.per_max / 2 );
                         g->u.recalc_hp();
                         for( const bodypart_id &bp : g->u.get_all_body_parts() ) {
@@ -3406,6 +3434,7 @@ int iuse::debug_grenade_act( player *p, item *it, bool t, const tripoint &pos )
                                 g->u.set_part_hp_cur( bp, rng( 1, hp_cur ) );
                             }
                         }
+                        apply_debug_grenade_skill_modifier( g->u, debug_grenade_skill_modifier_type::nerf );
                     }
                 }
                 break;
@@ -3434,7 +3463,18 @@ int iuse::debug_grenade_act( player *p, item *it, bool t, const tripoint &pos )
                 explosion_handler::draw_explosion( pos, explosion_radius, c_yellow, "explosion" );
                 for( const tripoint &dest : g->m.points_in_radius( pos, explosion_radius ) ) {
                     if( one_in( 5 ) && !g->critter_at( dest ) ) {
-                        g->m.add_field( dest, fd_bees, rng( 1, 3 ) );
+                        g->place_critter_at( mon_duck, dest );;
+                    }
+                }
+                break;
+            case 6:
+                add_msg( m_info, _( "\"EEPY!\"" ) );
+                explosion_handler::draw_explosion( pos, explosion_radius, c_magenta, "explosion" );
+                for( const tripoint &dest : g->m.points_in_radius( pos, explosion_radius ) ) {
+                    if( npc *const person = g->critter_at<npc>( dest ) ) {
+                        person->fall_asleep( 5_minutes );
+                    } else if( g->u.pos() == dest ) {
+                        g->u.fall_asleep( 5_minutes );
                     }
                 }
                 break;
@@ -4847,7 +4887,7 @@ int iuse::artifact( player *p, item *it, bool, const tripoint & )
 
             case AEA_MAP: {
                 const tripoint_abs_omt center = p->global_omt_location();
-                const bool new_map = overmap_buffer.reveal( center.xy(), 20, center.z() );
+                const bool new_map = get_overmapbuffer( p->get_dimension() ).reveal( center.xy(), 20, center.z() );
                 if( new_map ) {
                     p->add_msg_if_player( m_warning, _( "You have a vision of the surrounding area…" ) );
                     p->moves -= to_moves<int>( 1_seconds );
@@ -5691,7 +5731,10 @@ auto get_hackable_friendly_monsters( game &game_ref ) -> std::vector<shared_ptr_
     auto monsters = game_ref.all_monsters();
     auto &items = monsters.items;
     auto results = std::vector<shared_ptr_fast<monster>> {};
-    std::ranges::for_each( items, [&]( const auto & weak_monster ) {
+    if( !items ) {
+        return results;
+    }
+    std::ranges::for_each( *items, [&]( const auto & weak_monster ) {
         auto current = weak_monster.lock();
         if( !current || current->is_dead() ) {
             return;
@@ -7008,7 +7051,8 @@ static extended_photo_def photo_def_for_camera_point( const tripoint &aim_point,
 
     // TODO: fix point types
     const oter_id &cur_ter =
-        overmap_buffer.ter( tripoint_abs_omt( ms_to_omt_copy( g->m.getabs( aim_point ) ) ) );
+        get_overmapbuffer( get_map().get_bound_dimension() ).ter( tripoint_abs_omt( ms_to_omt_copy(
+                    g->m.getabs( aim_point ) ) ) );
     std::string overmap_desc = string_format( _( "In the background you can see a %s" ),
                                colorize( cur_ter->get_name(), cur_ter->get_color() ) );
     if( outside_tiles_num == total_tiles_num ) {
@@ -7323,7 +7367,7 @@ int iuse::camera( player *p, item *it, bool, const tripoint & )
                               e.c_str() );
                 }
 
-                const bool selfie = std::ranges::find( player_vec, p ) != player_vec.end();
+                const bool selfie = std::ranges::contains( player_vec, p );
 
                 if( selfie ) {
                     p->add_msg_if_player( _( "You took a selfie." ) );
@@ -7896,7 +7940,7 @@ static bool hackveh( player &p, item &it, vehicle &veh )
     if( !veh.is_locked || !veh.has_security_working() ) {
         return true;
     }
-    const bool advanced = !empty( veh.get_avail_parts( "REMOTE_CONTROLS" ) );
+    const auto advanced = !veh.get_avail_parts( "REMOTE_CONTROLS" ).empty();
     if( advanced && veh.is_alarm_on ) {
         p.add_msg_if_player( m_bad, _( "This vehicle's security system has locked you out!" ) );
         return false;
@@ -7959,8 +8003,8 @@ static vehicle *pickveh( const tripoint &center, bool advanced )
         auto &v = veh.v;
         if( rl_dist( center, v->global_pos3() ) < 40 &&
             v->fuel_left( itype_battery, true ) > 0 &&
-            ( !empty( v->get_avail_parts( advctrl ) ) ||
-              ( !advanced && !empty( v->get_avail_parts( ctrl ) ) ) ) ) {
+            ( !v->get_avail_parts( advctrl ).empty() ||
+              ( !advanced && !v->get_avail_parts( ctrl ).empty() ) ) ) {
             vehs.push_back( v );
         }
     }
@@ -8054,7 +8098,7 @@ int iuse::remoteveh( player *p, item *it, bool t, const tripoint &pos )
     } else if( choice == 1 ) {
         const auto rctrl_parts = veh->get_avail_parts( "REMOTE_CONTROLS" );
         // Revert to original behavior if we can't find remote controls.
-        if( empty( rctrl_parts ) ) {
+        if( rctrl_parts.empty() ) {
             veh->use_controls( pos );
         } else {
             veh->use_controls( rctrl_parts.begin()->pos() );
@@ -8576,7 +8620,7 @@ int iuse::weather_tool( player *p, item *it, bool, const tripoint & )
     }
     if( it->has_flag( flag_WEATHER_FORECAST ) ) {
         std::string message = string_format( "", message );
-        const auto tref = overmap_buffer.find_radio_station( it->frequency );
+        const auto tref = get_overmapbuffer( p->get_dimension() ).find_radio_station( it->frequency );
         if( tref ) {
             {
                 message = weather_forecast( tref.abs_sm_pos );
@@ -8589,7 +8633,7 @@ int iuse::weather_tool( player *p, item *it, bool, const tripoint & )
         if( optional_vpart_position vp = g->m.veh_at( p->pos() ) ) {
             vehwindspeed = std::lround( cmps_to_mps( std::abs( vp->vehicle().velocity ) ) * 2.23694 );
         }
-        const oter_id &cur_om_ter = overmap_buffer.ter( p->global_omt_location() );
+        const oter_id &cur_om_ter = get_overmapbuffer( p->get_dimension() ).ter( p->global_omt_location() );
         /* windpower defined in internal velocity units (=.01 mph) */
         const double windpower = 100 * get_local_windpower( weather.windspeed + vehwindspeed, cur_om_ter,
                                  p->pos(), weather.winddirection, g->is_sheltered( p->pos() ) );
@@ -8890,7 +8934,7 @@ int iuse::craft( player *p, item *it, bool, const tripoint &pos )
         }
     }
     p->activity->targets.emplace_back( where );
-    p->activity->coords.push_back( best_bench.position );
+    p->activity->coords.push_back( get_map().getabs( best_bench.position ) );
     p->activity->values.push_back( 0 ); // Not a long craft
     // Ugly
     p->activity->values.push_back( static_cast<int>( best_bench.type ) );
@@ -9053,7 +9097,9 @@ int iuse::report_grid_charge( player *p, item *, bool, const tripoint &pos )
 int iuse::report_grid_connections( player *p, item *, bool, const tripoint &pos )
 {
     tripoint_abs_omt pos_abs = project_to<coords::omt>( tripoint_abs_ms( get_map().getabs( pos ) ) );
-    std::vector<tripoint_rel_omt> connections = overmap_buffer.electric_grid_connectivity_at( pos_abs );
+    std::vector<tripoint_rel_omt> connections = get_overmapbuffer(
+                p->get_dimension() ).electric_grid_connectivity_at(
+                pos_abs );
 
     std::vector<std::string> connection_names;
     connection_names.reserve( connections.size() );
@@ -9120,7 +9166,9 @@ auto iuse::report_fluid_grid_connections( player *p, item *, bool, const tripoin
 int iuse::modify_grid_connections( player *p, item *it, bool, const tripoint &pos )
 {
     tripoint_abs_omt pos_abs = project_to<coords::omt>( tripoint_abs_ms( get_map().getabs( pos ) ) );
-    std::vector<tripoint_rel_omt> connections = overmap_buffer.electric_grid_connectivity_at( pos_abs );
+    std::vector<tripoint_rel_omt> connections = get_overmapbuffer(
+                p->get_dimension() ).electric_grid_connectivity_at(
+                pos_abs );
 
     uilist ui;
 
@@ -9147,10 +9195,12 @@ int iuse::modify_grid_connections( player *p, item *it, bool, const tripoint &po
     size_t ret = static_cast<size_t>( ui.ret );
     tripoint_abs_omt destination_pos_abs = pos_abs + tripoint_rel_omt( six_cardinal_directions[ret] );
     if( connection_present[ret] ) {
-        overmap_buffer.remove_grid_connection( pos_abs, destination_pos_abs );
+        get_overmapbuffer( p->get_dimension() ).remove_grid_connection( pos_abs, destination_pos_abs );
     } else {
-        std::set<tripoint_abs_omt> lhs_locations = overmap_buffer.electric_grid_at( pos_abs );
-        std::set<tripoint_abs_omt> rhs_locations = overmap_buffer.electric_grid_at( destination_pos_abs );
+        std::set<tripoint_abs_omt> lhs_locations = get_overmapbuffer( p->get_dimension() ).electric_grid_at(
+                    pos_abs );
+        std::set<tripoint_abs_omt> rhs_locations = get_overmapbuffer( p->get_dimension() ).electric_grid_at(
+                    destination_pos_abs );
         int cost_mult;
         if( lhs_locations == rhs_locations ) {
             cost_mult = 0;
@@ -9204,7 +9254,8 @@ int iuse::modify_grid_connections( player *p, item *it, bool, const tripoint &po
         }
         p->invalidate_crafting_inventory();
 
-        bool success = overmap_buffer.add_grid_connection( pos_abs, destination_pos_abs );
+        bool success = get_overmapbuffer( p->get_dimension() ).add_grid_connection( pos_abs,
+                       destination_pos_abs );
         if( success ) {
             return it->type->charges_to_use();
         }

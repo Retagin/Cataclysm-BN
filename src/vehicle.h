@@ -34,6 +34,7 @@ class npc;
 class player;
 class vehicle;
 struct vehicle_part;
+class mapbuffer;
 class vehicle_cursor;
 class vehicle_part_range;
 class vpart_info;
@@ -460,14 +461,24 @@ class vehicle
         }
 
         /**
-         * Find a possibly off-map vehicle. If necessary, loads up its submap through
-         * the global MAPBUFFER and pulls it from there. For this reason, you should only
-         * give it the coordinates of the origin tile of a target vehicle.
-         * @param where Location of the other vehicle's origin tile.
+         * Find a possibly off-map vehicle. If necessary, loads up its submap and pulls
+         * it from there. For this reason, you should only give it the coordinates of the
+         * origin tile of a target vehicle.
+         *
+         * The overload without @p mbuf uses the currently bound map's dimension and is
+         * only correct when that dimension matches the target vehicle's dimension.
+         * Prefer the mapbuffer overload when the caller has explicit dimension context.
+         *
+         * @param where  Location of the other vehicle's origin tile (absolute ms coords).
+         * @param mbuf   Mapbuffer for the dimension that owns the target vehicle.
          */
         static vehicle *find_vehicle( const tripoint &where );
+        static vehicle *find_vehicle( const tripoint &where, mapbuffer &mbuf );
         static vehicle *find_vehicle( const tripoint_abs_ms &where ) {
             return find_vehicle( where.raw() );
+        }
+        static vehicle *find_vehicle( const tripoint_abs_ms &where, mapbuffer &mbuf ) {
+            return find_vehicle( where.raw(), mbuf );
         }
 
         vehicle( const vproto_id &type_id, int init_veh_fuel = -1, int init_veh_status = -1,
@@ -1481,9 +1492,11 @@ class vehicle
         void play_music();
         void play_chimes();
         void operate_planter();
+        std::string brake_hold_toggle_string() const;
         std::string tracking_toggle_string();
         void autopilot_patrol_check();
         void toggle_autopilot();
+        void toggle_brake_hold();
         void enable_patrol();
         void toggle_tracking();
         //scoop operation,pickups, battery drain, etc.
@@ -1719,6 +1732,10 @@ class vehicle
          * not change therefor no call to set_submap_moved is required.
          */
         tripoint sm_pos;
+        // Absolute submap position — set by loadn(), on_submap_loaded(), copy_grid(),
+        // and displace_vehicle()/z-level transitions.  Runtime-only (not serialized).
+        // Always authoritative while the vehicle is in any loaded submap.
+        tripoint_abs_sm abs_sm_pos;
 
         // alternator load as a percentage of engine power, in units of 0.1% so 1000 is 100.0%
         int alternator_load = 0;
@@ -1742,6 +1759,14 @@ class vehicle
         int vertical_velocity = 0;
         // id of the om_vehicle struct corresponding to this vehicle
         int om_id = -1;
+
+        // ID of the dimension this vehicle belongs to.  Empty string = primary dimension.
+        // Set when the vehicle is loaded from a submap (map::loadn / on_submap_loaded).
+        // Persisted across saves so cross-dimension processing survives reload.
+        std::string dimension_id_ = "";  // empty = primary dimension
+        auto get_dimension() const -> const std::string & { // *NOPAD*
+            return dimension_id_;
+        }
         // direction, to which vehicle is turning (player control). will rotate frame on next move
         // must be a multiple of 15 degrees
         units::angle turn_dir = 0_degrees;
@@ -1807,6 +1832,8 @@ class vehicle
         bool cruise_on = true;
         // at least one engine is on, of any type
         bool engine_on = false;
+        // parked braking drag on/off
+        bool brake_hold = true;
         // vehicle tracking on/off
         bool tracking_on = false;
         // vehicle has no key

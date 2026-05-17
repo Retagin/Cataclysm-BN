@@ -3,6 +3,7 @@
 #include <bitset>
 #include <climits>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <optional>
@@ -26,12 +27,14 @@
 #include "location_ptr.h"
 #include "location_vector.h"
 #include "pldata.h"
+#include "coordinates.h"
 #include "point.h"
 #include "type_id.h"
 #include "units.h"
 #include "value_ptr.h"
 #include "monster_action.h"
 #include "monster_plan.h"
+#include "mtype.h"
 #include "visitable.h"
 #include "sounds.h"
 
@@ -237,25 +240,35 @@ class monster : public Creature, public location_visitable<monster>
 
         // How good of a target is given creature (checks for visibility).
         // Pass precalc_dist >= 0 to skip re-computing rl_dist_fast() internally
-        // when the caller already has the distance (PERF-LOSS-4).
+        // when the caller already has the distance.
         float rate_target( Creature &c, float best, bool smart = false,
                            int precalc_dist = -1 ) const;
         void plan();
         /**
          * Snapshot of alive creature pointers passed to compute_plan() so that
          * worker threads never call weak_ptr_fast::lock() (non-atomic, _S_single)
-         * on the main thread's creature collections.  Build both vectors serially
+         * on the main thread's creature collections.  Build all snapshots serially
          * on the main thread before launching the parallel planning pass.
-         * If either pointer is null, compute_plan() falls back to
-         * g->all_monsters() / g->all_npcs() — safe only on the main thread.
+         * If a pointer is null, compute_plan() falls back to the live collections
+         * or faction map — safe only on the main thread.
          */
+        /// faction id → raw monster pointers; avoids weak_ptr_fast::lock() on workers.
+        using faction_snap_t = std::unordered_map<mfaction_id, std::vector<monster *>>;
+        /// faction id → list of faction ids that are hostile to it (pre-filtered per tick).
+        using hostile_fac_map_t = std::unordered_map<mfaction_id, std::vector<mfaction_id>>;
         struct compute_plan_context {
             const std::vector<monster *> *monsters;
             const std::vector<npc *> *npcs;
-            constexpr compute_plan_context() noexcept : monsters( nullptr ), npcs( nullptr ) {}
+            const faction_snap_t *faction_snap;
+            const hostile_fac_map_t *hostile_fac_map;
+            constexpr compute_plan_context() noexcept
+                : monsters( nullptr ), npcs( nullptr ), faction_snap( nullptr ),
+                  hostile_fac_map( nullptr ) {}
             constexpr compute_plan_context( const std::vector<monster *> *m,
-                                            const std::vector<npc *> *n )
-            noexcept : monsters( m ), npcs( n ) {}
+                                            const std::vector<npc *> *n,
+                                            const faction_snap_t *fs,
+                                            const hostile_fac_map_t *hfm )
+            noexcept : monsters( m ), npcs( n ), faction_snap( fs ), hostile_fac_map( hfm ) {}
         };
 
         /**
@@ -273,13 +286,13 @@ class monster : public Creature, public location_visitable<monster>
         void apply_plan( const monster_plan_t &plan );
 
         /**
-         * Phase 2+ decision pass: reads monster and world state to determine
+         * Decision pass: reads monster and world state to determine
          * the single action this monster intends to take.  const — no mutations
-         * to *this.  Safe to call from a worker thread in Phase 2+ once the
+         * to *this.  Safe to call from a worker thread once the
          * same thread-safety preconditions as compute_plan() are met.
          *
          * Key constraint: must NOT call Pathfinding::route() (d_maps/d_maps_store
-         * are global static, not thread-local; see Phase 3 / Step 10 for the fix).
+         * are global static, not thread-local.
          * Sets needs_repath = true in the returned action when a fresh A* is
          * needed; execute_action() performs the actual repath.
          */
@@ -290,14 +303,13 @@ class monster : public Creature, public location_visitable<monster>
          * Call serially before the parallel planning phase so that
          * compute_plan() hits the shared_lock read path instead of taking
          * a unique_lock insert for every monster-player/NPC pair.
-         * (PERF-A / GAIN-A: replaces bare mon->sees(target) pre-warm.)
          */
         void prewarm_sight( const Creature &target ) const;
 
         /**
-         * Phase 2+ execution pass: applies the action returned by decide_action().
+         * Execution pass: applies the action returned by decide_action().
          * Must run on the main thread (or a thread that has exclusive access to
-         * this monster's position in the reservation map, Phase 3+).
+         * this monster's position in the reservation map).
          *
          * Also handles the pre-move mutations that cannot be done in the const
          * decide pass (wandf decrement, move_effects, behavior oracle, etc.).
@@ -507,12 +519,15 @@ class monster : public Creature, public location_visitable<monster>
         int shortest_special_cooldown() const;
 
         void process_turn() override;
+        /** Batch catchup: analytically simulate @p n missed turns. */
+        void batch_turns( int n ) override;
         /** Resets the value of all bonus fields to 0, clears special effect flags. */
         void reset_bonuses() override;
         /** Resets stats, and applies effects in an idempotent manner */
         void reset_stats() override;
 
         void die( Creature *killer ) override; //this is the die from Creature, it calls kill_mo
+        void erase() override;
         void drop_items_on_death();
 
         // Other
@@ -604,6 +619,10 @@ class monster : public Creature, public location_visitable<monster>
         int friendly;
         int anger = 0;
         int morale = 0;
+        // Per-npcmove-pass cache of attitude_to() result for a generic NPC (no special traits).
+        // Valid when cached_npc_attitude_epoch == g_npcmove_attitude_epoch.
+        uint32_t cached_npc_attitude_epoch = 0;
+        Attitude cached_npc_attitude = A_NEUTRAL;
         std::unordered_map<mfaction_id, int> faction_anger;  //< Per-faction anger tracking
         // Our faction (species, for most monsters)
         mfaction_id faction;
@@ -664,6 +683,19 @@ class monster : public Creature, public location_visitable<monster>
         void init_from_item( const item &itm );
 
         time_point last_updated = calendar::turn_zero;
+        // Absolute map-square position, stamped by game::despawn_monster() immediately before
+        // removal from critter_tracker.  Authoritative while the monster is stored in
+        // overmap::monster_map; stale (or zero-initialised) for active critter_tracker monsters.
+        tripoint_abs_ms pos_abs;
+
+        // ID of the dimension this monster belongs to.  Empty string = primary dimension.
+        // Set when the monster is spawned or loaded from a non-primary dimension submap.
+        // Persisted across saves so cross-dimension LOD assignment survives reload.
+        std::string dimension_id_ = "";  // empty = primary dimension
+        const std::string &get_dimension() const override {
+            return dimension_id_;
+        }
+
         /**
          * Do some cleanup and caching as monster is being unloaded from map.
          */
@@ -680,6 +712,12 @@ class monster : public Creature, public location_visitable<monster>
         std::set<tripoint> get_legacy_path_avoid() const override;
 
         std::pair<PathfindingSettings, RouteSettings> get_pathfinding_pair() const override;
+
+        // Discard the cached movement path so the monster replans on its next turn.
+        void clear_path() {
+            path.clear();
+            repath_requested = false;
+        }
 
         // summoned monsters via spells
         void set_summon_time( const time_duration &length );
@@ -713,6 +751,8 @@ class monster : public Creature, public location_visitable<monster>
         // Faction-specific anger tracking
         void add_faction_anger( mfaction_id target_faction, int amount );
         auto get_faction_anger( mfaction_id target_faction ) const -> int;
+
+        std::set<m_flag> monster_flags;
 
     private:
         void process_trigger( mon_trigger trig, int amount );

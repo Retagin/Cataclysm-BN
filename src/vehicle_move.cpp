@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <algorithm>
+#include <ranges>
 #include <array>
 #include <cmath>
 #include <cstdlib>
@@ -42,9 +43,6 @@
 #include "veh_type.h"
 #include "vpart_position.h"
 #include "vpart_range.h"
-
-#define dbg(x) DebugLogFL((x),DC::Map)
-
 static const itype_id fuel_type_muscle( "muscle" );
 static const itype_id fuel_type_animal( "animal" );
 static const itype_id fuel_type_battery( "battery" );
@@ -1408,15 +1406,11 @@ float get_collision_factor( const float delta_v )
 
 vehicle *vehicle::act_on_map()
 {
-    const tripoint pt = global_pos3();
     map &here = get_map();
-    if( !here.inbounds( pt ) ) {
-        dbg( DL::Info ) << "stopping out-of-map vehicle at global pos " << pt;
-        stop( false );
-        of_turn = 0;
-        is_falling = false;
-        return this;
-    }
+    // Note: no inbounds() guard here.  Vehicles outside the reality bubble are
+    // valid for loaded submaps.  A vehicle driving into an unloaded submap will naturally
+    // stop because map::move_cost() returns 0 for unloaded tiles, which the
+    // collision code classifies as veh_coll_other (solid wall).
     if( decrement_summon_timer() ) {
         return nullptr;
     }
@@ -1436,7 +1430,25 @@ vehicle *vehicle::act_on_map()
                 g->setremoteveh( nullptr );
             }
 
-            here.on_vehicle_moved( sm_pos.z );
+            {
+                // Compute this vehicle's submap footprint to avoid invalidating
+                // the entire z-level when it sinks.
+                const tripoint gpos = global_pos3();
+                point sink_sm_min = { INT_MAX, INT_MAX };
+                point sink_sm_max = { INT_MIN, INT_MIN };
+                std::ranges::for_each(
+                parts | std::views::filter( []( const auto & prt ) { return !prt.removed; } ),
+                [&]( const auto & prt ) {
+                    const int px = ( gpos.x + prt.precalc[0].x ) / SEEX;
+                    const int py = ( gpos.y + prt.precalc[0].y ) / SEEY;
+                    sink_sm_min.x = std::min( sink_sm_min.x, px );
+                    sink_sm_min.y = std::min( sink_sm_min.y, py );
+                    sink_sm_max.x = std::max( sink_sm_max.x, px );
+                    sink_sm_max.y = std::max( sink_sm_max.y, py );
+                }
+                );
+                here.on_vehicle_moved( sink_sm_min, sink_sm_max, sm_pos.z );
+            }
             // Destroy vehicle (sank to nowhere)
             here.destroy_vehicle( this );
             return nullptr;

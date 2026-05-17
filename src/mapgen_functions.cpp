@@ -100,7 +100,6 @@ building_gen_pointer get_mapgen_cfunction( const std::string &ident )
             { "road_end",         &mapgen_road },
             { "road_tee",         &mapgen_road },
             { "road_four_way",    &mapgen_road },
-            { "field",            &mapgen_field },
             { "highway",          &mapgen_highway },
             { "railroad_straight", &mapgen_railroad },
             { "railroad_curved",   &mapgen_railroad },
@@ -137,6 +136,7 @@ building_gen_pointer get_mapgen_cfunction( const std::string &ident )
 
             { "tutorial", &mapgen_tutorial },
             { "lake_shore", &mapgen_lake_shore },
+            { "pd_border", &mapgen_pd_border },
         }
     };
     const auto iter = pointers.find( ident );
@@ -1925,6 +1925,20 @@ void mapgen_rock( mapgendata &dat )
 void mapgen_open_air( mapgendata &dat )
 {
     fill_background( &dat.m, t_open_air );
+}
+
+void mapgen_pd_border( mapgendata &dat )
+{
+    // Use the boundary terrain from the map's dimension bounds if available,
+    // otherwise fall back to the default pocket dimension border terrain.
+    ter_id border_ter = ter_id( "t_pd_border" );
+    if( dat.m.has_dimension_bounds() ) {
+        std::optional<dimension_bounds> bounds = dat.m.get_dimension_bounds();
+        if( bounds && bounds->boundary_terrain.is_valid() ) {
+            border_ter = bounds->boundary_terrain.id();
+        }
+    }
+    fill_background( &dat.m, border_ter );
 }
 
 void mapgen_rift( mapgendata &dat )

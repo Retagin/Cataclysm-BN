@@ -904,11 +904,11 @@ void npc::handle_sound( const short heard_vol, sound_event sound )
     const bool player_ally = ( ( source_player || ( get_player_character().pos() == sound.origin ) ) &&
                                is_player_ally() ) ;
 
-    // Only reference this in cases where we know the sound source is either the player or an NPC
-    player *npc_critter = dynamic_cast<player *>( critter );
+    // ONLY reference this in cases where we know the sound source is an NPC
+    //Character const *npc_critter = dynamic_cast<Character>( *critter );
 
     // Is the sound source an NPC, and is the source NPC an ally of the hearing NPC?
-    const bool npc_ally = ( source_npc ) ? ( is_ally( *npc_critter ) ) : false;
+    const bool npc_ally = ( source_npc ) ? ( critter->as_npc()->is_ally( *this ) ) : false;
 
     // Is the sound source a monster, and is said monster an ally of the hearing NPC?
 
@@ -1040,7 +1040,7 @@ void npc::handle_sound( const short heard_vol, sound_event sound )
                 temp_warning.type = "speech_noise";
                 if( source_npc || source_player ) {
 
-                    if( !has_faction_relationship( *npc_critter, npc_factions::knows_your_voice ) ) {
+                    if( !has_faction_relationship( *critter->as_character(), npc_factions::knows_your_voice ) ) {
                         //The faction does not know the voice of the NPC in question, so alert.
                         ai_cache.warn_about_queue.push_back( temp_warning );
                     }
@@ -1515,7 +1515,18 @@ std::string dialogue::dynamic_line( const talk_topic &the_topic ) const
     } else if( topic == "TALK_OPINION" ) {
         return "&" + p->opinion_text();
     } else if( topic == "TALK_MIND_CONTROL" ) {
-        bool not_following = !g->get_follower_list().contains( p->getID() );
+        const auto player_id = get_avatar().getID();
+        for( auto *miss : p->chatbin.missions_assigned ) {
+            if( miss->get_assigned_player_id() == player_id ) {
+                miss->fail();
+            }
+        }
+        std::erase_if( p->chatbin.missions_assigned, [player_id]( const auto * miss ) { return miss->get_assigned_player_id() == player_id; } );
+        if( p->chatbin.mission_selected != nullptr &&
+            p->chatbin.mission_selected->get_assigned_player_id() == player_id ) {
+            p->chatbin.mission_selected = nullptr;
+        }
+        const bool not_following = !g->get_follower_list().contains( p->getID() );
         talk_function::follow( *p );
         if( not_following ) {
             return _( "YES, MASTER!" );
@@ -3166,6 +3177,7 @@ void talk_effect_t::parse_string_effect( const std::string &effect_id, const Jso
             WRAP( do_read ),
             WRAP( do_butcher ),
             WRAP( do_farming ),
+            WRAP( do_craft ),
             WRAP( assign_guard ),
             WRAP( stop_guard ),
             WRAP( buy_cow ),
