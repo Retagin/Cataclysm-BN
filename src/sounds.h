@@ -343,7 +343,7 @@ static constexpr auto wall_check_by_sdirection = std::array<std::pair<uint8_t, u
         {5, 1} //Direction "7"
     }
 };
-// Conversevly, A wall at the given adjacent tile/direction index invalidates propagation through the listed direction index
+// Conversely, A wall at the given adjacent tile/direction index invalidates propagation through the listed direction index
 // Only cardinal direction walls apply this behavior, but we keep the array the same size for compatability.
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]

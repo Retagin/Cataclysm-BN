@@ -9488,6 +9488,12 @@ bool map::inbounds( const tripoint &p ) const
     return map_boundaries.contains( p );
 }
 
+bool map::on_bubble_border( const point &p ) const
+{
+    const auto max_xy = my_MAPSIZE - 1;
+    return p.x == 0 || p.x == max_xy || p.y == 0 || p.y == max_xy;
+}
+
 bool map::is_position_simulated( const tripoint &p ) const
 {
     const tripoint_abs_sm abs_sm(

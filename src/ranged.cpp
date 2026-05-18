@@ -2411,6 +2411,23 @@ void ranged::make_gun_sound_effect( const Character &who, bool burst, const item
         se.volume = std::min(191, data.volume);
         se.category = sounds::sound_t::combat;
         se.description = data.sound.empty() ? _( "Bang!" ) : data.sound;
+        // Guns dont get to be ambient noise.
+        if (who.is_avatar()){
+            se.from_player = true;
+            se.faction = who.get_faction()->id;
+            se.monfaction = who.get_faction()->mon_faction;
+        } else if (who.is_npc() ){
+            se.from_npc = true;
+            se.faction = who.get_faction()->id;
+            se.monfaction = who.get_faction()->mon_faction;
+        } else if (who.is_monster()){
+            se.from_monster = true;
+            se.monfaction = who.as_monster()->faction.id();
+        }else {
+            // If it was none of the above but is shooting a gun anyways, its almost certainly a monster
+            // of some kind with wierd shenanagins done to make it fire a gun without a fake gun or something.
+            se.from_monster = true;
+        }
         sounds::sound( se );
     }
     sfx::generate_gun_sound( who.pos(), gun );

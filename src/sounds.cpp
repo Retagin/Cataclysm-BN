@@ -140,15 +140,15 @@ static constexpr short mdBspl_to_dBspl( const short mdB )
 {
     return mdBspl_to_dBspl_coeff * mdB;
 }
-static constexpr uint8_t MINIMUM_DISTANCE_FOR_SOUND_PROPAGATION = 1;
+static constexpr uint8_t MINIMUM_DISTANCE_FOR_SOUND_PROPAGATION = 2;
 static constexpr uint8_t MAXIMUM_DISTANCE_FOR_SOUND_PROPAGATION = 120;
 
 static constexpr uint8_t get_distance_for_volume_loss( const uint8_t tile_distance,
         const bool propagating_perpendicular )
 {
-    if( tile_distance <= MINIMUM_DISTANCE_FOR_SOUND_PROPAGATION ) {
+    if( tile_distance < MINIMUM_DISTANCE_FOR_SOUND_PROPAGATION ) {
         return MINIMUM_DISTANCE_FOR_SOUND_PROPAGATION;
-    } else if( tile_distance >= MAXIMUM_DISTANCE_FOR_SOUND_PROPAGATION ) {
+    } else if( tile_distance > MAXIMUM_DISTANCE_FOR_SOUND_PROPAGATION ) {
         return MAXIMUM_DISTANCE_FOR_SOUND_PROPAGATION;
     } else {
         return tile_distance + ( propagating_perpendicular ? -1 : 1 );
@@ -159,13 +159,6 @@ static constexpr std::array<point, 8> get_adjacent_tiles( const point &p )
 {
     const std::array<point, 8> adj_tiles = { { point( p.x - 1, p.y + 1 ), point( p.x, p.y + 1 ), point( p.x + 1, p.y + 1 ), point( p.x + 1, p.y ), point( p.x + 1, p.y - 1 ), point( p.x, p.y - 1 ), point( p.x - 1, p.y + 1 ), point( p.x - 1, p.y - 1 ) } };
     return adj_tiles;
-}
-
-// Used when flood filling sounds. We dont flood fill to tiles along the map border to prevent attempts to reference out of bounds tiles.
-// Do this here insted of with an inbouds
-static constexpr bool tile_along_map_border( const point &p )
-{
-    return ( p.x == 0 || p.x == MAPSIZE_X || p.y == 0 || p.y == MAPSIZE_Y );
 }
 
 static constexpr bool skip_due_to_wall( const bool &wall1, const bool &wall2,
@@ -283,6 +276,8 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                                            static_cast<short>( ambient_indoors - 3000 ) );
     const short minvol_outside = std::max( SOUND_MINIMUM_VOLUME_FOR_PROPAGATION,
                                            static_cast<short>( ambient_outside - 3000 ) );
+    // Use if checking to make sure sounds dont get LOUDER over distance.
+    const short origin_volume = dBspl_to_mdBspl(soundevent.volume);
 
     //// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
     //// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
@@ -320,20 +315,29 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         for( short i = 0; i < 8; i++ ) {
             const auto tile = adjacent_tiles[i];
             // Lets make sure that we only propagate inbounds, and not along the map border. After this we can just check !tile_along_map_border
-            if( !tile_along_map_border( tile ) && inbounds( tile ) ) {
+            if( !on_bubble_border( tile ) && inbounds( tile ) ) {
                 // Set our initial distance to 2. At the source there is no sound direction distance modifier.
                 // And set our tile volume based on the distance. We know that the sound origin is atleast 1600mdB.
                 // Set our direction based upon the adjacent tile index.
-                svol[temp_sound_cache.idx(tile.x,tile.y)] = std::max( 0,
-                                                 ( svol[temp_sound_cache.idx(temp_sound_cache.sound.origin.x, temp_sound_cache.sound.origin.y)] -
-                                                   ( dist_vol_loss[2] + absorption_cache[temp_sound_cache.idx(tile.x,tile.y)] ) ) );
+                svol[temp_sound_cache.idx(tile.x,tile.y)] = std::max( 0, ( svol[temp_sound_cache.idx(temp_sound_cache.sound.origin.x, temp_sound_cache.sound.origin.y)] - dist_vol_loss[2] - absorption_cache[temp_sound_cache.idx(tile.x,tile.y)] ) ) ;
                 if( svol[temp_sound_cache.idx(tile.x,tile.y)] > ( outside_cache[map_cache.idx(tile.x, tile.y)] ? minvol_outside : minvol_indoors ) ) {
-                    ptq.push( propagation_tile( tile, svol[temp_sound_cache.idx(tile.x,tile.y)], i, 2 ) );
+                    // Check this if sound propagation is acting up.
+                    if (svol[temp_sound_cache.idx(tile.x,tile.y)] > origin_volume){
+                        debugmsg( "Sound with description [ %1s ] attempted to propagate from %i:%i at %i mdB to %i:%i at %i mdB, a louder volume than the origin volume of %i mdB!" , soundevent.description, soundevent.origin.x, soundevent.origin.y, svol[temp_sound_cache.idx(temp_sound_cache.sound.origin.x, temp_sound_cache.sound.origin.y)], tile.x, tile.y, svol[temp_sound_cache.idx(tile.x,tile.y)], origin_volume );
+                    // Dont break the laws of physics
+                    continue;
+                    }
+                    ptq.emplace( propagation_tile( tile, svol[temp_sound_cache.idx(tile.x,tile.y)], i, 2 ) );
                 }
             }
         }
 
-        auto spropagate_from_tile = [&]( const propagation_tile & ptile ) {
+        auto spropagate_from_tile = [&]( const propagation_tile & top_of_que ) {
+            // Its possible if something goes wrong to slot a different top_of_que in part way through this proccess, so prof against that.
+            const auto ptile = top_of_que;
+            // Now that we have our const reference, pop the old top listing.
+            ptq.pop();
+
             // We know that we are not propagating from a tile along the map border, so it is safe to check for walls.
             // Grab our adjacent tiles, and the values for our center tile.
             adjacent_tiles = get_adjacent_tiles( ptile.pos );
@@ -356,24 +360,29 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                     }
                 }
                 auto &adj_tile = adjacent_tiles[adj_tile_dir];
-                // Dont check tiles that are not valid for propagation, i.e. behind the direction of sound, around a corner, or out of bounds.
-                if( inbounds( adj_tile ) ) {
+                // Dont check tiles that are not valid for propagation, i.e. behind the direction of sound, around a corner, out of bounds/along the map border.
+                if( !on_bubble_border( adj_tile ) ) {
                     auto &adj_tile_vol = svol[temp_sound_cache.idx(adj_tile.x, adj_tile.y)];
                     // Cap our tile distance between 1 and 121 to prevent overflow. We dont have or need distance loss values past dist_vol_loss[121]
                     // as the change in distance loss values past this point are negligible for gameplay scale.
                     const uint8_t dist_for_vol_loss = get_distance_for_volume_loss( ptile.dist, ( index == 0 ||
                                                       index == 4 ) );
-                    const short vol_to_check = ptile.vol - ( absorption_cache[map_cache.idx(adj_tile.x,adj_tile.y)] +
-                                               dist_vol_loss[dist_for_vol_loss] );
+                    const short vol_to_check = ptile.vol - (absorption_cache[map_cache.idx(adj_tile.x,adj_tile.y)]) - (dist_vol_loss[dist_for_vol_loss]);
                     // General priority goes loudest volume, then largest distance. Smaller distances loose volume more quickly.
                     // If volumes are equal and directions are one off from eachother, the cardinal direction wins.
                     // We dont want to track inaudible single dB values across the entire map for each sound.
                     if( ( vol_to_check ) > adj_tile_vol ) {
+                        // Check this if sound propagation is acting up. Comment out if things are playing nice.
+                        if (vol_to_check > origin_volume){
+                            debugmsg( "Sound with description [ %1s ] attempted to propagate from %i:%i at %i mdB to %i:%i at %i mdB, a louder volume than the origin volume of %i mdB!" , soundevent.description, ptile.pos.x, ptile.pos.y, ptile.vol, adj_tile.x, adj_tile.y, vol_to_check, origin_volume );
+                            // Dont break the laws of physics
+                            continue;
+                        }
                         adj_tile_vol = vol_to_check;
                         if( vol_to_check > SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) {
                             // If the tiles new volume is greater than 20dB, mark it for update.
                             // Will not update if the adjacent tile is along the map boundry.
-                            ptq.push( propagation_tile( adj_tile, vol_to_check, adj_tile_dir, dist_for_vol_loss ) );
+                            ptq.emplace( propagation_tile( adj_tile, vol_to_check, adj_tile_dir, dist_for_vol_loss ) );
                         }
                     }
                 }
@@ -386,8 +395,8 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         while( !ptq.empty() ) {
             // Propagate our loudest tile.
             spropagate_from_tile( ptq.top() );
-            // After calculating, remove our loudest entry.
-            ptq.pop();
+            // Our loudest sound should already have been removed by spropagate, and a new set of tiles potentially added.
+
         }
         // The sound cache should be built out by now.
         // Add our new sound cache to the games sound_caches vector.
@@ -449,9 +458,7 @@ void map::batch_flood_fill_sounds()
             // Skip all sounds that do not originate from our zlevel, are along the map border, or that are too far below our ambient volume.
             if( flooded_sound.origin.z != z ) {
                 continue;
-            } else if ( dBspl_to_mdBspl( flooded_sound.volume ) < ( (
-                    outside_cache[map_cache.idx(flooded_sound.origin.x,flooded_sound.origin.y)] ) ? minvol_outside :
-                    minvol_indoors ) ) {
+            } else if ( dBspl_to_mdBspl( flooded_sound.volume ) < ( (outside_cache[map_cache.idx(flooded_sound.origin.x,flooded_sound.origin.y)] ) ? minvol_outside : minvol_indoors ) ) {
                 num_invalidated_sounds++;
                 continue;
             } else if( ( dBspl_to_mdBspl( flooded_sound.volume ) > ( (
@@ -470,8 +477,7 @@ void map::batch_flood_fill_sounds()
 
                 // Set our initial conditions. We want 100ths of a decibel for the volume
                 // We dont apply directional sound propagation penalties at the very start.
-                svol[temp_sound_cache.idx(temp_sound_cache.sound.origin.x, temp_sound_cache.sound.origin.y)] =  dBspl_to_mdBspl(
-                            temp_sound_cache.sound.volume ) ;
+                svol[temp_sound_cache.idx(temp_sound_cache.sound.origin.x, temp_sound_cache.sound.origin.y)] =  dBspl_to_mdBspl(temp_sound_cache.sound.volume ) ;
                 adjacent_tiles = get_adjacent_tiles( temp_sound_cache.sound.origin.xy() );
 
                 // This propagates the sounds from the source tile to the 8 adjacent tiles, setting initial directions, distances and volumes.
@@ -479,20 +485,23 @@ void map::batch_flood_fill_sounds()
                 for( short i = 0; i < 8; i++ ) {
                     const auto tile = adjacent_tiles[i];
                     // Lets make sure that we only propagate inbounds, and not along the map border. After this we can just check !tile_along_map_border
-                    if( !tile_along_map_border( tile ) && inbounds( tile ) ) {
+                    if( !on_bubble_border( tile ) && inbounds( tile ) ) {
                         // Set our initial distance to 2. At the source there is no sound direction distance modifier.
                         // And set our tile volume based on the distance. We know that the sound origin is atleast 1600mdB.
                         // Set our direction based upon the adjacent tile index.
-                        svol[temp_sound_cache.idx(tile.x, tile.y)] = std::max( 0,
-                                                         ( svol[temp_sound_cache.idx(temp_sound_cache.sound.origin.x,temp_sound_cache.sound.origin.y)] -
-                                                           ( dist_vol_loss[2] + absorption_cache[map_cache.idx(tile.x,tile.y)] ) ) );
+                        svol[temp_sound_cache.idx(tile.x, tile.y)] = std::max( 0,(svol[temp_sound_cache.idx(temp_sound_cache.sound.origin.x,temp_sound_cache.sound.origin.y)] -  dist_vol_loss[2] - absorption_cache[map_cache.idx(tile.x,tile.y)] ));
                         if( svol[temp_sound_cache.idx(tile.x, tile.y)] > ( outside_cache[map_cache.idx(tile.x,tile.y)] ? minvol_outside : minvol_indoors ) ) {
-                            ptq.push( propagation_tile( tile, svol[temp_sound_cache.idx(tile.x, tile.y)], i, 2 ) );
+                            ptq.emplace( propagation_tile( tile, svol[temp_sound_cache.idx(tile.x, tile.y)], i, 2 ) );
                         }
                     }
                 }
 
-                auto spropagate_from_tile = [&]( const propagation_tile & ptile ) {
+                auto spropagate_from_tile = [&]( const propagation_tile & top_of_que ) {
+                    // Make a more consistant reference so we dont potentially somehow sort away our reference.
+                    const auto ptile = top_of_que;
+                    // Remove the old top listing.
+                    ptq.pop();
+
                     // We know that we are not propagating from a tile along the map border, so it is safe to check for walls.
                     // Grab our adjacent tiles, and the values for our center tile.
                     adjacent_tiles = get_adjacent_tiles( ptile.pos );
@@ -516,23 +525,29 @@ void map::batch_flood_fill_sounds()
                         }
                         auto &adj_tile = adjacent_tiles[adj_tile_dir];
                         // Dont check tiles that are not valid for propagation, i.e. behind the direction of sound, around a corner, or out of bounds.
-                        if( inbounds( adj_tile ) ) {
+                        if( !on_bubble_border( adj_tile ) && inbounds(adj_tile) ) {
                             auto &adj_tile_vol = svol[temp_sound_cache.idx(adj_tile.x, adj_tile.y)];
                             // Cap our tile distance between 1 and 121 to prevent overflow. We dont have or need distance loss values past dist_vol_loss[121]
                             // as the change in distance loss values past this point are negligible for gameplay scale.
                             const uint8_t dist_for_vol_loss = get_distance_for_volume_loss( ptile.dist, ( index == 0 ||
                                                               index == 4 ) );
-                            const short vol_to_check = ptile.vol - ( absorption_cache[map_cache.idx(adj_tile.x, adj_tile.y)] +
-                                                       dist_vol_loss[dist_for_vol_loss] );
+                            const short vol_to_check = (ptile.vol - (absorption_cache[map_cache.idx(adj_tile.x, adj_tile.y)]) - (dist_vol_loss[dist_for_vol_loss]));
                             // General priority goes loudest volume, then largest distance. Smaller distances loose volume more quickly.
                             // If volumes are equal and directions are one off from eachother, the cardinal direction wins.
                             // We dont want to track inaudible single dB values across the entire map for each sound.
-                            if( ( vol_to_check ) > adj_tile_vol ) {
+                            if( vol_to_check > adj_tile_vol ) {
+                                // Check this if sound propagation is acting up. Comment out if things are playing nice.
+                                if (vol_to_check > dBspl_to_mdBspl(temp_sound_cache.sound.volume)){
+                                    const int origin_volume = dBspl_to_mdBspl(temp_sound_cache.sound.volume);
+                                    debugmsg( "Sound with description [ %1s ] attempted to propagate from %i:%i at %i mdB to %i:%i at %i mdB, a louder volume than the origin volume of %i mdB!" , temp_sound_cache.sound.description, ptile.pos.x, ptile.pos.y, ptile.vol, adj_tile.x, adj_tile.y, vol_to_check, origin_volume );
+                                    // Dont break the laws of physics
+                                    continue;
+                                }
                                 adj_tile_vol = vol_to_check;
                                 if( vol_to_check > SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) {
                                     // If the tiles new volume is greater than 20dB, mark it for update.
                                     // Will not update if the adjacent tile is along the map boundry.
-                                    ptq.push( propagation_tile( adj_tile, vol_to_check, adj_tile_dir, dist_for_vol_loss ) );
+                                    ptq.emplace( propagation_tile( adj_tile, vol_to_check, adj_tile_dir, dist_for_vol_loss ) );
                                 }
                             }
                         }
@@ -545,8 +560,7 @@ void map::batch_flood_fill_sounds()
                 while( !ptq.empty() ) {
                     // Propagate our loudest tile.
                     spropagate_from_tile( ptq.top() );
-                    // After calculating, remove our loudest entry.
-                    ptq.pop();
+                    // After calculating our loudest sound should already have been removed.
                 }
                 // The sound cache should be built out by now.
                 // Add our new sound cache to the games sound_caches vector.
@@ -558,6 +572,7 @@ void map::batch_flood_fill_sounds()
             }
             // If our sound was not loud enough, invalidate it.
             num_invalidated_sounds++;
+            continue;
         }
     }
     batch_que.clear();
@@ -931,7 +946,7 @@ void sounds::sound( const sound_event &soundevent )
                                         mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ) );
 
     // We flood fill sounds from monsters and NPCs for performance and efficiency reasons.
-    if( soundevent.from_monster || soundevent.from_npc ) {
+    if( soundevent.from_monster || soundevent.from_npc || (!soundevent.from_player && soundevent.volume >= 120)) {
         sound_batch_floodfill_que.push_back( temp_sound_event );
     } else {
         map.flood_fill_sound( temp_sound_event, temp_sound_event.origin.z );
@@ -1582,6 +1597,13 @@ void sounds::process_sound_markers( Character *who )
         }
         auto &tile_vol = element.volume[element.idx(charx, chary) ];
 
+        if ( tile_vol >= MAXIMUM_VOLUME_ATMOSPHERE ){
+            // Dont count impossibly loud sounds.
+            add_msg( m_debug,
+             _( "Player given sound louder than possible in Atmosphere! Sound with description [ %1s ] from %i:%i:%i with an origin volume of %i dB, tile volume of %i mdB at %i:%i:%i is louder than possible." ),
+             element.sound.description, element.sound.origin.x, element.sound.origin.y, element.sound.origin.z, element.sound.volume, tile_vol, loc.x,loc.y,loc.z );
+            continue;
+        }
         // Do an early filter to only check sounds we have a chance of hearing.
         if( tile_vol > vol_threshold ) {
 
@@ -1594,10 +1616,8 @@ void sounds::process_sound_markers( Character *who )
                 // Put the loudest sound into the console
                 if ( (mdBspl_to_dBspl(adjusted_vol) >= who->volume ) && (who->volume >  mdBspl_to_dBspl( ambient_vol ) ) ) { 
                 const int volume_at_tile = mdBspl_to_dBspl(tile_vol);
-                add_msg( m_debug,
-                 _( "Loudest sound player heard had a description of [ %1s ] from %i:%i:%i at a heard volume of %i dB, tile volume of %i dB, and origin volume of %i dB." ),
-                 element.sound.description, element.sound.origin.x, element.sound.origin.y, element.sound.origin.z,
-                 mdBspl_to_dBspl(adjusted_vol), volume_at_tile, element.sound.volume );
+                const int heard_volume = mdBspl_to_dBspl(adjusted_vol);
+                add_msg( m_debug, _( "Loudest sound player heard had a description of [ %1s ] from %i:%i:%i at a heard volume of %i dB at %i:%i:%i, tile volume of %i dB, and origin volume of %i dB." ), element.sound.description, element.sound.origin.x, element.sound.origin.y, element.sound.origin.z, heard_volume, loc.x, loc.y, loc.z, volume_at_tile, element.sound.volume );
                 }
                 // Deafening is based on the felt volume, as a player may be too deaf to
                 // hear the deafening sound but still suffer additional hearing loss.

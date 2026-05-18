@@ -1959,6 +1959,8 @@ class map : public submap_load_listener
         bool inbounds( point p ) const {
             return inbounds( tripoint( p, 0 ) );
         }
+        /** Returns true if point p resides along the border of the reality bubble. */
+        bool on_bubble_border( const point &p ) const;
 
         bool inbounds_z( const int z ) const {
             return z >= -OVERMAP_DEPTH && z <= OVERMAP_HEIGHT;
