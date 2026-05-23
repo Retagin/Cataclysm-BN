@@ -10728,6 +10728,10 @@ sound_instance_cache::sound_instance_cache( sound_event &input_sound,
 
 }
 
+sound_filter_key::sound_filter_key() = default;
+
+sound_cache::sound_cache() = default;
+
 void map::set_pathfinding_cache_dirty( const int zlev )
 {
     if( !inbounds_z( zlev ) ) {

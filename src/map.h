@@ -23,9 +23,11 @@
 #include "calendar.h"
 #include "coordinates.h"
 #include "dimension_info.h"
+#include "enum_conversions.h"
 #include "enums.h"
 #include "filter_utils.h"
 #include "game_constants.h"
+#include "hash_utils.h"
 #include "item.h"
 #include "item_stack.h"
 #include "legacy_pathfinding.h"
@@ -432,7 +434,6 @@ struct level_cache {
 // the player, and are then discarded/removed from the sounds_caches vector.
 struct sound_instance_cache {
 
-    // Zeros all relevant values.
     // Default constructor creates a zero-sized cache used as a null sentinel only.
     sound_instance_cache();
 
@@ -550,6 +551,9 @@ struct sound_instance_cache {
 
 // These are used to filter against the vector of sound instances
 struct sound_filter_key {
+    sound_filter_key();
+    sound_filter_key(const sound_filter_key &other) = default;
+    sound_filter_key &operator=(const sound_filter_key &other) = default;
 
     // Ignore sounds of this category or less. Defaults to weather.
     sounds::sound_t category = sounds::sound_t::weather;
@@ -565,15 +569,45 @@ struct sound_filter_key {
     // Does the monster get angry at noises?
     bool noise_angers = false;
 
+    bool operator==(const sound_filter_key &other ) const
+    { return (category == other.category && 
+        monfaction == other.monfaction && 
+        horde_monster == other.horde_monster && 
+        ignore_movement == other.ignore_movement &&
+        noise_angers == other.noise_angers);
+    }
+
+};
+
+template <>
+struct std::hash<sound_filter_key>
+{
+    std::size_t operator()(const sound_filter_key &key) const
+    {
+        using std::size_t;
+        using std::string;
+        using cata::hash_combine;
+        const int cat_int = static_cast<int>(key.category);
+        const std::string stringfac = static_cast<std::string>(key.monfaction.str());
+
+        std::size_t seed = 0;
+        hash_combine(seed,cat_int);
+        hash_combine(seed, stringfac);
+        hash_combine(seed, key.horde_monster);
+        hash_combine(seed, key.ignore_movement);
+        hash_combine(seed, key.noise_angers);
+        return seed;
+    }
 };
 
 // One sound_cache to rule them all.
 // TODO: Make it so that each sound has a pointer or ref? Pointers need to be killed when sounds expire
 struct sound_cache {
 
+    sound_cache();
     //sound_cache(const sound_cache &) = default;
     //sound_cache(sound_cache &&) = default;
-    //sound_cache &operator=(const sound_cache &) = default;
+    sound_cache &operator=(const sound_cache &) = default;
     //sound_cache &operator=(sound_cache &&) = default;
 
     std::vector<sound_instance_cache> sound_instances;
@@ -644,16 +678,15 @@ struct sound_cache {
     // Wanted this to contain a vector of pointers, but then we would always loose the sounds it pointed to.
     // So instead each is a vector of iterator numbers for the sound_instances vector.
     // If we have more sounds than short can point to as an iterator, something is very wrong and the bad memory access crashing the game is probably doing us a favor.
-    std::unordered_map< const sound_filter_key, const std::vector<short>> sound_list_filtered;
+    std::unordered_map< sound_filter_key , std::vector<short>> sound_list_filtered;
     // Adds a filter kay and pointer vector pair to the filtered sound list.
     // We do want to make copies, as any reference made when informing a monster AI of sounds would go out of scope when we move to the next monster.
-    auto add_filtered_sound_list( const sound_filter_key key, const std::vector<short> list ) -> void { sound_list_filtered.emplace( key, list ); }
+    //auto add_filtered_sound_list(const sound_filter_key &key, const std::vector<short> &list ) -> void { sound_list_filtered.insert({key,list}); }
     // True if there is a matching list, false if not.
-    auto matching_filtered_list( const sound_filter_key &key ) -> bool { return sound_list_filtered.contains( key ); }
-    // Returns a reference to the desired vector of pointers.
-    auto get_filtered_list( const sound_filter_key &key ) -> const std::vector<short> & { return sound_list_filtered.at( key ); }
+    //auto matching_filtered_list(const sound_filter_key &key) -> bool { return sound_list_filtered.contains(key); }
+    
     // Clear the filtered list so we dont try to grab an old sound.
-    auto clear_all_filtered_lists() -> void { sound_list_filtered.clear(); }
+    //auto clear_all_filtered_lists() -> void { sound_list_filtered.clear(); }
 
 };
 
