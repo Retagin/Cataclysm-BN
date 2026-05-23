@@ -651,7 +651,7 @@ struct sound_cache {
     // True if there is a matching list, false if not.
     auto matching_filtered_list( const sound_filter_key &key ) -> bool { return sound_list_filtered.contains( key ); }
     // Returns a reference to the desired vector of pointers.
-    auto get_filtered_list( const sound_filter_key &key ) -> const std::vector<short> & { return sound_list_filtered.at( key ); }
+    auto get_filtered_list( const sound_filter_key &key ) -> const std::vector<short>& { return sound_list_filtered.at( key ); }
     // Clear the filtered list so we dont try to grab an old sound.
     auto clear_all_filtered_lists() -> void { sound_list_filtered.clear(); }
 
