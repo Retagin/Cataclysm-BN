@@ -1523,7 +1523,7 @@ void sounds::process_sounds()
         }
     }
     // Make sure this is empty before we get going. If its not, it is pretty much garunteed that all the entries will have jumbled iterators.
-    if (!sound_cache.sound_list_filtered.empty()){
+    if( !sound_cache.sound_list_filtered.empty() ) {
         sound_cache.sound_list_filtered.clear();
     }
 
@@ -1568,7 +1568,7 @@ void sounds::process_sounds()
         }
         const sound_filter_key key_2_electric_boogalo = key;
         const std::vector<short> filt_list_2_electric_boogalo = filtered_list;
-        filtered_sounds.insert({key_2_electric_boogalo, filt_list_2_electric_boogalo});
+        filtered_sounds.insert( {key_2_electric_boogalo, filt_list_2_electric_boogalo} );
     };
 
     // Lets run through all the monsters and feed them sound info.
@@ -1600,16 +1600,16 @@ void sounds::process_sounds()
         const auto &critterloc = critter.bub_pos();
 
         // Check to see if there is a matching filtered list, or if our list list empty.
-        if (!filtered_sounds.contains(filter_key) || filtered_sounds.empty()){
-            make_new_filtered_list(filter_key);
+        if( !filtered_sounds.contains( filter_key ) || filtered_sounds.empty() ) {
+            make_new_filtered_list( filter_key );
         }
         // We should have a fancy new filtered list by now. If we still dont, skip this monster because something funky happened.
-        if (!filtered_sounds.contains(filter_key)){
+        if( !filtered_sounds.contains( filter_key ) ) {
             continue;
         }
         // Lets get our shiny list.
-        const auto &s_list = sound_cache.sound_list_filtered.at(filter_key);
-        
+        const auto &s_list = sound_cache.sound_list_filtered.at( filter_key );
+
         // Make sure our list ist not empty, skip if it is.
         if( s_list.empty() ) {
             continue;
@@ -1966,8 +1966,8 @@ void sounds::process_sound_markers( Character *who )
     const bool pcunderground = loc.z() < 0;
     const bool pcoutdoors = map.is_outside( loc.xy() );
     const weather_manager &weather = get_weather();
-    const short player_t_absorp = level_cache.absorption_cache[level_cache.idx(charx,chary)];
-    const bool  player_indoors = !level_cache.outside_cache[level_cache.idx(charx,chary)];
+    const short player_t_absorp = level_cache.absorption_cache[level_cache.idx( charx, chary )];
+    const bool  player_indoors = !level_cache.outside_cache[level_cache.idx( charx, chary )];
 
     // Ambient underground is 20dB, ambient in a above ground building is 40. The assumption is that there are zombies making noise, and its not perfectly dead quiet.
     // Weather sound attenuation ranges from 0 - 8. We add this to existing ambient if applicable to approximate the sound of rain, snow, etc.
