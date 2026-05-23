@@ -1,7 +1,6 @@
 #include "active_tile_data.h"
 #include "active_tile_data_def.h"
 #include "calendar.h"
-#include "coordinate_conversions.h"
 #include "debug.h"
 #include "distribution_grid.h"
 #include "flag.h"
@@ -167,7 +166,7 @@ void solar_tile::update_internal( time_point to, const tripoint_abs_ms &p, distr
 
     // TODO: Use something that doesn't calc a ton of worthless crap
     const auto total_sunlight = sum_conditions( zero + rounded_then, zero + rounded_now,
-                                p.raw() ).sunlight;
+                                p ).sunlight;
 
     const auto raw_produced = compute_solar_energy( power, total_sunlight );
     const auto produced = static_cast<int64_t>( raw_produced ) / 1000;
@@ -302,7 +301,7 @@ void charger_tile::update_internal( time_point to, const tripoint_abs_ms &p,
     }
     std::int64_t power = this->power * to_seconds<std::int64_t>( to - get_last_updated() );
     // TODO: Make not a copy from map.cpp
-    for( item *const outer : sm->get_items( p_within_sm.raw() ) ) {
+    for( item *const outer : sm->get_items( p_within_sm ) ) {
         outer->visit_items( [&power, &grid]( item * it ) {
             item &n = *it;
             if( !n.has_flag( flag_RECHARGE ) && !n.has_flag( flag_USE_UPS ) ) {

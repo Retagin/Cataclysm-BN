@@ -28,6 +28,7 @@
 #include "mapsharing.h"
 #include "output.h"
 #include "path_info.h"
+#include "path_utils.h"
 #include "point.h"
 #include "popup.h"
 #include "sdlsound.h"
@@ -1036,7 +1037,7 @@ void options_manager::cOpt::setValue( const std::string &sSetIn )
  */
 static std::vector<options_manager::id_and_option> build_resource_list(
     std::map<std::string, std::string> &resource_option, const std::string &operation_name,
-    const std::string &dirname, const std::string &filename )
+    const fs::path &dirname, const fs::path &filename )
 {
     std::vector<options_manager::id_and_option> resource_names;
 
@@ -1044,7 +1045,7 @@ static std::vector<options_manager::id_and_option> build_resource_list(
     const auto resource_dirs = get_directories_with( filename, dirname, true );
 
     for( auto &resource_dir : resource_dirs ) {
-        read_from_file( resource_dir + "/" + filename, [&]( std::istream & fin ) {
+        read_from_file( resource_dir / filename, [&]( std::istream & fin ) {
             std::string resource_name;
             std::string view_name;
             // should only have 2 values inside it, otherwise is going to only load the last 2 values
@@ -1075,7 +1076,8 @@ static std::vector<options_manager::id_and_option> build_resource_list(
                 debugmsg( "Found \"%s\" duplicate with name \"%s\" (new definition will be ignored)",
                           operation_name, resource_name );
             } else {
-                resource_option.insert( std::pair<std::string, std::string>( resource_name, resource_dir ) );
+                resource_option.insert( std::pair<std::string, std::string>( resource_name,
+                                        cata_files::path_to_generic_utf8( resource_dir ) ) );
             }
         } );
     }
@@ -1084,7 +1086,7 @@ static std::vector<options_manager::id_and_option> build_resource_list(
 }
 
 std::vector<options_manager::id_and_option> options_manager::load_tilesets_from(
-    const std::string &path )
+    const fs::path &path )
 {
     // Use local map as build_resource_list will clear the first parameter
     std::map<std::string, std::string> local_tilesets;
@@ -1126,7 +1128,7 @@ std::vector<options_manager::id_and_option> options_manager::build_tilesets_list
 }
 
 std::vector<options_manager::id_and_option> options_manager::load_soundpack_from(
-    const std::string &path )
+    const fs::path &path )
 {
     // build_resource_list will clear &resource_option - first param
     std::map<std::string, std::string> local_soundpacks;
@@ -1164,8 +1166,8 @@ std::vector<options_manager::id_and_option> options_manager::build_soundpacks_li
 #if defined(__ANDROID__)
 bool options_manager::android_get_default_setting( const char *settings_name, bool default_value )
 {
-    JNIEnv *env = static_cast< JNIEnv *>( SDL_AndroidGetJNIEnv() );
-    jobject activity = static_cast< jobject>( SDL_AndroidGetActivity() );
+    JNIEnv *env = static_cast< JNIEnv *>( SDL_GetAndroidJNIEnv() );
+    jobject activity = static_cast< jobject>( SDL_GetAndroidActivity() );
     jclass clazz( env->GetObjectClass( activity ) );
     jmethodID method_id = env->GetMethodID( clazz, "getDefaultSetting", "(Ljava/lang/String;Z)Z" );
     jboolean ans = env->CallBooleanMethod( activity, method_id, env->NewStringUTF( settings_name ),
@@ -1618,13 +1620,19 @@ void options_manager::add_options_interface()
          //~ 12h time, e.g.  11:59pm
     {   { "12h", translate_marker( "12h" ) },
         //~ Military time, e.g.  2359
-        { "military", translate_marker( "Military" ) },
+        { "military", translate_marker_context( "time format", "Military" ) },
         //~ 24h time, e.g.  23:59
         { "24h", translate_marker( "24h" ) }
     },
     "12h" );
 
     add_empty_line();
+
+    add( "USE_PINYIN_SEARCH", interface, translate_marker( "Use pinyin in search" ),
+         translate_marker( "If true, pinyin can be used in searching and filtering Chinese text.  "
+                           "May slow down searches with many entries." ),
+         false
+       );
 
     add( "FORCE_CAPITAL_YN", interface, translate_marker( "Force Y/N in prompts" ),
          translate_marker( "If true, Y/N prompts are case-sensitive and y and n are not accepted." ),
@@ -1995,6 +2003,21 @@ void options_manager::add_options_graphics()
 
     get_option( "NIGHT_VISION_COLOR" ).setPrerequisite( "NIGHT_VISION_DEFAULT_COLOR", "custom" );
 
+    add( "ENHANCED_NIGHT_VISION_DEFAULT_COLOR", graphics,
+         translate_marker( "Enhanced Night Vision Default Colors" ),
+    translate_marker( "Choose from default night vision colors." ), {
+        { "#6cf5e7", translate_marker( "White Phosphor" ) },
+        { "#33e84e", translate_marker( "Green Phosphor" ) },
+        { "#888888", translate_marker( "Gray" ) },
+        { "custom", translate_marker( "Custom" ) }
+    }, "#6cf5e7" );
+
+    add( "ENHANCED_NIGHT_VISION_COLOR", graphics, translate_marker( "Enhanced Night Vision Color" ),
+         translate_marker( "Sets custom night vision color." ), "#6cf5e7", 60 );
+
+    get_option( "ENHANCED_NIGHT_VISION_COLOR" ).setPrerequisite( "ENHANCED_NIGHT_VISION_DEFAULT_COLOR",
+            "custom" );
+
     add_empty_line();
 
     add( "TERMINAL_X", graphics, translate_marker( "Terminal width" ),
@@ -2091,6 +2114,13 @@ void options_manager::add_options_graphics()
        );
 
     get_option( "USE_CHARACTER_PREVIEW" ).setPrerequisite( "USE_TILES" );
+
+    add( "LOADING_SCREEN_IMAGES", graphics, translate_marker( "Loading screen images" ),
+         translate_marker( "If true, shows loading splash images when available." ),
+         true, COPT_CURSES_HIDE
+       );
+
+    get_option( "LOADING_SCREEN_IMAGES" ).setPrerequisite( "USE_TILES" );
 
     add_empty_line();
 
@@ -2394,6 +2424,32 @@ void options_manager::add_options_performance()
              translate_marker( "When enabled, obstacles at other z-levels correctly cast 3D shadows. Requires 3D FoV. Significantly slower than disabled." ),
              false
            );
+        add( "PREVENT_OCCLUSION", page_id, translate_marker( "Handle occlusion by high sprites" ),
+             translate_marker( "Draw tall sprites normal (Off), retracted/transparent (On), or automatically retracting/transparent near the player (Auto)." ),
+        {
+            { "off", translate_marker( "Off" ) },
+            { "on", translate_marker( "On" ) },
+            { "auto", translate_marker( "Auto" ) }
+        },
+        "auto" );
+        add( "PREVENT_OCCLUSION_TRANSP", page_id, translate_marker( "Prevent occlusion via transparency" ),
+             translate_marker( "Prevent high-sprite occlusion by using semi-transparent *_transparent tile variants when available." ),
+             true
+           );
+        add( "PREVENT_OCCLUSION_RETRACT", page_id, translate_marker( "Prevent occlusion via retraction" ),
+             translate_marker( "Prevent high-sprite occlusion by retracting sprites that define retracted offsets." ),
+             true
+           );
+        add( "PREVENT_OCCLUSION_MIN_DIST", page_id,
+             translate_marker( "Minimum distance for automatic occlusion handling" ),
+             translate_marker( "Minimum distance for automatic occlusion handling. Values above zero override tileset settings." ),
+             0.0, 60.0, 0.0, 0.1
+           );
+        add( "PREVENT_OCCLUSION_MAX_DIST", page_id,
+             translate_marker( "Maximum distance for automatic occlusion handling" ),
+             translate_marker( "Maximum distance for automatic occlusion handling. Values above zero override tileset settings." ),
+             0.0, 60.0, 0.0, 0.1
+           );
     } );
 
     get_option( "FOV_3D_Z_RANGE" ).setPrerequisite( "FOV_3D" );
@@ -2459,10 +2515,8 @@ void options_manager::add_options_performance()
              true );
         add( "LAZY_BORDER", page_id,
              translate_marker( "Pre-load Border" ),
-             translate_marker( "Keep a border of submaps loaded around the reality bubble.  "
-                               "These are pre-loaded from disk in the background so that map "
-                               "shifts are faster (the data is already in memory).  Uses more "
-                               "memory but reduces stalls when the map scrolls.  " ),
+             translate_marker( "No effect — lazy border loading is pending async mapgen rework "
+                               "and is currently disabled regardless of this setting." ),
              !is_android );
     } );
 
@@ -2537,25 +2591,27 @@ void options_manager::add_options_performance()
                                           to_translation( "Configure how submaps are loaded and "
                                                   "processed outside of the reality bubble." ) ),
     [&]( auto & page_id ) {
-        add( "REALITY_BUBBLE_FIRE_SPREAD", page_id,
-             translate_marker( "Out-of-Bubble Fire Spread" ),
-             translate_marker( "Controls whether fire can keep areas loaded outside of render "
-                               "distance. 'None': fire burns out in place. "
-                               "'Adjacent': fire can spread into unloaded areas, and keeps "
-        "close enough." ), {
-            { "none", translate_marker( "None (pause spread)" ) },
-            { "adjacent", translate_marker( "Adjacent (one layer)" ) }
-        },
-        is_android ? "none" : "adjacent"
-           );
-        add( "FIRE_SPREAD_SUBMAP_CAP", page_id,
-             translate_marker( "Fire Spread Submap Cap" ),
-             translate_marker( "Maximum number of submaps that fire spread may keep loaded "
-                               "simultaneously across all dimensions. Higher values allow larger "
-                               "fires to be simulated correctly. "
-                               "0 disables out-of-bubble fire spread loading entirely. " ),
-             0, 250, 25 );
-        add( "POWER_PORTAL_LOAD_RADIUS", performance,
+        // Temporary fix for #8726: disable out-of-bubble fire spread until
+        // fire-loaded submaps can safely handle vehicle state.
+        // add( "REALITY_BUBBLE_FIRE_SPREAD", page_id,
+        //      translate_marker( "Out-of-Bubble Fire Spread" ),
+        //      translate_marker( "Controls whether fire can keep areas loaded outside of render "
+        //                        "distance. 'None': fire burns out in place. "
+        //                        "'Adjacent': fire can spread into unloaded areas, and keeps "
+        //                        "close enough." ), {
+        //     { "none", translate_marker( "None (pause spread)" ) },
+        //     { "adjacent", translate_marker( "Adjacent (one layer)" ) }
+        // },
+        // is_android ? "none" : "adjacent"
+        //    );
+        // add( "FIRE_SPREAD_SUBMAP_CAP", page_id,
+        //      translate_marker( "Fire Spread Submap Cap" ),
+        //      translate_marker( "Maximum number of submaps that fire spread may keep loaded "
+        //                        "simultaneously across all dimensions. Higher values allow larger "
+        //                        "fires to be simulated correctly. "
+        //                        "0 disables out-of-bubble fire spread loading entirely. " ),
+        //      0, 250, 25 );
+        add( "POWER_PORTAL_LOAD_RADIUS", page_id,
              translate_marker( "Power portal load radius (submaps)" ),
              translate_marker( "Radius in submaps around each end of a power-portal link that is "
                                "force-loaded while the link is active." ),
@@ -2563,7 +2619,7 @@ void options_manager::add_options_performance()
            );
     } );
 
-    get_option( "FIRE_SPREAD_SUBMAP_CAP" ).setPrerequisite( "REALITY_BUBBLE_FIRE_SPREAD", "adjacent" );
+    // get_option( "FIRE_SPREAD_SUBMAP_CAP" ).setPrerequisite( "REALITY_BUBBLE_FIRE_SPREAD", "adjacent" );
 }
 
 void options_manager::add_options_debug()
@@ -2693,14 +2749,6 @@ void options_manager::add_options_debug()
          translate_marker( "If true, injuries cause persistent pain until they are healed." ), false );
 
     add_empty_line();
-
-    add( "MIN_AUTODRIVE_SPEED", debug, translate_marker( "Minimum auto-drive speed" ),
-         translate_marker( "Set the minimum speed for the auto-drive feature.  In tiles/s.  Default is 1 (6 km/h or 4 mph)." ),
-         1, 100, 1 );
-
-    add( "MAX_AUTODRIVE_SPEED", debug, translate_marker( "Maximum auto-drive speed" ),
-         translate_marker( "Set the maximum speed for the auto-drive feature.  In tiles/s.  Default is 9 (57 km/h or 36 mph)." ),
-         1, 100, 9 );
 
     add( "LIMITED_BAYONETS", debug, translate_marker( "New bayonet system" ),
          translate_marker( "If true, bayonets replace weapon attack instead of adding to it.  WIP feature, weakens bayonets heavily at the moment." ),
@@ -4044,10 +4092,14 @@ std::string options_manager::show( bool ingame, const bool world_options_only,
 
             } else if( iter.first == "TILES" || iter.first == "USE_TILES" || iter.first == "STATICZEFFECT" ||
                        iter.first == "MEMORY_MAP_MODE" || iter.first == "OVERMAP_TILES" ||
-                       iter.first == "NIGHT_VISION_COLOR" || iter.first == "NIGHT_VISION_DEFAULT_COLOR" ) {
+                       iter.first == "NIGHT_VISION_COLOR" || iter.first == "NIGHT_VISION_DEFAULT_COLOR" ||
+                       iter.first == "ENHANCED_NIGHT_VISION_COLOR" ||
+                       iter.first == "ENHANCED_NIGHT_VISION_DEFAULT_COLOR" ) {
                 used_tiles_changed = true;
                 if( iter.first == "STATICZEFFECT" || iter.first == "MEMORY_MAP_MODE" ||
-                    iter.first == "NIGHT_VISION_COLOR" || iter.first == "NIGHT_VISION_DEFAULT_COLOR" ) {
+                    iter.first == "NIGHT_VISION_COLOR" || iter.first == "NIGHT_VISION_DEFAULT_COLOR" ||
+                    iter.first == "ENHANCED_NIGHT_VISION_COLOR" ||
+                    iter.first == "ENHANCED_NIGHT_VISION_DEFAULT_COLOR" ) {
                     force_tile_change = true;
                 }
             } else if( iter.first == "USE_LANG" ) {
@@ -4206,12 +4258,20 @@ void options_manager::cache_to_globals()
     use_tiles = false;
     use_tiles_overmap = false;
 #endif
+    use_pinyin_search = ::get_option<bool>( "USE_PINYIN_SEARCH" );
     log_from_top = ::get_option<std::string>( "LOG_FLOW" ) == "new_top";
     message_ttl = ::get_option<int>( "MESSAGE_TTL" );
     message_cooldown = ::get_option<int>( "MESSAGE_COOLDOWN" );
     fov_3d = ::get_option<bool>( "FOV_3D" );
     fov_3d_z_range = ::get_option<int>( "FOV_3D_Z_RANGE" );
     fov_3d_occlusion = ::get_option<bool>( "FOV_3D_OCCLUSION" );
+    const auto prevent_occlusion_option = ::get_option<std::string>( "PREVENT_OCCLUSION" );
+    prevent_occlusion = prevent_occlusion_option == "off" ? 0 : prevent_occlusion_option == "on" ? 1 :
+                        2;
+    prevent_occlusion_retract = ::get_option<bool>( "PREVENT_OCCLUSION_RETRACT" );
+    prevent_occlusion_transp = ::get_option<bool>( "PREVENT_OCCLUSION_TRANSP" );
+    prevent_occlusion_min_dist = ::get_option<float>( "PREVENT_OCCLUSION_MIN_DIST" );
+    prevent_occlusion_max_dist = ::get_option<float>( "PREVENT_OCCLUSION_MAX_DIST" );
     static_z_effect = ::get_option<bool>( "STATICZEFFECT" );
     overmap_transparency = ::get_option<bool>( "OVERMAP_TRANSPARENCY" );
     PICKUP_RANGE = ::get_option<int>( "PICKUP_RANGE" );
@@ -4225,9 +4285,10 @@ void options_manager::cache_to_globals()
     lod_coarse_scent_interval = ::get_option<int>( "LOD_COARSE_SCENT_INTERVAL" );
     lod_group_morale_max_tier = ::get_option<int>( "LOD_GROUP_MORALE_MAX_TIER" );
 
-    reality_bubble_fire_spread =
-        ::get_option<std::string>( "REALITY_BUBBLE_FIRE_SPREAD" ) == "adjacent";
-    fire_spread_submap_cap = ::get_option<int>( "FIRE_SPREAD_SUBMAP_CAP" );
+    // Temporary fix for #8726: force out-of-bubble fire spread off while the
+    // corresponding options are commented out above.
+    reality_bubble_fire_spread = false;
+    fire_spread_submap_cap = 0;
 
     {
         const auto psl_str = ::get_option<std::string>( "POCKET_SIMULATION_LEVEL" );
@@ -4251,7 +4312,7 @@ void options_manager::cache_to_globals()
     monster_plan_chunk_size   = ::get_option<int>( "MONSTER_PLAN_CHUNK_SIZE" );
     parallel_map_cache        = ::get_option<bool>( "PARALLEL_MAP_CACHE" );
     parallel_scent_update     = ::get_option<bool>( "PARALLEL_SCENT_UPDATE" );
-    lazy_border_enabled = ::get_option<bool>( "LAZY_BORDER" );
+    lazy_border_enabled = ::get_option<bool>( "LAZY_BORDER" ) && false;
 
     merge_comestible_mode = ( [] {
         const auto opt = ::get_option<std::string>( "MERGE_COMESTIBLES" );

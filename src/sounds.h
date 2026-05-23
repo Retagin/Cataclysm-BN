@@ -9,6 +9,7 @@
 #include "type_id.h"
 #include "point.h"
 
+#include "coordinates.h"
 #include "enum_traits.h"
 #include "units_angle.h"
 
@@ -20,7 +21,6 @@ class item;
 class monster;
 class player;
 class translation;
-struct tripoint;
 struct sound_event;
 template <typename E> struct enum_traits;
 
@@ -68,11 +68,11 @@ void process_sounds_npc();
 void process_sound_markers( Character *who );
 
 // Return list of points that have sound events the player can hear.
-std::vector<tripoint> get_footstep_markers();
+std::vector<tripoint_bub_ms> get_footstep_markers();
 // Return a vector of all sound events not from monsters, and all sound events from monsters.
-std::pair< std::vector<tripoint>, std::vector<tripoint>> get_monster_sounds();
+std::pair< std::vector<tripoint_bub_ms>, std::vector<tripoint_bub_ms>> get_monster_sounds();
 // retrieve the sound event(s?) at a location.
-std::string sound_at( const tripoint &location );
+std::string sound_at( const tripoint_bub_ms &location );
 /** Tells us if sound has been enabled in options */
 extern bool sound_enabled;
 
@@ -145,14 +145,14 @@ void play_ambient_variant_sound( const std::string &id, const std::string &varia
                                  channel channel, int fade_in_duration, double pitch = -1.0, int loops = -1 );
 void play_activity_sound( const std::string &id, const std::string &variant, int volume );
 void end_activity_sounds();
-void generate_gun_sound( const tripoint &source, const item &firing );
-void generate_melee_sound( const tripoint &source, const tripoint &target, bool hit,
+void generate_gun_sound( const tripoint_bub_ms &source, const item &firing );
+void generate_melee_sound( const tripoint_bub_ms &source, const tripoint_bub_ms &target, bool hit,
                            bool targ_mon = false, const std::string &material = "flesh" );
 void do_hearing_loss( int turns = -1 );
 void remove_hearing_loss();
 void do_projectile_hit( const Creature &target );
-int get_heard_volume( const tripoint &source );
-units::angle get_heard_angle( const tripoint &source );
+int get_heard_volume( const tripoint_bub_ms &source );
+units::angle get_heard_angle( const tripoint_bub_ms &source );
 void do_footstep();
 void do_danger_music();
 void do_ambient();
@@ -165,6 +165,8 @@ bool has_variant_sound( const std::string &id, const std::string &variant );
 void stop_sound_effect_fade( channel channel, int duration );
 void stop_sound_effect_timed( channel channel, int time );
 int set_channel_volume( channel channel, int volume );
+void set_channel_3d_position( channel channel, units::angle angle, int distance = 0 );
+int get_channel_volume( channel channel );
 void do_player_death_hurt( const player &target, bool death );
 void do_fatigue();
 // @param obst should be string id of obstacle terrain or vehicle part

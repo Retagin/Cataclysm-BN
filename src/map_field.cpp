@@ -17,7 +17,6 @@
 #include "bodypart.h"
 #include "calendar.h"
 #include "cata_utility.h"
-#include "coordinate_conversions.h"
 #include "creature.h"
 #include "damage.h"
 #include "debug.h"
@@ -153,7 +152,7 @@ static inline bool check_flammable( const map_data_common_t &t )
 /*
 Helper function that encapsulates the logic involved in creating hot air.
 */
-void map::create_hot_air( const tripoint &p, int intensity )
+void map::create_hot_air( const tripoint_bub_ms &p, int intensity )
 {
     field_type_id hot_air;
     switch( intensity ) {
@@ -175,7 +174,7 @@ void map::create_hot_air( const tripoint &p, int intensity )
     }
 
     for( int counter = 0; counter < 5; counter++ ) {
-        tripoint dst( p + point( rng( -1, 1 ), rng( -1, 1 ) ) );
+        tripoint_bub_ms dst( p + point( rng( -1, 1 ), rng( -1, 1 ) ) );
         add_field( dst, hot_air, 1 );
     }
 }
@@ -192,13 +191,13 @@ If you wish for a field effect to do something over time (propagate, interact wi
 void map::player_in_field( player &u )
 {
     // A copy of the current field for reference. Do not add fields to it, use map::add_field
-    field &curfield = get_field( u.pos() );
+    field &curfield = get_field( u.bub_pos() );
     // Are we inside?
     bool inside = false;
     // If we are in a vehicle figure out if we are inside (reduces effects usually)
     // and what part of the vehicle we need to deal with.
     if( u.in_vehicle ) {
-        if( const optional_vpart_position vp = veh_at( u.pos() ) ) {
+        if( const optional_vpart_position vp = veh_at( u.bub_pos() ) ) {
             inside = vp->is_inside();
         }
     }
@@ -542,7 +541,7 @@ void map::creature_in_field( Creature &critter )
             // If we are in a vehicle figure out if we are inside (reduces effects usually)
             // and what part of the vehicle we need to deal with.
             if( in_vehicle ) {
-                if( const optional_vpart_position vp = veh_at( u->pos() ) ) {
+                if( const optional_vpart_position vp = veh_at( u->bub_pos() ) ) {
                     if( vp->is_inside() ) {
                         inside_vehicle = true;
                     }
@@ -556,7 +555,7 @@ void map::creature_in_field( Creature &critter )
         }
     }
 
-    field &curfield = get_field( critter.pos() );
+    field &curfield = get_field( critter.bub_pos() );
     for( auto &field_entry_it : curfield ) {
         field_entry &cur_field_entry = field_entry_it.second;
         if( !cur_field_entry.is_field_alive() ) {
@@ -608,11 +607,11 @@ void map::monster_in_field( monster &z )
         // Digging monsters are immune to fields
         return;
     }
-    if( veh_at( z.pos() ) ) {
+    if( veh_at( z.bub_pos() ) ) {
         // FIXME: Immune when in a vehicle for now.
         return;
     }
-    field &curfield = get_field( z.pos() );
+    field &curfield = get_field( z.bub_pos() );
 
     int dam = 0;
     // Iterate through all field effects on this tile.
@@ -865,7 +864,7 @@ void map::monster_in_field( monster &z )
 }
 
 std::tuple<maptile, maptile, maptile> map::get_wind_blockers( const int &winddirection,
-        const tripoint &pos )
+        const tripoint_bub_ms &pos )
 {
     static const std::array<std::pair<int, std::tuple< point, point, point >>, 9> outputs = {{
             { 330, std::make_tuple( point_east, point_north_east, point_south_east ) },
@@ -880,14 +879,14 @@ std::tuple<maptile, maptile, maptile> map::get_wind_blockers( const int &winddir
         }
     };
 
-    tripoint removepoint;
-    tripoint removepoint2;
-    tripoint removepoint3;
+    tripoint_bub_ms removepoint;
+    tripoint_bub_ms removepoint2;
+    tripoint_bub_ms removepoint3;
     for( const std::pair<int, std::tuple< point, point, point >> &val : outputs ) {
         if( winddirection >= val.first ) {
-            removepoint = pos + std::get<0>( val.second );
-            removepoint2 = pos + std::get<1>( val.second );
-            removepoint3 = pos + std::get<2>( val.second );
+            removepoint = tripoint_bub_ms( pos + std::get<0>( val.second ) );
+            removepoint2 = tripoint_bub_ms( pos + std::get<1>( val.second ) );
+            removepoint3 = tripoint_bub_ms( pos + std::get<2>( val.second ) );
             break;
         }
     }
@@ -898,7 +897,7 @@ std::tuple<maptile, maptile, maptile> map::get_wind_blockers( const int &winddir
     return std::make_tuple( remove_tile, remove_tile2, remove_tile3 );
 }
 
-void map::emit_field( const tripoint &pos, const emit_id &src, float mul )
+void map::emit_field( const tripoint_bub_ms &pos, const emit_id &src, float mul )
 {
     if( !src.is_valid() ) {
         return;
@@ -911,12 +910,12 @@ void map::emit_field( const tripoint &pos, const emit_id &src, float mul )
     }
 }
 
-void map::propagate_field( const tripoint &center, const field_type_id &type, int amount,
+void map::propagate_field( const tripoint_bub_ms &center, const field_type_id &type, int amount,
                            int max_intensity )
 {
-    using gas_blast = std::pair<float, tripoint>;
+    using gas_blast = std::pair<float, tripoint_bub_ms>;
     std::priority_queue<gas_blast, std::vector<gas_blast>, pair_greater_cmp_first> open;
-    std::set<tripoint> closed;
+    std::set<tripoint_bub_ms> closed;
     open.emplace( 0.0f, center );
 
     const bool not_gas = type.obj().phase != GAS;
@@ -961,7 +960,7 @@ void map::propagate_field( const tripoint &center, const field_type_id &type, in
             static const std::array<int, 8> x_offset = {{ -1, 1,  0, 0,  1, -1, -1, 1  }};
             static const std::array<int, 8> y_offset = {{  0, 0, -1, 1, -1,  1, -1, 1  }};
             for( size_t i = 0; i < 8; i++ ) {
-                tripoint pt = gp.second + point( x_offset[ i ], y_offset[ i ] );
+                auto pt = gp.second + point( x_offset[ i ], y_offset[ i ] );
                 if( closed.contains( pt ) ) {
                     continue;
                 }
@@ -989,7 +988,7 @@ namespace
 // Lightweight tile handle to any loaded submap.
 struct SubTile {
     submap *sm    = nullptr;
-    point   local;
+    point_sm_ms   local;
 
     [[nodiscard]] auto valid()      const -> bool                    { return sm != nullptr; }
     [[nodiscard]] auto get_field()  const -> field                 & { return sm->get_field( local ); }
@@ -1001,18 +1000,18 @@ struct SubTile {
 // Resolve `local + delta` crossing submap boundaries via mapbuffer.
 // Returns an invalid SubTile if the neighbour is not loaded.
 auto neighbor_tile( submap *base, const tripoint_abs_sm &base_pos,
-                    const point &local, const point &delta,
+                    const point_sm_ms &local, const point &delta,
                     mapbuffer &mb ) -> SubTile
 {
-    const auto nx  = local.x + delta.x;
-    const auto ny  = local.y + delta.y;
+    const auto nx  = local.x() + delta.x;
+    const auto ny  = local.y() + delta.y;
     const auto dsx = nx < 0 ? -1 : ( nx >= SEEX ? 1 : 0 );
     const auto dsy = ny < 0 ? -1 : ( ny >= SEEY ? 1 : 0 );
     if( dsx == 0 && dsy == 0 ) {
         return { base, { nx, ny } };
     }
     const tripoint_abs_sm nbr_pos( base_pos.raw() + tripoint{ dsx, dsy, 0 } );
-    auto *nbr = mb.lookup_submap_in_memory( nbr_pos.raw() );
+    auto *nbr = mb.lookup_submap_in_memory( nbr_pos );
     if( !nbr ) {
         return {};
     }
@@ -1120,7 +1119,7 @@ auto process_fields_in_submap( submap &sm,
     // Newly-added entries are newborn (age 0) and skip all effects anyway, so processing
     // them next tick is correct behaviour.
     const auto field_positions = sm.field_cache;
-    std::ranges::for_each( field_positions, [&]( const point & local ) {
+    std::ranges::for_each( field_positions, [&]( const point_sm_ms & local ) {
         auto &curfield = sm.get_field( local );
 
         if( !curfield.displayed_field_type() ) {
@@ -1259,9 +1258,9 @@ auto process_fields_in_submap( submap &sm,
                 }
 
                 // --- Z-rise: level-3 fire spreads upward ---
-                if( pos.z() < OVERMAP_HEIGHT && cur.get_field_intensity() == 3 ) {
+                if( can_spread && pos.z() < OVERMAP_HEIGHT && cur.get_field_intensity() == 3 ) {
                     const tripoint_abs_sm above_pos( pos.raw() + tripoint{ 0, 0, 1 } );
-                    auto *above_sm = mb.lookup_submap_in_memory( above_pos.raw() );
+                    auto *above_sm = mb.lookup_submap_in_memory( above_pos );
                     if( above_sm ) {
                         const auto &above_ter = above_sm->get_ter( local ).obj();
                         if( above_ter.has_flag( TFLAG_NO_FLOOR ) ||
@@ -1391,7 +1390,7 @@ auto process_fields_in_submap( submap &sm,
                 // --- Z-fall: fire on open-air tile falls to z-level below ---
                 if( no_floor && pos.z() > -OVERMAP_DEPTH ) {
                     const tripoint_abs_sm below_pos( pos.raw() + tripoint{ 0, 0, -1 } );
-                    auto *below_sm = mb.lookup_submap_in_memory( below_pos.raw() );
+                    auto *below_sm = mb.lookup_submap_in_memory( below_pos );
                     if( below_sm ) {
                         auto *fire_below = below_sm->get_field( local ).find_field( fd_fire );
                         if( !fire_below ) {
@@ -1421,12 +1420,13 @@ auto process_fields_in_submap( submap &sm,
             if( !is_newborn && cur.gas_can_spread() ) {
                 const auto gas_pct = cur_fd_type.percent_spread;
                 if( gas_pct > 0 && cur.get_field_intensity() > 1 &&
+                    !sm.floor_cache[local.x()][local.y()] &&
                     rng( 1, 100 ) <= gas_pct ) {
                     // Try to fall first.
                     auto spread_done = false;
                     if( pos.z() > -OVERMAP_DEPTH ) {
                         const tripoint_abs_sm below_pos( pos.raw() + tripoint{ 0, 0, -1 } );
-                        auto *below_sm = mb.lookup_submap_in_memory( below_pos.raw() );
+                        auto *below_sm = mb.lookup_submap_in_memory( below_pos );
                         if( below_sm ) {
                             auto dst = SubTile{ below_sm, local };
                             if( gas_can_spread_sub( cur, dst ) ) {
@@ -1587,12 +1587,12 @@ auto process_fields_in_submap( submap &sm,
                             ydir = rng( -1, 1 );
                         }
                         const auto dist = rng( 4, 12 );
-                        auto cx         = local.x;
-                        auto cy         = local.y;
+                        auto cx         = local.x();
+                        auto cy         = local.y();
                         for( auto n = 0; n < dist; ++n ) {
                             cx += xdir;
                             cy += ydir;
-                            const auto delta = point{ cx - local.x, cy - local.y };
+                            const auto delta = point{ cx - local.x(), cy - local.y() };
                             auto bolt_dst    = neighbor_tile( &sm, pos, local, delta, mb );
                             sub_add_field( bolt_dst, fd_electricity, rng( 2, 3 ), 0_turns );
                             if( one_in( 4 ) ) {
@@ -1720,8 +1720,8 @@ auto process_fields_in_submap( submap &sm,
                 for( auto wx = -wradius; wx <= wradius; ++wx ) {
                     for( auto wy = -wradius; wy <= wradius; ++wy ) {
                         const auto wlocal = local + point{ wx, wy };
-                        if( wlocal.x < 0 || wlocal.x >= SEEX ||
-                            wlocal.y < 0 || wlocal.y >= SEEY ) {
+                        if( wlocal.x() < 0 || wlocal.x() >= SEEX ||
+                            wlocal.y() < 0 || wlocal.y() >= SEEY ) {
                             continue;
                         }
                         auto *wfld = sm.get_field( wlocal ).find_field( wtype );
@@ -1770,11 +1770,11 @@ auto process_fields_in_submap( submap &sm,
     // duplicates are discarded in the same pass that removes dead entries.
     std::bitset<SEEX *SEEY> seen;
     sm.field_cache.erase(
-    std::ranges::remove_if( sm.field_cache, [&]( const point & local ) {
+    std::ranges::remove_if( sm.field_cache, [&]( const point_sm_ms & local ) {
         if( !sm.get_field( local ).displayed_field_type() ) {
             return true;
         }
-        const auto idx = static_cast<std::size_t>( local.x + local.y * SEEX );
+        const auto idx = static_cast<std::size_t>( local.x() + local.y() * SEEX );
         if( seen.test( idx ) ) {
             return true;
         }
