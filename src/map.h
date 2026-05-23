@@ -2124,6 +2124,10 @@ class map : public submap_load_listener
         tripoint_bub_sm abs_to_bub( const tripoint_abs_sm &abs ) const {
             return tripoint_bub_sm( tripoint( abs.x() - abs_sub.x(), abs.y() - abs_sub.y(), abs.z() ) );
         }
+        point_abs_ms bub_to_abs( const point_bub_ms &bub ) const { return project_to<coords::ms>( abs_sub ).xy() + point_rel_ms( bub.raw() ); }
+        point_bub_ms abs_to_bub( const point_abs_ms &abs ) const { return point_bub_ms( ( abs - project_to<coords::ms>( abs_sub ).xy() ).raw() ); }
+        point_abs_sm bub_to_abs( const point_bub_sm &bub ) const { return abs_sub.xy() + point_rel_sm( bub.raw() ); }
+        point_bub_sm abs_to_bub( const point_abs_sm &abs ) const { return ( abs - abs_sub.raw().xy() ).reinterpret_as<point_bub_sm>(); }
         /** Returns true if point p resides along the border of the reality bubble. */
         bool on_bubble_border( const point_bub_ms &p ) const;
 
