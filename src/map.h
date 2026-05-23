@@ -98,7 +98,6 @@ struct weighted_int_list;
 struct rl_vec2d;
 struct sound_event;
 
-
 /** Causes all generated maps to be empty grass and prevents saved maps from being loaded, used by the test suite */
 extern bool disable_mapgen;
 
@@ -427,43 +426,88 @@ struct level_cache {
     std::vector<bool> sound_wall_cache;
 };
 
-// Use the vector sounds_caches for most purposes when working with sounds in reference to a specific position or checking multiple sounds.
-// Each sound cache is an originating sound_event, a "volume" short that stores the mdB volume of that sound event at that map position, and some sorting bools.
-// These are kept until they have been heard by both monsters and the player, and are then discarded/removed from the sounds_caches vector.
-struct sound_cache {
+// Use the vector sounds_caches for most purposes when working with sounds in
+// reference to a specific position or checking multiple sounds. Each
+// sound_instance_cache is an originating sound_event, a "volume" short that
+// stores the mdB volume of that sound event at that map position, and some
+// sorting bools. These are kept until they have been heard by both monsters and
+// the player, and are then discarded/removed from the sounds_caches vector.
+struct sound_instance_cache {
 
     // Zeros all relevant values.
     // Default constructor creates a zero-sized cache used as a null sentinel only.
-    sound_cache();
-    // Normal constructor: mx = SEEX * mapsize, my = SEEY * mapsize.
-    explicit sound_cache( int mx, int my );
-    sound_cache( const sound_cache &other ) = default;
-    sound_cache &operator=( const sound_cache &other ) = default;
+    sound_instance_cache();
 
-    // Runtime dimensions for this sound.
-    // cache_x = SEEX * mapsize, cache_y = SEEY * mapsize, cache_mapsize = mapsize.
-    int cache_x = 0;
-    int cache_y = 0;
-    int cache_mapsize = 0;
+    explicit sound_instance_cache( sound_event input_sound, const sound_vol_for_flood_dist d_e, const int f_r );
+    sound_instance_cache(const sound_instance_cache &other) = default;
+    sound_instance_cache &operator=(const sound_instance_cache &other) = default;
 
-    /// Flat index for tile-coordinate arrays: vec[x * cache_y + y].
-    /// Uses the runtime cache_y stride (= SEEY * mapsize) so that all
-    /// vector accesses correctly reflect the actual loaded-area dimensions.
-    auto idx( int x, int y ) const -> int { return x * cache_y + y; }
-    // Flat index for submap-coordinate bitsets: bitset[sx * cache_mapsize + sy]
-    int bidx( int sx, int sy ) const {
-        return sx * cache_mapsize + sy;
-    }
-
-    // The origionating sound, includes volume @1m, tripoint, description, type, etc.
+    // The originating sound, includes volume @1m, tripoint, description, type,
+    // etc.
     sound_event sound;
 
-    // Volume in 100ths of a dB (mdB) of the sound in question at the specified map coordinates.
-    // ---- 12 tile-coordinate arrays (size: cache_x * cache_y) ----
-    // Indexed as: vec[x * cache_y + y]  (X-outer layout, matching old C-array [MAPSIZE_X][MAPSIZE_Y])
-    // This has to be fully initialized when the sound is made, to the current bubble size.
+    enum sound_vol_for_flood_dist dist_enum;
+
+    // "radius" around the origin to flood a sound through.
+    // The flood envelope is 1 + (radius * 2) on a side. 
+    // Set based on the dist_enum above, and the distance setting for each enum in sound_cache.
+    // radius 7 equates to a 15x15 area, radius 3 is a 7x7 area. 
+    int flood_radius = 3;
+
+    // Normal tripoint origin of the sound instance.
+    tripoint origin;
+
+    // The tripoint that corresponds to index location 0.
+    // Calculated off the origin point - flood radius to x and y.
+    tripoint envelope_index_point;
+
+    // Offsets are used to convert between normal tripoint/point coords to the floodfill coords. 
+
+    // The numerical offset between index_point.x and 0. Must be calced on sound instance creation.
+    int offset_x;
+    // the numerical offset between index_point.y and 0. Must be calced on sound instance creation.
+    int offset_y;
+
+    // Volume in 100ths of a dB (mdB) of the sound in question
+    // Indexed as: vec[x * (flood_radius * 2) + y]
+    // The origin point is always the center tile, indexed at (flood_radius * (flood_radius * 2) + flood_radius) 
+    // This has to be fully initialized when the sound is made, to the desired flood envelope.
     std::vector<short> volume;
 
+    // The base volume level in mdB to use for long distance sound, by direction defaulting to 0.
+    // Determined by the highest volume on a tile along the envelope boundary in that respective direction.
+    //              0 1 2
+    // Indexed as   7 S 3 where S is the source, indexes 8 and 9 are Down and Up escapes, respectively. 
+    //              6 5 4
+    // Index to use is determined by general direction from source to requester.
+    std::array<short,10> base_distance_vol_by_dir = {{0}};
+    
+    // Flat index for tile-coordinate arrays: vec[x * (flood_radius * 2) + y].
+    // Returns index location if provided with x and y corrected to envelope quards.
+    // vector accesses DOES NOT REFLECT ACTUAL LOADED-AREA DIMENSIONS.
+    // auto idx(int x, int y) const -> int { return x * (2 * flood_radius) + y; }
+
+    // Returns corresponding flood envelope volume index provided normal x / y coords
+    auto env_index(int x, int y) const -> int { return ((x - offset_x) * (2 * flood_radius) + (y - offset_y)); }
+
+    // Returns the corresponding flood envelope volume index provided a normal point.
+    auto p_to_env_index(const point &p) const -> int { return ((p.x - offset_x) * (2 * flood_radius) + (p.y - offset_y)); }
+
+    // Checks if a point is in the envelope, returns the volume at that index if true and 0 if not.
+    auto vol_at_tri(const tripoint &tri) const -> short {return (in_envelope(tri) ? volume[p_to_env_index(tri.xy())] : 0);}
+
+    // Flat index for submap-coordinate bitsets: bitset[sx * cache_mapsize + sy]
+    // int bidx(int sx, int sy) const { return sx * cache_mapsize + sy; }
+
+    // Returns true if a given tripoint is inside our envelope. X and Y offsets taken from our index point, the bottom left corner of our envelope.
+    bool in_envelope(const tripoint &tp) const {
+        return (tp.x - offset_x) >= 0 && (tp.y - offset_y) >= 0 && (tp.x - offset_x) <= (flood_radius * 2) && (tp.y - offset_y) <= (flood_radius * 2);
+    }
+    // Returns true if a given point is on the border of the flood envelope.
+    bool on_envelope_border(const point &p) const {
+        return (p.x - offset_x) == 0 || (p.x - offset_x) == (flood_radius * 2) || (p.y - offset_y) == 0 || (p.y - offset_y) == (flood_radius * 2);
+    }
+    
     // NPCs/Monsters/the Player all get a chance to hear a sound.
     // After everyone has heard the sound, it is deleted.
     // This requires a little bit of juggling.
@@ -475,7 +519,9 @@ struct sound_cache {
     // Has a sound been heard by the NPCs?
     bool heard_by_npcs = false;
 
-    // Is this noise from movement? For quick filtering, so monsters dont hear their own footsteps and NPCs dont investiage a noise they should know is wandering zombies.
+    // Is this noise from movement? For quick filtering, so monsters dont hear
+    // their own footsteps and NPCs dont investiage a noise they should know is
+    // wandering zombies.
     bool movement_noise = false;
     // Dis the player make this noise? for quick filtering.
     bool from_player = false;
@@ -483,7 +529,123 @@ struct sound_cache {
     bool from_monster = false;
     // Did an NPC make this noise? For quick filtering.
     bool from_npc = false;
-    // If the noise was not made by the player, a monster, or an NPC, it is ambient or enviornmental.
+    // If the noise was not made by the player, a monster, or an NPC, it is
+    // ambient or enviornmental.
+
+    // Was the source of our sound indoors?
+    bool source_indoors = false;
+    // If the source of our sound was indoors, did it ever escape to an outside tile?
+    // Used for approximating sound reduction of a large sealed room without having to actually floodfill an entire floor of the necropolis or something.
+    bool escaped_indoors = false;
+    
+    // mdB spl absorption per tile value of the local terrain at the sound source tile.
+    short terrain_sound_absorbtion_at_source = 0;
+    // The approximated tile distance until a sound reaches a volume of 20dB spl based on the maximum escape vol.
+    // Will always be atleast the flood radius, can be bonkers huge. 
+    // For use with monsters as a easy distance filter. Goodhearing monsters always ignore this and check anyways. 
+    int approximate_minvol_distance = 3;
+
+};
+
+// These are used to filter against the vector of sound instances 
+struct sound_filter_key {
+
+    // Ignore sounds of this category or less. Defaults to weather.
+    sounds::sound_t category = sounds::sound_t::weather;
+    mfaction_str_id monfaction = mfaction_str_id( "" );
+    // Not currently implimented, does this monster belong to an NPC faction? i.e., a robot owned by some survivors, someones dog, etc.
+    // faction_id npc_faction = faction_id( "no_faction" );
+    // Is the monster something like a zombie that uses simpler logic and gets angry at everything.
+    bool horde_monster = false;
+    // For whatever reason, does this monster ignore movement noise?
+    bool ignore_movement = false;
+    // Is the monster afraid of noise?
+    bool noise_fear = false;
+    // Does the monster get angry at noises?
+    bool noise_angers = false;
+
+};
+
+// One sound_cache to rule them all.
+// TODO: Make it so that each sound has a pointer or ref? Pointers need to be killed when sounds expire
+struct sound_cache {
+
+    //sound_cache(const sound_cache &) = default;
+    //sound_cache(sound_cache &&) = default;
+    //sound_cache &operator=(const sound_cache &) = default;
+    //sound_cache &operator=(sound_cache &&) = default;
+
+    std::vector<sound_instance_cache> sound_instances;
+
+    // Use these to tweak sound floodfilling.
+    // Only here for completeness and characters with super hearing or bionic ears in an anechoic chamber.
+    int flood_radius_SILENT = 1; // 3x3 flood. 
+    int flood_radius_NEARLY_SILENT = 3;
+    int flood_radius_QUIET = 4;
+    int flood_radius_NORMAL = 6;
+    int flood_radius_LOUD = 8;
+    int flood_radius_VERY_LOUD = 10;
+    int flood_radius_DEAFENING = 12; // radius 12 equates to a 25x25 flooded zone.
+    // in dB spl
+    short vol_threshold_SILENT = 1;
+    // in dB spl
+    short vol_threshold_NEARLY_SILENT = 20;
+    // in dB spl
+    short vol_threshold_QUIET = 45;
+    // in dB spl
+    short vol_threshold_NORMAL = 75;
+    // in dB spl
+    short vol_threshold_LOUD = 95;
+    // in dB spl
+    short vol_threshold_VERY_LOUD = 125;
+    // in dB spl
+    short vol_threshold_DEAFENING = 191;
+
+    // Return the radius to flood a sound out to from the provided enum.
+    int flood_radius_by_enum(const enum sound_vol_for_flood_dist &dist_enum) const {
+        switch (dist_enum) {
+            case sound_vol_for_flood_dist::SILENT: return flood_radius_SILENT;
+            case sound_vol_for_flood_dist::NEARLY_SILENT: return flood_radius_NEARLY_SILENT;
+            case sound_vol_for_flood_dist::QUIET: return flood_radius_QUIET;
+            case sound_vol_for_flood_dist::NORMAL: return flood_radius_NORMAL;
+            case sound_vol_for_flood_dist::LOUD: return flood_radius_LOUD;
+            case sound_vol_for_flood_dist::VERY_LOUD: return flood_radius_VERY_LOUD;
+            case sound_vol_for_flood_dist::DEAFENING: return flood_radius_DEAFENING;
+        }
+    }
+    // Return a sorting enum provided a dB volume short.
+    sound_vol_for_flood_dist flood_dist_enum_by_volume(const short &dB_vol) const {
+        if (dB_vol > vol_threshold_VERY_LOUD){
+            return sound_vol_for_flood_dist::DEAFENING;
+        } else if (dB_vol > vol_threshold_LOUD) {
+            return sound_vol_for_flood_dist::VERY_LOUD;
+        } else if (dB_vol > vol_threshold_NORMAL) {
+            return sound_vol_for_flood_dist::LOUD;
+        } else if (dB_vol > vol_threshold_QUIET) {
+            return sound_vol_for_flood_dist::NORMAL;
+        }else if (dB_vol > vol_threshold_NEARLY_SILENT) {
+            return sound_vol_for_flood_dist::QUIET;
+        }else if (dB_vol > vol_threshold_SILENT) {
+            return sound_vol_for_flood_dist::NEARLY_SILENT;
+        } else {
+            return sound_vol_for_flood_dist::SILENT;
+        }
+    }
+    // Generated and checked against while informing monster AI of sounds.
+    // MUST be cleared after all monsters are informed of sounds, or if the sound cache gets culled.
+    // Wanted this to contain a vector of pointers, but then we would always loose the sounds it pointed to. 
+    // So instead each is a vector of iterator numbers for the sound_instances vector.
+    // If we have more sounds than short can point to as an iterator, something is very wrong and the bad memory access crashing the game is probably doing us a favor.
+    std::unordered_map< const sound_filter_key , const std::vector<short>> sound_list_filtered;
+    // Adds a filter kay and pointer vector pair to the filtered sound list.
+    // We do want to make copies, as any reference made when informing a monster AI of sounds would go out of scope when we move to the next monster.
+    auto add_filtered_sound_list(const sound_filter_key key, const std::vector<short> list ) -> void { sound_list_filtered.emplace(key,list); }
+    // True if there is a matching list, false if not.
+    auto matching_filtered_list(const sound_filter_key &key) -> bool { return sound_list_filtered.contains(key); }
+    // Returns a reference to the desired vector of pointers. 
+    auto get_filtered_list(const sound_filter_key &key) -> const std::vector<short>& { return sound_list_filtered.at(key); }
+    // Clear the filtered list so we dont try to grab an old sound.
+    auto clear_all_filtered_lists() -> void { sound_list_filtered.clear(); }
 
 };
 
@@ -2148,13 +2310,13 @@ class map : public submap_load_listener
         // If true, update the absorption cache. We want this built after the other caches, but before sounds are calced.
         // Function logic located in sounds.cpp
         bool build_absorption_cache( const int zlev );
-        // Builds a sound_cache by flood filling from a given sound event.
+        // Builds a sound_instance_cache by flood filling from a given sound event.
         // Function logic located in sounds.cpp
         void flood_fill_sound( const sound_event soundevent, int zlev );
         // Batch builds a set of sound caches from std::vector<sound_event> sound_batch_floodfill_que
         // Similar to flood_fill_sound, used for monster sounds for performance.
         void batch_flood_fill_sounds();
-        // Checks and culls sound_caches from the sound_caches vector.
+        // Checks and culls sound_instance_caches from the sound_instance_caches vector.
         // Sounds that have been heard by monsters and by the player are culled so they are not re-heard.
         void cull_heard_sounds();
 
@@ -2446,16 +2608,13 @@ class map : public submap_load_listener
         }
 
         /**
-        * Holds the caches for sounds. Each cache has a short for mdB (100th of a dB) volume at [x][y], a sound_event, and some filtering bools.
-        * Make this a vector so that we can easily add or delete sounds. We dont really care what the order of the sounds in the vector is.
-        * As the player is the center of the universe and for performance/sanity reasons we only fully consider sounds at the players z-level, other sounds are adjusted by height difference then flood filled at player z-level.
-        * After the PC, Monsters, and NPCs have all "heard" a sound an been fed information from it, that sound is deleted by map::cull_hear_sounds
-        *
-        * todo: see if moving into private and building a ref getter function similar to map::level_cache.get_cache_ref() is desirable,
-        * or rebuild sound_cache struct to be the main storage, make a ref getter func, and make a new struct to store the flood filled sound instances.
-        * this would also let us store a total rms volume for a tile and a ref to the loudest relevant sound event which could be used to speed up flood filling, informing monsters/npcs of sounds, etc.
+        * Holds the individual caches for sounds. Each individual cache has a std::vector<short> that stores mdB spl volumes for the flooded area, a sound_event, and some filtering bools.
+        * Each sound is only flooded out to a certain distance for performance and memory reasons. Individual sounds are not referenced directly for volume.
+        * See the strut definition for information on the various getters.
+        * TODO: total rms volume for a tile getter and a ref to the loudest relevant sound event which could be used to speed up flood filling, informing monsters/npcs of sounds, etc.
         */
-        std::vector< sound_cache > sound_caches;
+        sound_cache m_sound_cache;
+        //std::vector< sound_instance_cache > sound_instance_caches;
 
         /// Return the pathfinding flags for a single tile, rebuilding the per-submap
         /// pf_cache if it has been marked dirty.  Works for any loaded position.

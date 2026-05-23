@@ -1,5 +1,6 @@
 #include "map.h"
 
+#include "faction.h"
 #include "mapgen_async.h"
 
 #include <algorithm>
@@ -9490,8 +9491,9 @@ bool map::inbounds( const tripoint &p ) const
 
 bool map::on_bubble_border( const point &p ) const
 {
-    const auto max_xy = my_MAPSIZE - 1;
-    return p.x == 0 || p.x == max_xy || p.y == 0 || p.y == max_xy;
+    const auto max_x = SEEX * my_MAPSIZE - 1;
+    const auto max_y = SEEY * my_MAPSIZE - 1;
+    return p.x == 0 || p.x == max_x || p.y == 0 || p.y == max_y;
 }
 
 bool map::is_position_simulated( const tripoint &p ) const
@@ -10914,14 +10916,27 @@ level_cache::level_cache( int mx, int my )
 }
 
 // Default constructor: zero-sized null sentinel — not for normal use.
-sound_cache::sound_cache() = default;
+sound_instance_cache::sound_instance_cache() = default;
 
-// Normal constructor: mx = SEEX * mapsize, my = SEEY * mapsize.
+// Normal constructor. Use this in almost all cases, takes the originating sound event.
 // This is done so we can garuntee that the sound is sized to the reality bubble and the level_cache.
-sound_cache::sound_cache(int mx, int my)
-    :  cache_x( mx ), cache_y( my ), cache_mapsize( mx / SEEX ),
-    volume(static_cast<size_t>( mx * my ), 0 )
-{}
+sound_instance_cache::sound_instance_cache(sound_event &input_sound, const sound_vol_for_flood_dist &d_e, const int &f_r )
+    : sound( input_sound), 
+    dist_enum( d_e ),
+    flood_radius( f_r ),
+    origin(input_sound.origin),
+    envelope_index_point(tripoint(origin.x - flood_radius, origin.y - flood_radius, origin.z)),
+    offset_x(envelope_index_point.x),
+    offset_y(envelope_index_point.y),
+    // 4r^2 + 4r + 1 equals our total area, for some (2r + 1) by (2r + 1) flood envelope.
+    volume(static_cast<size_t>( (1 + (4 * flood_radius) + ( 4 * (flood_radius * flood_radius)) )), 0 ),
+    movement_noise(input_sound.movement_noise),
+    from_player(input_sound.from_player),
+    from_monster(input_sound.from_monster),
+    from_npc(input_sound.from_npc)
+{
+
+}
 
 void map::set_pathfinding_cache_dirty( const int zlev )
 {
