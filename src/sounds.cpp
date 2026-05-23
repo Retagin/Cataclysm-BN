@@ -175,123 +175,135 @@ static constexpr bool skip_due_to_wall( const bool &wall1, const bool &wall2,
     return false;
 }
 
-// Direction angle threshold coefficients for use with dir_index_to_sound_source. 
+// Direction angle threshold coefficients for use with dir_index_to_sound_source.
 // Or anything else that you want to pull direction from atan2 with.
 
 // +/- Threshold for east from an atan2 result.
 static constexpr float RADIAN_THRESHOLD_EAST = M_PI / 8;
 // +/- Threshold for North or South from an atan2 result.
-static constexpr float RADIAN_THRESHOLD_NORTH_SOUTH = (3.0 * M_PI) / 8.0;
+static constexpr float RADIAN_THRESHOLD_NORTH_SOUTH = ( 3.0 * M_PI ) / 8.0;
 // +/- Threshold for North West or South West from an atan2 result.
-static constexpr float RADIAN_THRESHOLD_NORTHW_SOUTHW = ((5.0 * M_PI) / 8.0);
+static constexpr float RADIAN_THRESHOLD_NORTHW_SOUTHW = ( ( 5.0 * M_PI ) / 8.0 );
 // +/- Threshold for West from an atan2 result.
-static constexpr float RADIAN_THRESHOLD_WEST = ((7.0 * M_PI) / 8.0);
+static constexpr float RADIAN_THRESHOLD_WEST = ( ( 7.0 * M_PI ) / 8.0 );
 
 // Returns the direction index to use for checking sound volume at a distance.
 // Returns a uint8_t value between 0 and 9. If we are given two points at the same x/y, returns 8 or 9.
 // [NW] [ N] [NE]   [ 0 ] [ 1 ] [ 2 ]
 // [W ] [@ ] [ E] = [ 7 ] [ 8 ] [ 3 ]
 // [SW] [ S] [SE]   [ 6 ] [ 5 ] [ 4 ]
-static constexpr uint8_t dir_index_to_sound_source(const tripoint &source, const tripoint &listener)
+static constexpr uint8_t dir_index_to_sound_source( const tripoint &source,
+        const tripoint &listener )
 {
-    if(source.x == listener.x && source.y==listener.y){
-        if(source.z > listener.z){
+    if( source.x == listener.x && source.y == listener.y ) {
+        if( source.z > listener.z ) {
             return 8;
-        }else{
+        } else {
             return 9;
         }
     }
     // We take our source at 0,0, and adjust our listener z/y accordingly.
-    // We could use the units::angle atan2, but this is easier 
-    const float radians = std::atan2(listener.x - source.x,listener.y - source.y);
+    // We could use the units::angle atan2, but this is easier
+    const float radians = std::atan2( listener.x - source.x, listener.y - source.y );
     // We have 8 directions, at 45 degrees or pi/4 radians each. Because our result ranges from -pi to pi east for example is a result of pi/8 > angle > -pi/8
-    if (radians == 0){
+    if( radians == 0 ) {
         return 3;
-    }else if (radians > 0){
+    } else if( radians > 0 ) {
         //Some variety of north.
-        if (radians >= RADIAN_THRESHOLD_WEST){
+        if( radians >= RADIAN_THRESHOLD_WEST ) {
             return 7;
-        }else if (radians > RADIAN_THRESHOLD_NORTHW_SOUTHW) {
+        } else if( radians > RADIAN_THRESHOLD_NORTHW_SOUTHW ) {
             return 0;
-        }else if (radians >= RADIAN_THRESHOLD_NORTH_SOUTH) {
+        } else if( radians >= RADIAN_THRESHOLD_NORTH_SOUTH ) {
             return 1;
-        }else if (radians > RADIAN_THRESHOLD_EAST) {
+        } else if( radians > RADIAN_THRESHOLD_EAST ) {
             return 2;
-        }else{
+        } else {
             return 3;
         }
-    }else{
+    } else {
         //Some variety of south.
-        if (radians <= -RADIAN_THRESHOLD_WEST) {
-            return 7; 
-        }else if (radians < -RADIAN_THRESHOLD_NORTHW_SOUTHW) {
+        if( radians <= -RADIAN_THRESHOLD_WEST ) {
+            return 7;
+        } else if( radians < -RADIAN_THRESHOLD_NORTHW_SOUTHW ) {
             return 6;
-        }else if (radians <= RADIAN_THRESHOLD_NORTH_SOUTH){
+        } else if( radians <= RADIAN_THRESHOLD_NORTH_SOUTH ) {
             return 5;
-        }else if (radians < RADIAN_THRESHOLD_EAST) {
+        } else if( radians < RADIAN_THRESHOLD_EAST ) {
             return 4;
-        }else {
+        } else {
             return 3;
         }
     }
 }
 
 // Returns the volume adjustment due to altitude in mdB spl. While better than assessing a direct penalty per zlevel, this still has has many assumptions worked into it.
-static constexpr short vol_z_adjust( const tripoint &source, const tripoint &listener, const bool &lineofsight = false, const bool &for_horde_signal = false ) 
+static constexpr short vol_z_adjust( const tripoint &source, const tripoint &listener,
+                                     const bool &lineofsight = false, const bool &for_horde_signal = false )
 {
-        // Take our easy out if we have it for whatever reason.
-        // If we have direct line of sight, the horizontal volume loss over distance most likely wont be that far off from the amount that would have been lost straight line.
-        if (source.z == listener.z || lineofsight){
-            return 0;
-        } else {
-            short vol_adjust = 0;
-            // We want to work our way down from the top.
-            const int c_index = get_map().get_cache_ref(0).idx(listener.x, listener.y);
-            for (int i = std::max(source.z, listener.z); i > std::min(source.z, listener.z); i--){
-                // If we only have a floor, assess the pentalty for a barrier. If we have a soundwall, asses the full wall value.
-                const auto &lev_cache = get_map().get_cache_ref(i);
-                if (lev_cache.sound_wall_cache[c_index]){
-                    vol_adjust += SOUND_ABSORPTION_WALL;
-                }else if (lev_cache.floor_cache[c_index] > 0){
-                    vol_adjust += SOUND_ABSORPTION_BARRIER;
-                }
+    // Take our easy out if we have it for whatever reason.
+    // If we have direct line of sight, the horizontal volume loss over distance most likely wont be that far off from the amount that would have been lost straight line.
+    if( source.z == listener.z || lineofsight ) {
+        return 0;
+    } else {
+        short vol_adjust = 0;
+        // We want to work our way down from the top.
+        const int c_index = get_map().get_cache_ref( 0 ).idx( listener.x, listener.y );
+        for( int i = std::max( source.z, listener.z ); i > std::min( source.z, listener.z ); i-- ) {
+            // If we only have a floor, assess the pentalty for a barrier. If we have a soundwall, asses the full wall value.
+            const auto &lev_cache = get_map().get_cache_ref( i );
+            if( lev_cache.sound_wall_cache[c_index] ) {
+                vol_adjust += SOUND_ABSORPTION_WALL;
+            } else if( lev_cache.floor_cache[c_index] > 0 ) {
+                vol_adjust += SOUND_ABSORPTION_BARRIER;
             }
-        return std::min(mdBspl_to_dBspl(MAXIMUM_VOLUME_ATMOSPHERE),(for_horde_signal) ? mdBspl_to_dBspl(vol_adjust): vol_adjust);
         }
+        return std::min( mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ),
+                         ( for_horde_signal ) ? mdBspl_to_dBspl( vol_adjust ) : vol_adjust );
+    }
 };
 
-// Returns a the mdB volume of a given sound cache at some tripoint. 
+// Returns a the mdB volume of a given sound cache at some tripoint.
 // If you feed this an invalid tripoint, there is a very good chance it explodes or gives you 0.
-static constexpr short svol_at(const sound_instance_cache &sound_inst, const tripoint &tri, const short &t_absorp = SOUND_ABSORPTION_OPEN_FIELD, const bool &listener_indoors = false, const bool &lineofsight = false )
+static constexpr short svol_at( const sound_instance_cache &sound_inst, const tripoint &tri,
+                                const short &t_absorp = SOUND_ABSORPTION_OPEN_FIELD, const bool &listener_indoors = false,
+                                const bool &lineofsight = false )
 {
     // Good idea to track this.
     const bool samez = sound_inst.origin.z == tri.z;
     // Lets go for our easy solution first.
-    if(sound_inst.in_envelope(tri) ){
-        if (samez){
-            return sound_inst.vol_at_tri(tri);
+    if( sound_inst.in_envelope( tri ) ) {
+        if( samez ) {
+            return sound_inst.vol_at_tri( tri );
         } else {
             // Return the loudest of either the tile vol or the vertical escape vol - vol_z_adjust, minimum 0.
-            const auto &vertical_escape_vol = (sound_inst.origin.z > tri.z) ? sound_inst.base_distance_vol_by_dir[9] : sound_inst.base_distance_vol_by_dir[8];
-            return std::max(0,(std::max(sound_inst.vol_at_tri(tri),vertical_escape_vol) - vol_z_adjust(sound_inst.origin,tri,lineofsight)));
+            const auto &vertical_escape_vol = ( sound_inst.origin.z > tri.z ) ?
+                                              sound_inst.base_distance_vol_by_dir[9] : sound_inst.base_distance_vol_by_dir[8];
+            return std::max( 0, ( std::max( sound_inst.vol_at_tri( tri ),
+                                            vertical_escape_vol ) - vol_z_adjust( sound_inst.origin, tri, lineofsight ) ) );
         }
     }
     // Thankfully rl_dist does not account for z differences.
-    const int distance = rl_dist(sound_inst.origin, tri);
-    const uint8_t dir_index = dir_index_to_sound_source(sound_inst.origin, tri);
+    const int distance = rl_dist( sound_inst.origin, tri );
+    const uint8_t dir_index = dir_index_to_sound_source( sound_inst.origin, tri );
     // We know at this point that we are out of the envelope so our distance is greater than our flood radius.
     // We use a different escape volume depending upon a couple of factors.
     // Apologies for the messy ternary.
 
     // For vertical escape use up by default.
-    const auto &vertical_escape_vol = (sound_inst.origin.z >= tri.z) ? sound_inst.base_distance_vol_by_dir[9] : sound_inst.base_distance_vol_by_dir[8];
+    const auto &vertical_escape_vol = ( sound_inst.origin.z >= tri.z ) ?
+                                      sound_inst.base_distance_vol_by_dir[9] : sound_inst.base_distance_vol_by_dir[8];
     // Determine if we can use the up escape.
     // Broken out for readability. If we are not on the same Z level we can use the vertical escape, or if we are outside, the sound is indoors and escaped.
-    const auto &use_vert_escape = ( !samez ) ? true : (lineofsight && samez)? false : ((!listener_indoors && sound_inst.source_indoors && sound_inst.escaped_indoors && !lineofsight ) ? true : false);
+    const auto &use_vert_escape = ( !samez ) ? true : ( lineofsight &&
+                                  samez ) ? false : ( ( !listener_indoors && sound_inst.source_indoors &&
+                                          sound_inst.escaped_indoors && !lineofsight ) ? true : false );
 
-    const auto &vol_escape = (use_vert_escape) ? std::max(vertical_escape_vol,sound_inst.base_distance_vol_by_dir[dir_index]) : sound_inst.base_distance_vol_by_dir[dir_index];
+    const auto &vol_escape = ( use_vert_escape ) ? std::max( vertical_escape_vol,
+                             sound_inst.base_distance_vol_by_dir[dir_index] ) : sound_inst.base_distance_vol_by_dir[dir_index];
 
-    return std::max(0,(vol_escape - get_cumulative_vol_dist_loss(sound_inst.flood_radius, distance, t_absorp) - vol_z_adjust(sound_inst.origin, tri)));
+    return std::max( 0, ( vol_escape - get_cumulative_vol_dist_loss( sound_inst.flood_radius, distance,
+                          t_absorp ) - vol_z_adjust( sound_inst.origin, tri ) ) );
 }
 
 // For use when flood filling sounds to allow for Dijkstra-like max-heap processing instead of breadth first, not preserved.
@@ -314,7 +326,8 @@ static short terrain_sound_attenuation( tripoint_abs_omt omtpos, season_type sea
     // This is a bit heinous, but we have to step through several structs to actually get to the int code number for the land use codes.
     // 40 land use cases in total. We either use the integer identifier, or the string id. Int id is significantly easier to expand upon later or mod.
     // We only care about the terrain around the player.
-    const int landusecodenum = get_overmapbuffer(get_avatar().get_dimension()).ter( omtpos ).obj().get_land_use_code()->land_use_code;
+    const int landusecodenum = get_overmapbuffer( get_avatar().get_dimension() ).ter(
+                                   omtpos ).obj().get_land_use_code()->land_use_code;
     // Forests have less attenuation in the fall, and during winter sound attenuation is higher accross the board
     // because of expected ambient snow, which is a extremely strong sound attenuator and can absorb somewhere between 50% and 90% of high frequency sound.
     // const season_type season = season_of_year( calendar::turn );
@@ -378,11 +391,11 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
     const auto &outside_cache = map_cache.outside_cache;
     const auto &wall_present = map_cache.sound_wall_cache;
     // Use if checking to make sure sounds dont get LOUDER over distance.
-    const auto &origin_volume = dBspl_to_mdBspl(soundevent.volume);
+    const auto &origin_volume = dBspl_to_mdBspl( soundevent.volume );
     // If we are at zlev 10, we dont want to try to check whats above us to avoid out of bounds checks.
     const bool check_up_valid = zlev < 10;
     // Make sure that there is a valid reference to A mapcache, even if we dont call it if we are too high up.
-    const auto &up_map_cache = (check_up_valid) ? get_cache(zlev + 1) : map_cache;
+    const auto &up_map_cache = ( check_up_valid ) ? get_cache( zlev + 1 ) : map_cache;
 
     //// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
     //// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
@@ -398,52 +411,56 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
 
     if( dBspl_to_mdBspl( soundevent.volume ) >= ( SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) ) {
 
-        const auto vol_enum = m_sound_cache.flood_dist_enum_by_volume(soundevent.volume);
-        const auto f_radius = m_sound_cache.flood_radius_by_enum(vol_enum);
+        const auto vol_enum = m_sound_cache.flood_dist_enum_by_volume( soundevent.volume );
+        const auto f_radius = m_sound_cache.flood_radius_by_enum( vol_enum );
         sound_instance_cache temp_sound_cache( soundevent, vol_enum, f_radius );
         auto &svol = temp_sound_cache.volume;
-        
-        temp_sound_cache.source_indoors = !outside_cache[map_cache.idx(temp_sound_cache.origin.x, temp_sound_cache.origin.y)];
+
+        temp_sound_cache.source_indoors = !outside_cache[map_cache.idx( temp_sound_cache.origin.x,
+                                                         temp_sound_cache.origin.y )];
 
         // Set this for use with the slightly cheaper direct line propagation.
-        temp_sound_cache.terrain_sound_absorbtion_at_source = absorption_cache[map_cache.idx(temp_sound_cache.origin.x,temp_sound_cache.origin.y)];
+        temp_sound_cache.terrain_sound_absorbtion_at_source = absorption_cache[map_cache.idx(
+                    temp_sound_cache.origin.x, temp_sound_cache.origin.y )];
         // And lets make a pair of vectors to store our up and down escapes. Stored as volume, distance. We seed the first value at 0,0.
-        std::vector<std::pair<const short, const uint8_t>> up_escape_vector = {{0,0}};
-        std::vector<std::pair<const short, const uint8_t>> down_escape_vector = {{0,0}};
+        std::vector<std::pair<const short, const uint8_t>> up_escape_vector = {{0, 0}};
+        std::vector<std::pair<const short, const uint8_t>> down_escape_vector = {{0, 0}};
 
         // Set our initial conditions. We want 100ths of a decibel for the volume
         // We dont apply directional sound propagation penalties at the very start.
         // the volume vector in the sound instance IS NOT aligned with normal game tripoints, and uses a limited local "area"
         // The origin will always be located at (radius, radius), equivalent to and index position of (radius * (2 * radius) + radius) = r^2 + 3r
-        svol[(f_radius * f_radius) + (3 * f_radius)] =  origin_volume;
+        svol[( f_radius * f_radius ) + ( 3 * f_radius )] =  origin_volume;
 
         // If we are not indoors and there is no floor on the tile above us, escape up.
-        if (!temp_sound_cache.source_indoors && check_up_valid){
-            if( get_cache(zlev + 1).floor_cache[map_cache.idx(temp_sound_cache.origin.x,temp_sound_cache.origin.y)] == 0 ){
-                up_escape_vector.push_back({origin_volume,1});
+        if( !temp_sound_cache.source_indoors && check_up_valid ) {
+            if( get_cache( zlev + 1 ).floor_cache[map_cache.idx( temp_sound_cache.origin.x,
+                                                                 temp_sound_cache.origin.y )] == 0 ) {
+                up_escape_vector.push_back( {origin_volume, 1} );
             }
         }
         // If there is no floor where we are, escape down.
-        if (map_cache.floor_cache[map_cache.idx(temp_sound_cache.origin.x, temp_sound_cache.origin.y)] == 0){
-            down_escape_vector.push_back({origin_volume,1});
+        if( map_cache.floor_cache[map_cache.idx( temp_sound_cache.origin.x,
+                                                 temp_sound_cache.origin.y )] == 0 ) {
+            down_escape_vector.push_back( {origin_volume, 1} );
         }
         adjacent_tiles = get_adjacent_tiles( temp_sound_cache.sound.origin.xy() );
 
         // Returns the flood envelope volume vector index position given some normal tripoint.
         // We only want to flood fill within the boundries of our floodfill envelope. We get our index point from our origin point and floodfill radius.
         // From that we get our x and y offsets.
-        auto v_index_from_p = [&](const point &p){
-            return temp_sound_cache.p_to_env_index(p);
+        auto v_index_from_p = [&]( const point & p ) {
+            return temp_sound_cache.p_to_env_index( p );
         };
 
-        auto check_escape = [&](const point &p, const short &tile_vol, const uint8_t &dist){
-            if (map_cache.outside_cache[map_cache.idx(p.x, p.y)] && check_up_valid){
-                if( up_map_cache.floor_cache[map_cache.idx(p.x,p.y)] == 0 ){
-                    up_escape_vector.push_back({tile_vol,dist});
+        auto check_escape = [&]( const point & p, const short & tile_vol, const uint8_t &dist ) {
+            if( map_cache.outside_cache[map_cache.idx( p.x, p.y )] && check_up_valid ) {
+                if( up_map_cache.floor_cache[map_cache.idx( p.x, p.y )] == 0 ) {
+                    up_escape_vector.push_back( {tile_vol, dist} );
                 }
             }
-            if (map_cache.floor_cache[map_cache.idx(p.x,p.y)] == 0){
-                down_escape_vector.push_back({tile_vol,dist});
+            if( map_cache.floor_cache[map_cache.idx( p.x, p.y )] == 0 ) {
+                down_escape_vector.push_back( {tile_vol, dist} );
             }
         };
 
@@ -454,27 +471,33 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
             // Lets make sure that we only propagate inbounds, and not along the map border. After this we can just check !tile_along_map_border
             if( !on_bubble_border( tile ) && inbounds( tile ) ) {
                 // If our sound started inside, lets check if it got outside.
-                const auto &tile_outdoors = outside_cache[map_cache.idx(tile.x, tile.y)];
-                if (temp_sound_cache.source_indoors && tile_outdoors){
+                const auto &tile_outdoors = outside_cache[map_cache.idx( tile.x, tile.y )];
+                if( temp_sound_cache.source_indoors && tile_outdoors ) {
                     temp_sound_cache.escaped_indoors = true;
                 }
                 // Set our initial distance to 2. At the source there is no sound direction distance modifier.
                 // And set our tile volume based on the distance. We know that the sound origin is atleast 1600mdB.
                 // Set our direction based upon the adjacent tile index.
-                svol[v_index_from_p(tile)] = std::max( 0, ( svol[v_index_from_p(tile)] - dist_vol_loss[2] - absorption_cache[map_cache.idx(tile.x,tile.y)] ) ) ;
-                if( svol[v_index_from_p(tile)] > ( SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) ) {
+                svol[v_index_from_p( tile )] = std::max( 0,
+                                               ( svol[v_index_from_p( tile )] - dist_vol_loss[2] - absorption_cache[map_cache.idx( tile.x,
+                                                       tile.y )] ) ) ;
+                if( svol[v_index_from_p( tile )] > ( SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) ) {
 
                     // Check this if sound propagation is acting up.
-                    if (svol[v_index_from_p(tile)] > origin_volume){
-                        debugmsg( "Sound with description [ %1s ] attempted to propagate from %i:%i at %i mdB to %i:%i at %i mdB, a louder volume than the origin volume of %i mdB!" , soundevent.description, soundevent.origin.x, soundevent.origin.y, svol[temp_sound_cache.env_index(temp_sound_cache.sound.origin.x, temp_sound_cache.sound.origin.y)], tile.x, tile.y, svol[temp_sound_cache.p_to_env_index(tile)], origin_volume );
+                    if( svol[v_index_from_p( tile )] > origin_volume ) {
+                        debugmsg( "Sound with description [ %1s ] attempted to propagate from %i:%i at %i mdB to %i:%i at %i mdB, a louder volume than the origin volume of %i mdB!"
+                                  , soundevent.description, soundevent.origin.x, soundevent.origin.y,
+                                  svol[temp_sound_cache.env_index( temp_sound_cache.sound.origin.x,
+                                          temp_sound_cache.sound.origin.y )], tile.x, tile.y, svol[temp_sound_cache.p_to_env_index( tile )],
+                                  origin_volume );
                         // Dont break the laws of physics
                         continue;
                     }
                     // If there is no floor above or below with a few other conditions, escape.
-                    check_escape(tile, svol[v_index_from_p(tile)], 2);
+                    check_escape( tile, svol[v_index_from_p( tile )], 2 );
 
-                    if (temp_sound_cache.in_envelope(tripoint(tile,zlev))){
-                        ptq.emplace( propagation_tile( tile, svol[v_index_from_p(tile)], i, 2 ) );
+                    if( temp_sound_cache.in_envelope( tripoint( tile, zlev ) ) ) {
+                        ptq.emplace( propagation_tile( tile, svol[v_index_from_p( tile )], i, 2 ) );
                     }
                 }
             }
@@ -498,7 +521,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                                                                                 adjacent_tiles[wall_dirs.second].y ];
             // Iterate through adjacent tiles.
             const auto &dirs_to_check = spropagation_tiles_by_sdirection[ptile.dir];
-            for( short index = 0; index < 5; index++ ) { 
+            for( short index = 0; index < 5; index++ ) {
 
                 auto &adj_tile_dir = dirs_to_check[index];
                 // Only check if we know a wall is present.
@@ -509,27 +532,30 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                 }
                 auto &adj_tile = adjacent_tiles[adj_tile_dir];
                 // Dont check tiles that are not valid for propagation, i.e. behind the direction of sound, around a corner, out of bounds/along the map border.
-                if( !on_bubble_border( adj_tile ) && inbounds( adj_tile )) {
-                    auto &adj_tile_vol = svol[v_index_from_p(adj_tile)];
+                if( !on_bubble_border( adj_tile ) && inbounds( adj_tile ) ) {
+                    auto &adj_tile_vol = svol[v_index_from_p( adj_tile )];
                     // Cap our tile distance between 1 and 121 to prevent overflow. We dont have or need distance loss values past dist_vol_loss[121]
                     // as the change in distance loss values past this point are negligible for gameplay scale.
                     const uint8_t dist_for_vol_loss = get_distance_for_volume_loss( ptile.dist, ( index == 0 ||
                                                       index == 4 ) );
-                    const short vol_to_check = ptile.vol - (absorption_cache[map_cache.idx(adj_tile.x,adj_tile.y)]) - (dist_vol_loss[dist_for_vol_loss]);
+                    const short vol_to_check = ptile.vol - ( absorption_cache[map_cache.idx( adj_tile.x,
+                                               adj_tile.y )] ) - ( dist_vol_loss[dist_for_vol_loss] );
                     // General priority goes loudest volume, then largest distance. Smaller distances loose volume more quickly.
                     // If volumes are equal and directions are one off from eachother, the cardinal direction wins.
                     // We dont want to track inaudible single dB values across the entire map for each sound.
                     if( ( vol_to_check ) > adj_tile_vol ) {
                         // Check this if sound propagation is acting up. Comment out if things are playing nice.
-                        if (vol_to_check > origin_volume){
-                            debugmsg( "Sound with description [ %1s ] attempted to propagate from %i:%i at %i mdB to %i:%i at %i mdB, a louder volume than the origin volume of %i mdB!" , soundevent.description, ptile.pos.x, ptile.pos.y, ptile.vol, adj_tile.x, adj_tile.y, vol_to_check, origin_volume );
+                        if( vol_to_check > origin_volume ) {
+                            debugmsg( "Sound with description [ %1s ] attempted to propagate from %i:%i at %i mdB to %i:%i at %i mdB, a louder volume than the origin volume of %i mdB!"
+                                      , soundevent.description, ptile.pos.x, ptile.pos.y, ptile.vol, adj_tile.x, adj_tile.y, vol_to_check,
+                                      origin_volume );
                             // Dont break the laws of physics
                             continue;
                         }
-                        check_escape(adj_tile, adj_tile_vol, dist_for_vol_loss);
+                        check_escape( adj_tile, adj_tile_vol, dist_for_vol_loss );
 
                         adj_tile_vol = vol_to_check;
-                        if( temp_sound_cache.in_envelope(tripoint(adj_tile, temp_sound_cache.origin.z))) {
+                        if( temp_sound_cache.in_envelope( tripoint( adj_tile, temp_sound_cache.origin.z ) ) ) {
                             // If the tiles new volume is greater than the old one and is inside our propagation envelope, propagate.
                             // Will not update if the adjacent tile is along the map boundry.
                             ptq.emplace( propagation_tile( adj_tile, vol_to_check, adj_tile_dir, dist_for_vol_loss ) );
@@ -554,95 +580,110 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         // 6 5 4
         auto &escape_direction_vol = temp_sound_cache.base_distance_vol_by_dir;
         const int envelope_width = temp_sound_cache.flood_radius * 2;
-        int vol_tally= 0;
+        int vol_tally = 0;
         int non_zero = 0;
-        for (int i = 0; i <= envelope_width; i++){
+        for( int i = 0; i <= envelope_width; i++ ) {
             // Starting with north escapes, so all of our desired volumes will be at envelope_y = radius * 2.
-            if (svol[ i * envelope_width + envelope_width] > 0 ){
+            if( svol[ i * envelope_width + envelope_width] > 0 ) {
                 non_zero++;
-                vol_tally += pow(svol[ i * envelope_width + envelope_width], 2);
-            } 
+                vol_tally += pow( svol[ i * envelope_width + envelope_width], 2 );
+            }
         }
-        escape_direction_vol[1] = (non_zero == 0) ? 0 : sqrt(vol_tally / non_zero);
+        escape_direction_vol[1] = ( non_zero == 0 ) ? 0 : sqrt( vol_tally / non_zero );
 
-        vol_tally = 0; non_zero = 0;
-        for (int i = 0; i <= envelope_width; i++){
+        vol_tally = 0;
+        non_zero = 0;
+        for( int i = 0; i <= envelope_width; i++ ) {
             // For east escapes all all of our desired volumes will be at envelope_x = radius * 2.
-            if (svol[ (envelope_width * envelope_width) + i] > 0 ){
+            if( svol[( envelope_width * envelope_width ) + i] > 0 ) {
                 non_zero++;
-                vol_tally += pow(svol[ (envelope_width * envelope_width) + 1], 2);
-            } 
+                vol_tally += pow( svol[( envelope_width * envelope_width ) + 1], 2 );
+            }
         }
-        escape_direction_vol[3] = (non_zero == 0) ? 0 : sqrt(vol_tally / non_zero);
+        escape_direction_vol[3] = ( non_zero == 0 ) ? 0 : sqrt( vol_tally / non_zero );
 
-        vol_tally = 0; non_zero = 0;
-        for (int i = 0; i <= envelope_width; i++){
+        vol_tally = 0;
+        non_zero = 0;
+        for( int i = 0; i <= envelope_width; i++ ) {
             // For south escapes all all of our desired volumes will be at envelope_y = 0.
-            if (svol[ (i * envelope_width)] > 0 ){
+            if( svol[( i * envelope_width )] > 0 ) {
                 non_zero++;
-                vol_tally += pow(svol[ i * envelope_width ], 2);
-            } 
+                vol_tally += pow( svol[ i * envelope_width ], 2 );
+            }
         }
-        escape_direction_vol[5] = (non_zero == 0) ? 0 : sqrt(vol_tally / non_zero);
+        escape_direction_vol[5] = ( non_zero == 0 ) ? 0 : sqrt( vol_tally / non_zero );
 
-        vol_tally = 0; non_zero = 0;
-        for (int i = 0; i <= envelope_width; i++){
+        vol_tally = 0;
+        non_zero = 0;
+        for( int i = 0; i <= envelope_width; i++ ) {
             // For west escapes all all of our desired volumes will be at envelope_x = 0.
-            if (svol[ i ] > 0 ){
+            if( svol[ i ] > 0 ) {
                 non_zero++;
-                vol_tally += pow(svol[ i ], 2);
-            } 
+                vol_tally += pow( svol[ i ], 2 );
+            }
         }
-        escape_direction_vol[7] = (non_zero == 0) ? 0 : sqrt(vol_tally / non_zero);
-        // Now run through our diagonals. 
-        escape_direction_vol[0] = ( escape_direction_vol[1] != 0 || escape_direction_vol[7] != 0 ) ? sqrt((pow(escape_direction_vol[7], 2) + pow(escape_direction_vol[1], 2))/2) : 0;
-        escape_direction_vol[2] = ( escape_direction_vol[1] != 0 || escape_direction_vol[3] != 0 ) ? sqrt((pow(escape_direction_vol[1], 2) + pow(escape_direction_vol[3], 2))/2) : 0;
-        escape_direction_vol[4] = ( escape_direction_vol[3] != 0 || escape_direction_vol[5] != 0 ) ? sqrt((pow(escape_direction_vol[3], 2) + pow(escape_direction_vol[5], 2))/2) : 0;
-        escape_direction_vol[6] = ( escape_direction_vol[5] != 0 || escape_direction_vol[7] != 0 ) ? sqrt((pow(escape_direction_vol[5], 2) + pow(escape_direction_vol[7], 2))/2) : 0;
+        escape_direction_vol[7] = ( non_zero == 0 ) ? 0 : sqrt( vol_tally / non_zero );
+        // Now run through our diagonals.
+        escape_direction_vol[0] = ( escape_direction_vol[1] != 0 ||
+                                    escape_direction_vol[7] != 0 ) ? sqrt( ( pow( escape_direction_vol[7],
+                                            2 ) + pow( escape_direction_vol[1], 2 ) ) / 2 ) : 0;
+        escape_direction_vol[2] = ( escape_direction_vol[1] != 0 ||
+                                    escape_direction_vol[3] != 0 ) ? sqrt( ( pow( escape_direction_vol[1],
+                                            2 ) + pow( escape_direction_vol[3], 2 ) ) / 2 ) : 0;
+        escape_direction_vol[4] = ( escape_direction_vol[3] != 0 ||
+                                    escape_direction_vol[5] != 0 ) ? sqrt( ( pow( escape_direction_vol[3],
+                                            2 ) + pow( escape_direction_vol[5], 2 ) ) / 2 ) : 0;
+        escape_direction_vol[6] = ( escape_direction_vol[5] != 0 ||
+                                    escape_direction_vol[7] != 0 ) ? sqrt( ( pow( escape_direction_vol[5],
+                                            2 ) + pow( escape_direction_vol[7], 2 ) ) / 2 ) : 0;
         // Now lets sum up our up and down escapes. If our distance value is less than our flood radius, reduce volume by the appropriate amount.
-        vol_tally = 0; non_zero = 0;
-        for (std::pair<short,uint8_t> listing : down_escape_vector){
-            if (listing.first > 0){
+        vol_tally = 0;
+        non_zero = 0;
+        for( std::pair<short, uint8_t> listing : down_escape_vector ) {
+            if( listing.first > 0 ) {
                 short vol = listing.first;
-                if (listing.second < temp_sound_cache.flood_radius){
-                    for (uint8_t i = listing.second; listing.second < temp_sound_cache.flood_radius; i++){
+                if( listing.second < temp_sound_cache.flood_radius ) {
+                    for( uint8_t i = listing.second; listing.second < temp_sound_cache.flood_radius; i++ ) {
                         vol -= dist_vol_loss[i + 1];
                     }
                 }
-                if (vol > 0 ){
-                    vol_tally += pow(vol,2);
+                if( vol > 0 ) {
+                    vol_tally += pow( vol, 2 );
                     non_zero++;
                 }
             }
         }
         // 8 is down, 9 is up.
-        escape_direction_vol[8] = (non_zero == 0) ? 0 : sqrt(vol_tally / non_zero);
+        escape_direction_vol[8] = ( non_zero == 0 ) ? 0 : sqrt( vol_tally / non_zero );
 
-        vol_tally = 0; non_zero = 0;
-        for (std::pair<short,uint8_t> listing : up_escape_vector){
-            if (listing.first > 0){
+        vol_tally = 0;
+        non_zero = 0;
+        for( std::pair<short, uint8_t> listing : up_escape_vector ) {
+            if( listing.first > 0 ) {
                 short vol = listing.first;
-                if (listing.second < temp_sound_cache.flood_radius){
-                    for (uint8_t i = listing.second; listing.second < temp_sound_cache.flood_radius; i++){
+                if( listing.second < temp_sound_cache.flood_radius ) {
+                    for( uint8_t i = listing.second; listing.second < temp_sound_cache.flood_radius; i++ ) {
                         vol -= dist_vol_loss[i + 1];
                     }
                 }
-                if (vol > 0 ){
-                    vol_tally += pow(vol,2);
+                if( vol > 0 ) {
+                    vol_tally += pow( vol, 2 );
                     non_zero++;
                 }
             }
         }
         // 8 is down, 9 is up.
-        escape_direction_vol[9] = (non_zero == 0) ? 0 : sqrt(vol_tally / non_zero);
+        escape_direction_vol[9] = ( non_zero == 0 ) ? 0 : sqrt( vol_tally / non_zero );
 
         // And from the maximum escape volume, approximate our minvol radius for easy distance filtering.
         vol_tally = 0;
-        for (short esc_vol : escape_direction_vol){
-            vol_tally = std::max(vol_tally,static_cast<int>(esc_vol));
+        for( short esc_vol : escape_direction_vol ) {
+            vol_tally = std::max( vol_tally, static_cast<int>( esc_vol ) );
         }
         // We use this for an easy distance check threshold when feeding monsters sound.
-        temp_sound_cache.approximate_minvol_distance = average_minvol_distance(temp_sound_cache.flood_radius, static_cast<short>(vol_tally), temp_sound_cache.terrain_sound_absorbtion_at_source);
+        temp_sound_cache.approximate_minvol_distance = average_minvol_distance(
+                    temp_sound_cache.flood_radius, static_cast<short>( vol_tally ),
+                    temp_sound_cache.terrain_sound_absorbtion_at_source );
 
         // The sound cache should be built out by now.
         // Add our new sound cache to the games sound_caches vector.
@@ -688,7 +729,7 @@ void map::batch_flood_fill_sounds()
         // If we are at zlev 10, we dont want to try to check whats above us to avoid out of bounds checks.
         const bool check_up_valid = z < 10;
         // Make sure that there is a valid reference to A mapcache, even if we dont call it if we are too high up.
-        const auto &up_map_cache = (check_up_valid) ? get_cache(z + 1) : map_cache;
+        const auto &up_map_cache = ( check_up_valid ) ? get_cache( z + 1 ) : map_cache;
 
 
 
@@ -697,54 +738,61 @@ void map::batch_flood_fill_sounds()
             // Skip all sounds that do not originate from our zlevel, are along the map border, or that are too far below our ambient volume.
             if( flooded_sound.origin.z != z ) {
                 continue;
-            } else if ( dBspl_to_mdBspl( flooded_sound.volume ) < ( SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) ) {
+            } else if( dBspl_to_mdBspl( flooded_sound.volume ) < ( SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) ) {
                 num_invalidated_sounds++;
                 continue;
             } else {
 
-                sound_instance_cache temp_sound_cache(flooded_sound, m_sound_cache.flood_dist_enum_by_volume(flooded_sound.volume), m_sound_cache.flood_radius_by_enum(m_sound_cache.flood_dist_enum_by_volume(flooded_sound.volume)));
+                sound_instance_cache temp_sound_cache( flooded_sound,
+                                                       m_sound_cache.flood_dist_enum_by_volume( flooded_sound.volume ),
+                                                       m_sound_cache.flood_radius_by_enum( m_sound_cache.flood_dist_enum_by_volume(
+                                                               flooded_sound.volume ) ) );
                 auto &svol = temp_sound_cache.volume;
                 auto &f_radius = temp_sound_cache.flood_radius;
-                temp_sound_cache.source_indoors = !outside_cache[map_cache.idx(temp_sound_cache.origin.x, temp_sound_cache.origin.y)];
+                temp_sound_cache.source_indoors = !outside_cache[map_cache.idx( temp_sound_cache.origin.x,
+                                                                 temp_sound_cache.origin.y )];
                 auto &escape_vol = temp_sound_cache.base_distance_vol_by_dir;
                 // Set this for use with the slightly cheaper direct line propagation.
-                temp_sound_cache.terrain_sound_absorbtion_at_source = absorption_cache[map_cache.idx(temp_sound_cache.origin.x,temp_sound_cache.origin.y)];
-                
+                temp_sound_cache.terrain_sound_absorbtion_at_source = absorption_cache[map_cache.idx(
+                            temp_sound_cache.origin.x, temp_sound_cache.origin.y )];
+
                 // Given some point, return the corresponding volume vector index.
                 // Only use after confirming that the tile is within the envelope using in_envelope().
-                auto v_index_from_p = [&](const point &p){
-                    return temp_sound_cache.p_to_env_index(p);
+                auto v_index_from_p = [&]( const point & p ) {
+                    return temp_sound_cache.p_to_env_index( p );
                 };
 
-                auto check_escape = [&](const point &p, const short &tile_vol, const uint8_t &dist){
-                    if (map_cache.outside_cache[map_cache.idx(p.x, p.y)] && check_up_valid){
-                        if( up_map_cache.floor_cache[map_cache.idx(p.x,p.y)] == 0 && tile_vol > escape_vol[9]){
+                auto check_escape = [&]( const point & p, const short & tile_vol, const uint8_t &dist ) {
+                    if( map_cache.outside_cache[map_cache.idx( p.x, p.y )] && check_up_valid ) {
+                        if( up_map_cache.floor_cache[map_cache.idx( p.x, p.y )] == 0 && tile_vol > escape_vol[9] ) {
                             short vol = tile_vol;
-                            if (dist < temp_sound_cache.flood_radius){
-                                for (uint8_t i = dist; i < temp_sound_cache.flood_radius; i++){
+                            if( dist < temp_sound_cache.flood_radius ) {
+                                for( uint8_t i = dist; i < temp_sound_cache.flood_radius; i++ ) {
                                     vol -= dist_vol_loss[i + 1];
                                 }
                             }
-                            escape_vol[9] = std::max(vol, escape_vol[9]);
+                            escape_vol[9] = std::max( vol, escape_vol[9] );
                         }
                     }
-                    if (map_cache.floor_cache[map_cache.idx(p.x,p.y)] == 0 && tile_vol > escape_vol[8]){
-                            short vol = tile_vol;
-                            if (dist < temp_sound_cache.flood_radius){
-                                for (uint8_t i = dist; i < temp_sound_cache.flood_radius; i++){
-                                    vol -= dist_vol_loss[i + 1];
-                                }
+                    if( map_cache.floor_cache[map_cache.idx( p.x, p.y )] == 0 && tile_vol > escape_vol[8] ) {
+                        short vol = tile_vol;
+                        if( dist < temp_sound_cache.flood_radius ) {
+                            for( uint8_t i = dist; i < temp_sound_cache.flood_radius; i++ ) {
+                                vol -= dist_vol_loss[i + 1];
                             }
-                            escape_vol[8] = std::max(vol, escape_vol[8]);
+                        }
+                        escape_vol[8] = std::max( vol, escape_vol[8] );
                     }
-                };                
+                };
                 // Set our initial conditions. We want 100ths of a decibel for the volume
                 // We dont apply directional sound propagation penalties at the very start.
                 // The center of our flood envelope is always (flood radius, flood radius). Index location math is (radius * (2 * radius) + radius) = (radius * radius) + (3 * radius)
-                svol[(f_radius * f_radius) + (3 * f_radius)] =  dBspl_to_mdBspl(temp_sound_cache.sound.volume ) ;
+                svol[( f_radius * f_radius ) + ( 3 * f_radius )] =  dBspl_to_mdBspl( temp_sound_cache.sound.volume )
+                        ;
                 adjacent_tiles = get_adjacent_tiles( temp_sound_cache.sound.origin.xy() );
 
-                check_escape(point(temp_sound_cache.origin.x, temp_sound_cache.origin.y), dBspl_to_mdBspl(temp_sound_cache.sound.volume ) - dist_vol_loss[2], 2);
+                check_escape( point( temp_sound_cache.origin.x, temp_sound_cache.origin.y ),
+                              dBspl_to_mdBspl( temp_sound_cache.sound.volume ) - dist_vol_loss[2], 2 );
 
                 // This propagates the sounds from the source tile to the 8 adjacent tiles, setting initial directions, distances and volumes.
                 // Adj tiles are 0-7
@@ -756,13 +804,15 @@ void map::batch_flood_fill_sounds()
                         // Set our initial distance to 2. At the source there is no sound direction distance modifier.
                         // And set our tile volume based on the distance. We know that the sound origin is atleast 1600mdB.
                         // Set our direction based upon the adjacent tile index.
-                        svol[v_index_from_p(tile)] = std::max( 0,(svol[v_index_from_p(tile)] -  dist_vol_loss[2] - absorption_cache[map_cache.idx(tile.x,tile.y)] ));
+                        svol[v_index_from_p( tile )] = std::max( 0,
+                                                       ( svol[v_index_from_p( tile )] -  dist_vol_loss[2] - absorption_cache[map_cache.idx( tile.x,
+                                                               tile.y )] ) );
 
-                        if( temp_sound_cache.in_envelope(tripoint(tile,z) ) ) {
+                        if( temp_sound_cache.in_envelope( tripoint( tile, z ) ) ) {
 
-                            check_escape(tile, svol[v_index_from_p(tile)], 2);
+                            check_escape( tile, svol[v_index_from_p( tile )], 2 );
 
-                            ptq.emplace( propagation_tile( tile, svol[v_index_from_p(tile)], i, 2 ) );
+                            ptq.emplace( propagation_tile( tile, svol[v_index_from_p( tile )], i, 2 ) );
                         }
                     }
                 }
@@ -796,29 +846,32 @@ void map::batch_flood_fill_sounds()
                         }
                         auto &adj_tile = adjacent_tiles[adj_tile_dir];
                         // Dont check tiles that are not valid for propagation, i.e. behind the direction of sound, around a corner, or out of bounds.
-                        if( !on_bubble_border( adj_tile ) && inbounds(adj_tile) ) {
-                            auto &adj_tile_vol = svol[v_index_from_p(adj_tile)];
+                        if( !on_bubble_border( adj_tile ) && inbounds( adj_tile ) ) {
+                            auto &adj_tile_vol = svol[v_index_from_p( adj_tile )];
                             // Cap our tile distance between 1 and 121 to prevent overflow. We dont have or need distance loss values past dist_vol_loss[121]
                             // as the change in distance loss values past this point are negligible for gameplay scale.
                             const uint8_t dist_for_vol_loss = get_distance_for_volume_loss( ptile.dist, ( index == 0 ||
                                                               index == 4 ) );
-                            const short vol_to_check = (ptile.vol - (absorption_cache[map_cache.idx(adj_tile.x, adj_tile.y)]) - (dist_vol_loss[dist_for_vol_loss]));
+                            const short vol_to_check = ( ptile.vol - ( absorption_cache[map_cache.idx( adj_tile.x,
+                                                         adj_tile.y )] ) - ( dist_vol_loss[dist_for_vol_loss] ) );
                             // General priority goes loudest volume, then largest distance. Smaller distances loose volume more quickly.
                             // If volumes are equal and directions are one off from eachother, the cardinal direction wins.
                             // We dont want to track inaudible single dB values across the entire map for each sound.
                             if( vol_to_check > adj_tile_vol ) {
                                 // Check this if sound propagation is acting up. Comment out if things are playing nice.
-                                if (vol_to_check > dBspl_to_mdBspl(temp_sound_cache.sound.volume)){
-                                    const int origin_volume = dBspl_to_mdBspl(temp_sound_cache.sound.volume);
-                                    debugmsg( "Sound with description [ %1s ] attempted to propagate from %i:%i at %i mdB to %i:%i at %i mdB, a louder volume than the origin volume of %i mdB!" , temp_sound_cache.sound.description, ptile.pos.x, ptile.pos.y, ptile.vol, adj_tile.x, adj_tile.y, vol_to_check, origin_volume );
+                                if( vol_to_check > dBspl_to_mdBspl( temp_sound_cache.sound.volume ) ) {
+                                    const int origin_volume = dBspl_to_mdBspl( temp_sound_cache.sound.volume );
+                                    debugmsg( "Sound with description [ %1s ] attempted to propagate from %i:%i at %i mdB to %i:%i at %i mdB, a louder volume than the origin volume of %i mdB!"
+                                              , temp_sound_cache.sound.description, ptile.pos.x, ptile.pos.y, ptile.vol, adj_tile.x, adj_tile.y,
+                                              vol_to_check, origin_volume );
                                     // Dont break the laws of physics
                                     continue;
                                 }
                                 adj_tile_vol = vol_to_check;
 
-                                check_escape(adj_tile, vol_to_check, dist_for_vol_loss);
+                                check_escape( adj_tile, vol_to_check, dist_for_vol_loss );
 
-                                if( temp_sound_cache.in_envelope(tripoint(adj_tile, temp_sound_cache.origin.z))) {
+                                if( temp_sound_cache.in_envelope( tripoint( adj_tile, temp_sound_cache.origin.z ) ) ) {
                                     // If the tiles new volume is greater than our old one and is inside the envelope, mark it for update.
                                     // Will not update if the adjacent tile is along the map boundry.
                                     ptq.emplace( propagation_tile( adj_tile, vol_to_check, adj_tile_dir, dist_for_vol_loss ) );
@@ -837,67 +890,76 @@ void map::batch_flood_fill_sounds()
                     // After calculating our loudest sound should already have been removed.
                 }
 
-                // Probably a cleaner way to do this but oh well. 
+                // Probably a cleaner way to do this but oh well.
                 // Less total work than checking if we are at the edge of the envelope, figuring out which side of the envelope, and then incrimenting our bean count every time we propagate a tile.
 
                 const int envelope_width = temp_sound_cache.flood_radius * 2;
-                int vol_tally= 0;
+                int vol_tally = 0;
                 int non_zero = 0;
-                for (int i = 0; i <= envelope_width; i++){
+                for( int i = 0; i <= envelope_width; i++ ) {
                     // Starting with north escapes, so all of our desired volumes will be at envelope_y = radius * 2.
-                    if (svol[ i * envelope_width + envelope_width] > 0 ){
+                    if( svol[ i * envelope_width + envelope_width] > 0 ) {
                         non_zero++;
-                        vol_tally += pow(svol[ i * envelope_width + envelope_width], 2);
-                    } 
+                        vol_tally += pow( svol[ i * envelope_width + envelope_width], 2 );
+                    }
                 }
-                escape_vol[1] = (non_zero == 0) ? 0 : sqrt(vol_tally / non_zero);
+                escape_vol[1] = ( non_zero == 0 ) ? 0 : sqrt( vol_tally / non_zero );
 
-                vol_tally = 0; non_zero = 0;
-                for (int i = 0; i <= envelope_width; i++){
+                vol_tally = 0;
+                non_zero = 0;
+                for( int i = 0; i <= envelope_width; i++ ) {
                     // For east escapes all all of our desired volumes will be at envelope_x = radius * 2.
-                    if (svol[ (envelope_width * envelope_width) + i] > 0 ){
+                    if( svol[( envelope_width * envelope_width ) + i] > 0 ) {
                         non_zero++;
-                        vol_tally += pow(svol[ (envelope_width * envelope_width) + 1], 2);
-                    } 
+                        vol_tally += pow( svol[( envelope_width * envelope_width ) + 1], 2 );
+                    }
                 }
-                escape_vol[3] = (non_zero == 0) ? 0 : sqrt(vol_tally / non_zero);
+                escape_vol[3] = ( non_zero == 0 ) ? 0 : sqrt( vol_tally / non_zero );
 
-                vol_tally = 0; non_zero = 0;
-                for (int i = 0; i <= envelope_width; i++){
+                vol_tally = 0;
+                non_zero = 0;
+                for( int i = 0; i <= envelope_width; i++ ) {
                     // For south escapes all all of our desired volumes will be at envelope_y = 0.
-                    if (svol[ (i * envelope_width)] > 0 ){
+                    if( svol[( i * envelope_width )] > 0 ) {
                         non_zero++;
-                        vol_tally += pow(svol[ i * envelope_width ], 2);
-                    } 
+                        vol_tally += pow( svol[ i * envelope_width ], 2 );
+                    }
                 }
-                escape_vol[5] = (non_zero == 0) ? 0 : sqrt(vol_tally / non_zero);
+                escape_vol[5] = ( non_zero == 0 ) ? 0 : sqrt( vol_tally / non_zero );
 
-                vol_tally = 0; non_zero = 0;
-                for (int i = 0; i <= envelope_width; i++){
+                vol_tally = 0;
+                non_zero = 0;
+                for( int i = 0; i <= envelope_width; i++ ) {
                     // For west escapes all all of our desired volumes will be at envelope_x = 0.
-                    if (svol[ i ] > 0 ){
+                    if( svol[ i ] > 0 ) {
                         non_zero++;
-                        vol_tally += pow(svol[ i ], 2);
-                    } 
+                        vol_tally += pow( svol[ i ], 2 );
+                    }
                 }
-                escape_vol[7] = (non_zero == 0) ? 0 : sqrt(vol_tally / non_zero);
-                // Now run through our diagonals. 
-                escape_vol[0] = ( escape_vol[1] != 0 || escape_vol[7] != 0 ) ? sqrt((pow(escape_vol[7], 2) + pow(escape_vol[1], 2))/2) : 0;
-                escape_vol[2] = ( escape_vol[1] != 0 || escape_vol[3] != 0 ) ? sqrt((pow(escape_vol[1], 2) + pow(escape_vol[3], 2))/2) : 0;
-                escape_vol[4] = ( escape_vol[3] != 0 || escape_vol[5] != 0 ) ? sqrt((pow(escape_vol[3], 2) + pow(escape_vol[5], 2))/2) : 0;
-                escape_vol[6] = ( escape_vol[5] != 0 || escape_vol[7] != 0 ) ? sqrt((pow(escape_vol[5], 2) + pow(escape_vol[7], 2))/2) : 0;
+                escape_vol[7] = ( non_zero == 0 ) ? 0 : sqrt( vol_tally / non_zero );
+                // Now run through our diagonals.
+                escape_vol[0] = ( escape_vol[1] != 0 ||
+                                  escape_vol[7] != 0 ) ? sqrt( ( pow( escape_vol[7], 2 ) + pow( escape_vol[1], 2 ) ) / 2 ) : 0;
+                escape_vol[2] = ( escape_vol[1] != 0 ||
+                                  escape_vol[3] != 0 ) ? sqrt( ( pow( escape_vol[1], 2 ) + pow( escape_vol[3], 2 ) ) / 2 ) : 0;
+                escape_vol[4] = ( escape_vol[3] != 0 ||
+                                  escape_vol[5] != 0 ) ? sqrt( ( pow( escape_vol[3], 2 ) + pow( escape_vol[5], 2 ) ) / 2 ) : 0;
+                escape_vol[6] = ( escape_vol[5] != 0 ||
+                                  escape_vol[7] != 0 ) ? sqrt( ( pow( escape_vol[5], 2 ) + pow( escape_vol[7], 2 ) ) / 2 ) : 0;
 
-                if(temp_sound_cache.source_indoors && escape_vol[9] > 0){
+                if( temp_sound_cache.source_indoors && escape_vol[9] > 0 ) {
                     temp_sound_cache.escaped_indoors = true;
                 }
 
                 // And from the maximum escape volume, approximate our minvol radius for easy distance filtering.
                 vol_tally = 0;
-                for (short esc_vol : escape_vol){
-                    vol_tally = std::max(vol_tally,static_cast<int>(esc_vol));
+                for( short esc_vol : escape_vol ) {
+                    vol_tally = std::max( vol_tally, static_cast<int>( esc_vol ) );
                 }
                 // We use this for an easy distance check threshold when feeding monsters sound.
-                temp_sound_cache.approximate_minvol_distance = average_minvol_distance(temp_sound_cache.flood_radius, static_cast<short>(vol_tally), temp_sound_cache.terrain_sound_absorbtion_at_source);
+                temp_sound_cache.approximate_minvol_distance = average_minvol_distance(
+                            temp_sound_cache.flood_radius, static_cast<short>( vol_tally ),
+                            temp_sound_cache.terrain_sound_absorbtion_at_source );
 
 
                 // The sound cache should be built out by now.
@@ -952,7 +1014,8 @@ bool map::build_absorption_cache( const int zlev )
         // We have two general cases, sound absorption due to a barrier
         // And sound absorption due to surface effect.
         // We default to no absorption, i.e., some arbitrarily hard surface (asphault/concrete ground surfaces are effectively 0 for our purposes)
-        std::fill( absorption_cache.begin(), absorption_cache.end(), static_cast<short>( SOUND_ABSORPTION_OPEN_FIELD ) );
+        std::fill( absorption_cache.begin(), absorption_cache.end(),
+                   static_cast<short>( SOUND_ABSORPTION_OPEN_FIELD ) );
     }
 
     const season_type season = season_of_year( calendar::turn );
@@ -979,7 +1042,7 @@ bool map::build_absorption_cache( const int zlev )
             auto calc_absorption = [&]( point  p ) {
                 const point sp = p - sm_offset;
                 // If we are indoors, we dont get terrain sound attenuation.
-                short value = ( outside_cache[map_cache.idx(p.x, p.y)] ) ? default_terrain_absorption :
+                short value = ( outside_cache[map_cache.idx( p.x, p.y )] ) ? default_terrain_absorption :
                               SOUND_ABSORPTION_OPEN_FIELD;
 
                 // See if there is a vehicle in our given tripoint.
@@ -1003,11 +1066,11 @@ bool map::build_absorption_cache( const int zlev )
                 // Do this last as it involves the most calcs.
                 if( ( tile_ter.has_flag( "BLOCK_WIND" ) ||
                       tile_ter.has_flag( "CONNECT_TO_WALL" ) ) &&
-                    !outside_cache[map_cache.idx(p.x, p.y)] ) {
+                    !outside_cache[map_cache.idx( p.x, p.y )] ) {
                     // Store which type of sound block we are using. If true we have a windblocker, if false we have a barrier
                     const bool blockswind = tile_ter.has_flag( "BLOCK_WIND" );
 
-                    // TODO: Turn into static constexpr and make 
+                    // TODO: Turn into static constexpr and make
                     // Make an array for points, and two for bools (valid terrain, and if there is a roof).
                     // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
                     // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 3 ] [ 4 ] [ 5 ]
@@ -1027,7 +1090,7 @@ bool map::build_absorption_cache( const int zlev )
 
                         // Does the point in question have a roof?
                         // Remember, outside cache returns true if something counts as outdoors and has no roof.
-                        roof_cover[i] = !outside_cache[map_cache.idx(temp_point.x, temp_point.y) ];
+                        roof_cover[i] = !outside_cache[map_cache.idx( temp_point.x, temp_point.y ) ];
                         //( outside_cache[temp_point.x][temp_point.y] ) ? roof_cover[i] = false : roof_cover[i] = true;
 
                         // Does the point in question have terrain that blocks wind or connects to wall, and does it have a roof?
@@ -1103,12 +1166,12 @@ bool map::build_absorption_cache( const int zlev )
                 if( !rebuild_all || value != SOUND_ABSORPTION_OPEN_FIELD ) {
                     for( int sx = 0; sx < SEEX; ++sx ) {
                         // init all sy indices in one go. Our absorption cache should already be initialized. If it is not, something REALLY wierd has happened.
-                        std::fill_n( &absorption_cache[map_cache.idx(sm_offset.x + sx,sm_offset.y)], SEEY, value );
+                        std::fill_n( &absorption_cache[map_cache.idx( sm_offset.x + sx, sm_offset.y )], SEEY, value );
                         if( value >= SOUND_ABSORPTION_THICK_BARRIER ) {
                             const int x = sx + sm_offset.x;
                             for( int sy = 0; sy < SEEY; ++sy ) {
                                 const int y = sy + sm_offset.y;
-                                map_cache.sound_wall_cache[map_cache.idx(x, y)] = true;
+                                map_cache.sound_wall_cache[map_cache.idx( x, y )] = true;
                             }
                         }
                     }
@@ -1118,9 +1181,9 @@ bool map::build_absorption_cache( const int zlev )
                     const int x = sx + sm_offset.x;
                     for( int sy = 0; sy < SEEY; ++sy ) {
                         const int y = sy + sm_offset.y;
-                        absorption_cache[map_cache.idx(x, y)] = calc_absorption( { x, y } );
-                        if( absorption_cache[map_cache.idx(x, y)] >= SOUND_ABSORPTION_THICK_BARRIER ) {
-                            map_cache.sound_wall_cache[map_cache.idx(x, y)] = true;
+                        absorption_cache[map_cache.idx( x, y )] = calc_absorption( { x, y } );
+                        if( absorption_cache[map_cache.idx( x, y )] >= SOUND_ABSORPTION_THICK_BARRIER ) {
+                            map_cache.sound_wall_cache[map_cache.idx( x, y )] = true;
                         }
                     }
                 }
@@ -1252,13 +1315,13 @@ void sounds::sound( const sound_event &soundevent )
                                            get_weather().weather_id->sound_attn ) - 19 ) {
         // Dont propagate sounds that are too quiet to be heard.
         return;
-    }else if( temp_sound_event.volume > mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ) ) {
+    } else if( temp_sound_event.volume > mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ) ) {
         add_msg( m_debug,
                  _( "Sound with description [ %1s ] at %i:%i attempted to propagate with a volume of %i dB which is louder than possible in atmosphere!" ),
                  temp_sound_event.description, temp_sound_event.origin.x(), temp_sound_event.origin.y(),
                  temp_sound_event.volume );
-        // Dont propagate the sound if it is too loud. 99 out of 100 times it is going to be a sound that is incorrectly loud due to a json or math error. 
-        // Like doors attempting a 273dB volume when opened or closed. 
+        // Dont propagate the sound if it is too loud. 99 out of 100 times it is going to be a sound that is incorrectly loud due to a json or math error.
+        // Like doors attempting a 273dB volume when opened or closed.
         return;
     }
     // Description is not an optional parameter
@@ -1284,7 +1347,8 @@ void sounds::sound( const sound_event &soundevent )
                                         mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ) );
 
     // We flood fill sounds from monsters and NPCs for performance and efficiency reasons.
-    if( soundevent.from_monster || soundevent.from_npc || (!soundevent.from_player && soundevent.volume >= 120)) {
+    if( soundevent.from_monster || soundevent.from_npc || ( !soundevent.from_player &&
+            soundevent.volume >= 120 ) ) {
         sound_batch_floodfill_que.push_back( temp_sound_event );
     } else {
         map.flood_fill_sound( temp_sound_event, temp_sound_event.origin.z );
@@ -1444,38 +1508,39 @@ void sounds::process_sounds()
         // We assume that we dont have a direct line of sight so we actually check for floors and walls.
         const short alt_adjust = vol_z_adjust( s_origin, s_origin.xy(), false, true );
         if( ( ( sound.sound.volume ) - alt_adjust ) >= 110 ) {
-            const auto abs_omt = project_to_coords::omt>( s_origin );
+            const auto abs_omt = project_to_coords::omt > ( s_origin );
             const short default_terrain_absorption = terrain_sound_attenuation( abs_omt, season, true );
 
             const int sig_power = get_signal_for_hordes( sound.sound, ground_ambient_vol,
                                   default_terrain_absorption,
                                   alt_adjust );
             if( sig_power > 0 ) {
-                get_overmapbuffer(get_avatar().get_dimension()).signal_hordes( tripoint_abs_sm( point_abs_sm( ms_to_sm_copy( map.bub_to_abs(
-                                                  s_origin.xy() ) ) ), s_origin.z() ), sig_power );
+                get_overmapbuffer( get_avatar().get_dimension() ).signal_hordes( tripoint_abs_sm( point_abs_sm(
+                            ms_to_sm_copy( map.bub_to_abs(
+                                               s_origin.xy() ) ) ), s_origin.z() ), sig_power );
 
             }
         }
     }
     // Make sure this is empty before we get going. If its not, it is pretty much garunteed that all the entries will have jumbled iterators.
-    if (!sound_cache.sound_list_filtered.empty()){
+    if( !sound_cache.sound_list_filtered.empty() ) {
         sound_cache.clear_all_filtered_lists();
     }
 
-    auto make_new_filtered_list = [&](const sound_filter_key &key){
+    auto make_new_filtered_list = [&]( const sound_filter_key & key ) {
         std::vector<short> filtered_list;
         // If we have more sounds in the vector than a short can point to we have bigger problems than a bad memory access.
-        const short length = static_cast<short>(sound_instance_caches.size());
-        for(short i = 0; i < length; i++){
+        const short length = static_cast<short>( sound_instance_caches.size() );
+        for( short i = 0; i < length; i++ ) {
             const auto &sound = sound_instance_caches[i];
 
-            if ( sound.sound.category <= key.category || (key.ignore_movement && sound.movement_noise) ){
+            if( sound.sound.category <= key.category || ( key.ignore_movement && sound.movement_noise ) ) {
                 continue;
             }
 
             // We generally want to ignore the movement noises from our own faction, to prevent zombies from all hearing their own footsteps.
             // And to prevent monsters that are afraid of noise from being locked in an eternal fear loop by their allies footsteps.
-            if (key.monfaction == sound.sound.monfaction && sound.movement_noise ){
+            if( key.monfaction == sound.sound.monfaction && sound.movement_noise ) {
                 continue;
             }
             // Handle our most likely case, horde monsters, first.
@@ -1483,23 +1548,27 @@ void sounds::process_sounds()
             // We make an exception here to reduce the amount of sounds we will need to process, especially for standard zombies.
             // If a sound is below a category threshold or origin volume threshold and is from our faction/a faction we are neutral to, we ignore it.
             // So hulk roars will draw nearby zombies, but random zombie jibbering or flailing at a fence post wont.
-            if (key.horde_monster){
-                if (key.monfaction == sound.sound.monfaction || key.monfaction->attitude(sound.sound.monfaction) == MFA_FRIENDLY || key.monfaction->attitude(sound.sound.monfaction) == MFA_NEUTRAL  ){
-                    if (sound.sound.category < sound_t::alarm && sound.sound.volume < 90 ){
+            if( key.horde_monster ) {
+                if( key.monfaction == sound.sound.monfaction ||
+                    key.monfaction->attitude( sound.sound.monfaction ) == MFA_FRIENDLY ||
+                    key.monfaction->attitude( sound.sound.monfaction ) == MFA_NEUTRAL ) {
+                    if( sound.sound.category < sound_t::alarm && sound.sound.volume < 90 ) {
                         continue;
                     }
                 }
-            }else if ((key.noise_angers || key.noise_fear) && (key.monfaction == sound.sound.monfaction || key.monfaction->attitude(sound.sound.monfaction) == MFA_FRIENDLY ) && sound.sound.category < sound_t::destructive_activity){
+            } else if( ( key.noise_angers || key.noise_fear ) && ( key.monfaction == sound.sound.monfaction ||
+                       key.monfaction->attitude( sound.sound.monfaction ) == MFA_FRIENDLY ) &&
+                       sound.sound.category < sound_t::destructive_activity ) {
                 // If we are afraid of noises or angered by noises, make sure we dont trigger on our faction or friendly faction noises below a category threshold.
                 continue;
             }
 
-            // If we pass all the filter checks, return our list. 
-            filtered_list.push_back(i);
+            // If we pass all the filter checks, return our list.
+            filtered_list.push_back( i );
         }
         //We need to check that the list is not empty whenever we check sounds.
         const sound_filter_key key_2_electric_boogalo = key;
-        sound_cache.add_filtered_sound_list(key_2_electric_boogalo, filtered_list);
+        sound_cache.add_filtered_sound_list( key_2_electric_boogalo, filtered_list );
     };
 
     // Lets run through all the monsters and feed them sound info.
@@ -1531,24 +1600,24 @@ void sounds::process_sounds()
         const auto &critterloc = critter.bub_pos();
 
         // Check to see if there is a matching filtered list, or if our list list empty.
-        if (!sound_cache.matching_filtered_list(filter_key) || filtered_sounds.empty()){
-            make_new_filtered_list(filter_key);
+        if( !sound_cache.matching_filtered_list( filter_key ) || filtered_sounds.empty() ) {
+            make_new_filtered_list( filter_key );
         }
         // We should have a fancy new filtered list by now. If we still dont, skip this monster because something funky happened.
-        if (!sound_cache.matching_filtered_list(filter_key)){
+        if( !sound_cache.matching_filtered_list( filter_key ) ) {
             continue;
         }
         // Lets get our shiny list.
-        const auto &s_list = sound_cache.get_filtered_list(filter_key);
-        
+        const auto &s_list = sound_cache.get_filtered_list( filter_key );
+
         // Make sure our list ist not empty, skip if it is.
-        if (s_list.empty()){
+        if( s_list.empty() ) {
             continue;
         }
 
         // We only need to store the sound_instance_caches iterator value of our loudest sound.
         // We set this initially to -1 so we know if we did not hear anything.
-        short loudest_sound_iter = -1; 
+        short loudest_sound_iter = -1;
         short loudest_vol = 0;
         const bool goodhearing = critter.has_flag( MF_GOODHEARING );
 
@@ -1563,24 +1632,29 @@ void sounds::process_sounds()
                                             ( goodhearing ? 2000 : 1000 ) ), 1000 );
 
         const auto &level_cache = map.get_cache_ref( critterloc.z() );
-        const short critter_t_absorb = level_cache.absorption_cache[level_cache.idx( critterloc.x(), critterloc.y() )];
-        const bool critter_indoors = !level_cache.outside_cache[level_cache.idx( critterloc.x(), critterloc.y() )];
+        const short critter_t_absorb = level_cache.absorption_cache[level_cache.idx( critterloc.x(),
+                                                        critterloc.y() )];
+        const bool critter_indoors = !level_cache.outside_cache[level_cache.idx( critterloc.x(),
+                                                      critterloc.y() )];
 
         for( auto &iter : s_list ) {
             const auto &sound = sound_instance_caches[iter];
             const auto &s_category = sound.sound.category;
             // Do a quick check to see if we even have a hope of hearing the sound.
-            if ( critter_vol_threshold >= SOUND_MINIMUM_VOLUME_FOR_PROPAGATION && !goodhearing && rl_dist( critterloc ,sound.origin ) > sound.approximate_minvol_distance ){
+            if( critter_vol_threshold >= SOUND_MINIMUM_VOLUME_FOR_PROPAGATION && !goodhearing &&
+                rl_dist( critterloc, sound.origin ) > sound.approximate_minvol_distance ) {
                 continue;
             }
             // Alot of our simpler sorting should already be done by this point.
             // What we have left to do is checking distance, volume, and some specific stuff on monsters that are the players pets.
 
-            const bool lineofsight = critter.sees(sound.origin);
+            const bool lineofsight = critter.sees( sound.origin );
             // We grab either the average of our terrain absorption, or zero if both are zero.
-            const short avg_t_absorp = (sound.terrain_sound_absorbtion_at_source == 0 && critter_t_absorb == 0) ? 0 : std::round((sound.terrain_sound_absorbtion_at_source + critter_t_absorb)/2);
+            const short avg_t_absorp = ( sound.terrain_sound_absorbtion_at_source == 0 &&
+                                         critter_t_absorb == 0 ) ? 0 : std::round( ( sound.terrain_sound_absorbtion_at_source +
+                                                 critter_t_absorb ) / 2 );
             // Which we already have a handler for.
-            const short heard_vol = svol_at(sound, critter.pos(),avg_t_absorp,critter_indoors,lineofsight);
+            const short heard_vol = svol_at( sound, critter.pos(), avg_t_absorp, critter_indoors, lineofsight );
 
 
             if( heard_vol >= critter_vol_threshold ) {
@@ -1620,7 +1694,8 @@ void sounds::process_sounds()
                                                      source_fac == faction_id( "your_followers" );
 
                             // Are we a brave monster?
-                            if( !fears_enemy_sounds && (s_category == sounds::sound_t::combat || s_category == sounds::sound_t::alarm) ) {
+                            if( !fears_enemy_sounds && ( s_category == sounds::sound_t::combat ||
+                                                         s_category == sounds::sound_t::alarm ) ) {
 
                                 // Do our friends need help?
                                 if( source_ally ) {
@@ -1651,10 +1726,11 @@ void sounds::process_sounds()
             }
         }
         // If we heard no sound, dont try to queary the vector.
-        if (loudest_sound_iter < 0){
+        if( loudest_sound_iter < 0 ) {
             continue;
         }
-        critter.hear_sound( sound_instance_caches[loudest_sound_iter].sound, loudest_vol, critter_ambient_vol, false, fears_sounds );
+        critter.hear_sound( sound_instance_caches[loudest_sound_iter].sound, loudest_vol,
+                            critter_ambient_vol, false, fears_sounds );
     }
 }
 
@@ -1764,14 +1840,14 @@ void sounds::process_sounds_npc()
             return OUTDOOR_AMBIENT;
         }
     };
-    
+
     // Now we work through all of our active NPCs.
     for( npc &who : g->all_npcs() ) {
         // We only want NPCs who are simulated and inbounds to hear noises.
-        if( who.is_simulated() && map.inbounds(who.pos())) {
+        if( who.is_simulated() && map.inbounds( who.pos() ) ) {
             bool is_deaf = who.is_deaf();
             auto &loc = who.pos();
-            const auto &level_cache = map.get_cache_ref(loc.z);
+            const auto &level_cache = map.get_cache_ref( loc.z );
             const float volume_multiplier = who.hearing_ability();
             const short deafening_threshold = std::max( 0.0f,
                                               std::floor( 12000 - ( 200 * ( volume_multiplier - 1 ) ) ) ) ;
@@ -1795,7 +1871,7 @@ void sounds::process_sounds_npc()
             // In a perfect simulation most hearing protection absorbs high frequency sounds much more than low frequency sounds.
             // We cap our minimum at 10dB to prevent underground NPCs from hearing everything everywhere on the entire map.
             const short min_vol = std::max( 1000, ( ambient_vol - below_ambient + passive_sound_dampening ) );
-            const short npc_t_absorb = level_cache.absorption_cache[level_cache.idx(charx, chary)];
+            const short npc_t_absorb = level_cache.absorption_cache[level_cache.idx( charx, chary )];
 
             // dBspl is a root-mean-square value so while all the volumes in the tile should be cumulative,
             // proper tile volume would follow the formula sqrt((1/n)*(v1^2 + v2^2+ ... + vn^2)) where n is the number of volumes.
@@ -1803,13 +1879,16 @@ void sounds::process_sounds_npc()
             // 100dB + 20dB + 80dB +70dB = ~101dB  So we just take the loudest.
             for( auto &element : sound_vector ) {
                 //Skip sounds that NPCs have already heard, if for whatever reason they manage to hear such a sound.
-                if (element.heard_by_npcs){
+                if( element.heard_by_npcs ) {
                     continue;
                 }
-                const auto &average_t_absorp = (npc_t_absorb == 0 && element.terrain_sound_absorbtion_at_source == 0)? 0 : std::round((npc_t_absorb+element.terrain_sound_absorbtion_at_source)/2);
+                const auto &average_t_absorp = ( npc_t_absorb == 0 &&
+                                                 element.terrain_sound_absorbtion_at_source == 0 ) ? 0 : std::round( ( npc_t_absorb +
+                                                         element.terrain_sound_absorbtion_at_source ) / 2 );
                 // Do an early filter for sounds that would always be indaudible.
                 // Check to see if the NPC is deaf here as well, as we may deafen them part way through the process.
-                const short tile_vol = svol_at(element,who.pos(),average_t_absorp, !level_cache.outside_cache[level_cache.idx(charx,chary)], who.sees(element.origin));
+                const short tile_vol = svol_at( element, who.pos(), average_t_absorp,
+                                                !level_cache.outside_cache[level_cache.idx( charx, chary )], who.sees( element.origin ) );
 
                 if( tile_vol <= min_vol ) {
                     continue;
@@ -1878,7 +1957,7 @@ void sounds::process_sound_markers( Character *who )
     const float volume_multiplier = who->hearing_ability();
     auto &loc = who->bub_pos();
     auto &map = get_map();
-    const auto &level_cache = map.get_cache_ref(loc.z);
+    const auto &level_cache = map.get_cache_ref( loc.z );
     auto &sound_vector = map.m_sound_cache.sound_instances;
     // We want constant ints for our x/y, makes the compiler happier when getting cache[x][y].
     // How far below ambient can this character hear? Default of 20dB, uncapped unlike NPCs.
@@ -1887,7 +1966,7 @@ void sounds::process_sound_markers( Character *who )
     const bool pcunderground = loc.z() < 0;
     const bool pcoutdoors = map.is_outside( loc.xy() );
     const weather_manager &weather = get_weather();
-    const short player_t_absorp = level_cache.absorption_cache[level_cache.idx(  loc.x(), loc.y() )];
+    const short player_t_absorp = level_cache.absorption_cache[level_cache.idx( loc.x(), loc.y() )];
     const bool  player_indoors = !level_cache.outside_cache[level_cache.idx( loc.x(), loc.y() )];
 
     // Ambient underground is 20dB, ambient in a above ground building is 40. The assumption is that there are zombies making noise, and its not perfectly dead quiet.
@@ -1925,196 +2004,203 @@ void sounds::process_sound_markers( Character *who )
 
     // Cant hear noises that are significantly quieter than the loudest noise you are currently hearing,
     // Softer sounds just get drowned out in loud areas.
-    const short vol_threshold = std::max(0, (passive_sound_dampening + ambient_vol - below_ambient) );
+    const short vol_threshold = std::max( 0,
+                                          ( passive_sound_dampening + ambient_vol - below_ambient ) );
 
     for( auto &element : sound_vector ) {
         // Skip sounds the player has already heard.
-        if (element.heard_by_player){
+        if( element.heard_by_player ) {
             continue;
         }
-        // And set the sound as having been heard by the player, before we potentially skip it for volume reasons. 
+        // And set the sound as having been heard by the player, before we potentially skip it for volume reasons.
         element.heard_by_player = true;
-        if (element.sound.volume >= mdBspl_to_dBspl(MAXIMUM_VOLUME_ATMOSPHERE)){
+        if( element.sound.volume >= mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ) ) {
             // Dont count impossibly loud sounds.
             add_msg( m_debug,
-             _( "Player given sound louder than possible in Atmosphere! Sound with description [ %1s ] from %i:%i with an origin volume of %i dB is louder than possible." ),
-             element.sound.description, element.sound.origin.x, element.sound.origin.y,
-             element.sound.volume );
+                     _( "Player given sound louder than possible in Atmosphere! Sound with description [ %1s ] from %i:%i with an origin volume of %i dB is louder than possible." ),
+                     element.sound.description, element.sound.origin.x, element.sound.origin.y,
+                     element.sound.volume );
             continue;
         }
 
-        const auto &average_t_absorp = (player_t_absorp == 0 && element.terrain_sound_absorbtion_at_source == 0) ? 0 : std::round((player_t_absorp + element.terrain_sound_absorbtion_at_source)/2);
-        const short tile_vol = svol_at(element,loc,average_t_absorp, player_indoors,who->sees(element.origin));
+        const auto &average_t_absorp = ( player_t_absorp == 0 &&
+                                         element.terrain_sound_absorbtion_at_source == 0 ) ? 0 : std::round( ( player_t_absorp +
+                                                 element.terrain_sound_absorbtion_at_source ) / 2 );
+        const short tile_vol = svol_at( element, loc, average_t_absorp, player_indoors,
+                                        who->sees( element.origin ) );
 
-        loudest_vol = std::max(loudest_vol,tile_vol);
+        loudest_vol = std::max( loudest_vol, tile_vol );
 
-        if ( tile_vol >= MAXIMUM_VOLUME_ATMOSPHERE ){
+        if( tile_vol >= MAXIMUM_VOLUME_ATMOSPHERE ) {
             // Dont count impossibly loud sounds.
             add_msg( m_debug,
-             _( "Player given sound louder than possible in Atmosphere! Sound with description [ %1s ] from %i:%i:%i with an origin volume of %i dB, tile volume of %i mdB at %i:%i:%i is louder than possible." ),
-             element.sound.description, element.sound.origin.x, element.sound.origin.y(), element.sound.origin.z(), element.sound.volume, tile_vol, loc.x(), loc.y(), loc.z() );
+                     _( "Player given sound louder than possible in Atmosphere! Sound with description [ %1s ] from %i:%i:%i with an origin volume of %i dB, tile volume of %i mdB at %i:%i:%i is louder than possible." ),
+                     element.sound.description, element.sound.origin.x, element.sound.origin.y(),
+                     element.sound.origin.z(), element.sound.volume, tile_vol, loc.x(), loc.y(), loc.z() );
             continue;
         }
-            // If the sound is loud enough, inform the player of it.
-            if( tile_vol > vol_threshold ) {
-                
-                // Deafening is based on the felt volume, as a player may be too deaf to
-                // hear the deafening sound but still suffer additional hearing loss.
-                // Is the loudest tile volume louder than the deafening threshold?
-                // Passive sound dampening counts 2x for protecting against hearing loss compared to is normal volume adjustment to approximate hearing protection working more effectively against harmful high frequency sounds.
-                const short deafening_vol = std::max( 0,tile_vol - ( active_sound_dampening + passive_sound_dampening + passive_sound_dampening ) );
-                const bool is_sound_deafening =  deafening_vol >= rng( deafening_threshold, deafening_garuntee );
-                if(is_sound_deafening) {
-                    
-                    // A deaf player hear no sound, but they are still at risk of additional hearing loss.
-                    if( is_deaf ) {
-                        if( is_sound_deafening && !who->is_immune_effect( effect_deaf ) ) {
-                            who->add_effect( effect_deaf, std::min( 4_minutes,
-                                                                    time_duration::from_turns( mdBspl_to_dBspl( deafening_vol ) - 130 ) ) );
-                            if( !who->has_trait( trait_id( "NOPAIN" ) ) ) {
-                                who->add_msg_if_player( m_bad, _( "Your eardrums suddenly ache!" ) );
-                                if( who->get_pain() < 10 ) {
+        // If the sound is loud enough, inform the player of it.
+        if( tile_vol > vol_threshold ) {
 
-                                    who->mod_pain( rng( 0, 2 ) );
-                                }
+            // Deafening is based on the felt volume, as a player may be too deaf to
+            // hear the deafening sound but still suffer additional hearing loss.
+            // Is the loudest tile volume louder than the deafening threshold?
+            // Passive sound dampening counts 2x for protecting against hearing loss compared to is normal volume adjustment to approximate hearing protection working more effectively against harmful high frequency sounds.
+            const short deafening_vol = std::max( 0,
+                                                  tile_vol - ( active_sound_dampening + passive_sound_dampening + passive_sound_dampening ) );
+            const bool is_sound_deafening =  deafening_vol >= rng( deafening_threshold, deafening_garuntee );
+            if( is_sound_deafening ) {
+
+                // A deaf player hear no sound, but they are still at risk of additional hearing loss.
+                if( is_deaf ) {
+                    if( is_sound_deafening && !who->is_immune_effect( effect_deaf ) ) {
+                        who->add_effect( effect_deaf, std::min( 4_minutes,
+                                                                time_duration::from_turns( mdBspl_to_dBspl( deafening_vol ) - 130 ) ) );
+                        if( !who->has_trait( trait_id( "NOPAIN" ) ) ) {
+                            who->add_msg_if_player( m_bad, _( "Your eardrums suddenly ache!" ) );
+                            if( who->get_pain() < 10 ) {
+
+                                who->mod_pain( rng( 0, 2 ) );
                             }
                         }
-                        continue;
                     }
-
-                    if( is_sound_deafening && !who->is_immune_effect( effect_deaf ) ) {
-                        const time_duration deafness_duration = time_duration::from_turns( mdBspl_to_dBspl(
-                                deafening_vol ) - 130 );
-                        who->add_effect( effect_deaf, deafness_duration );
-                        if( who->is_deaf() && !is_deaf ) {
-                            is_deaf = true;
-                            continue;
-                        }
-                    }
-                }
-                // Direct distance to the sound source. elevation effects are handled by the z level adjust.
-                const int distance_to_sound = rl_dist( loc, element.sound.origin );
-
-                // Secure the flag before wake_up() clears the effect
-                bool slept_through = who->has_effect( effect_slept_through_alarm );
-                // Grab the decibel value of our adjusted vol for use with comparisons etc.
-                const int db_vol = mdBspl_to_dBspl( tile_vol - passive_sound_dampening );
-                // See if we need to wake someone up
-                // Remember we are working with dB spl volumes instead of tile volumes and dB spl is a logarithmic unit. 60dB is normal conversation, 80-100 is a car horn, ~160 is a gunshot, 180+ can kill a human.
-                // We want somewhat less swingy results, so use d10s
-                // Noise past 60dB should automatically wake up not heavy sleepers.
-                // Noise past 100dB should automatically wake up heavy sleepers.
-                // Noise past 120dB will cause pain and should automatically wake up heavy sleeper 2.
-                if( who->has_effect( effect_sleep ) ) {
-                    if( ( ( !( who->has_trait( trait_HEAVYSLEEPER ) ||
-                               who->has_trait( trait_HEAVYSLEEPER2 ) ) && dice( 6, 10 ) <= db_vol ) ||
-                          ( who->has_trait( trait_HEAVYSLEEPER ) && dice( 10, 10 ) <= db_vol ) ||
-                          ( who->has_trait( trait_HEAVYSLEEPER2 ) && dice( 12, 10 ) <= db_vol ) ) &&
-                        !who->has_effect( effect_narcosis ) ) {
-                        //Not kidding about sleep-through-firefight
-                        who->wake_up();
-                        who->add_msg_if_player( m_warning, _( "Something is making noise." ) );
-                    } else {
-                        continue;
-                    }
-                }
-                const std::string &description = element.sound.description.empty() ? _( "a noise" ) :
-                                                 element.sound.description;
-
-                // don't print our own noise or things without descriptions
-                if( ( element.sound.from_monster || element.sound.from_player || element.sound.from_npc ) &&
-                    ( element.sound.origin != who->bub_pos() ) &&
-                    !get_map().pl_sees( element.sound.origin, distance_to_sound ) ) {
-                    if( !who->activity->is_distraction_ignored( distraction_type::noise ) &&
-                        !get_safemode().is_sound_safe( element.sound.description, distance_to_sound ) ) {
-                        const std::string final_description = ensure_punctuation( description, '!' );
-                        const std::string query = string_format( _( "Heard %s!" ), final_description );
-                        g->cancel_activity_or_ignore_query( distraction_type::noise, query );
-                    }
-                }
-
-                // skip some sounds to avoid message spam
-                if( describe_sound( element.sound.category, element.sound.origin == who->bub_pos() ) ) {
-                    game_message_type severity = m_info;
-                    if( element.sound.category == sound_t::combat || element.sound.category == sound_t::alarm ) {
-                        severity = m_warning;
-                    }
-
-                    std::string final_description = ensure_punctuation( description, '.' );
-
-                    // if we can see it, don't print a direction
-                    if( element.sound.origin == who->bub_pos() ) {
-                        add_msg( severity, _( "From your position you hear %1$s" ), final_description );
-                    } else if( who->sees( element.sound.origin ) ) {
-                        add_msg( severity, _( "You hear %1$s" ), final_description );
-                    } else {
-                        std::string direction = direction_name( direction_from( who->pos(), element.sound.origin ) );
-                        add_msg( severity, _( "From the %1$s you hear %2$s" ), direction, final_description );
-                    }
-                }
-
-                if( !who->has_effect( effect_sleep ) && who->has_effect( effect_alarm_clock ) &&
-                    !who->has_bionic( bionic_id( "bio_infolink" ) ) ) {
-                    // if we don't have effect_sleep but we're in_sleep_state, either
-                    // we were trying to fall asleep for so long our alarm is now going
-                    // off or something disturbed us while trying to sleep
-                    const bool trying_to_sleep = who->in_sleep_state();
-                    if( who->get_effect( effect_alarm_clock ).get_duration() == 1_turns ) {
-                        if( slept_through ) {
-                            add_msg( _( "Your alarm clock finally wakes you up." ) );
-                        } else if( !trying_to_sleep ) {
-                            add_msg( _( "Your alarm clock wakes you up." ) );
-                        } else {
-                            add_msg( _( "Your alarm clock goes off and you haven't slept a wink." ) );
-                            who->activity->set_to_null();
-                        }
-                        add_msg( _( "You turn off your alarm-clock." ) );
-                        who->get_effect( effect_alarm_clock ).set_duration( 0_turns );
-                    }
-                }
-
-                const std::string &sfx_id = element.sound.id;
-                const std::string &sfx_variant = element.sound.variant;
-                if( !sfx_id.empty() ) {
-                    sfx::play_variant_sound( sfx_id, sfx_variant, sfx::get_heard_volume( element.sound.origin ) );
-                }
-
-                // Place footstep markers.
-                if( element.sound.origin == who->bub_pos() || who->sees( element.sound.origin ) ) {
-                    // If we are or can see the source, don't draw a marker.
                     continue;
                 }
 
-                int err_offset;
-                if( ( db_vol + distance_to_sound ) / distance_to_sound < 2 ) {
-                    err_offset = 3;
-                } else if( ( db_vol + distance_to_sound ) / distance_to_sound < 3 ) {
-                    err_offset = 2;
-                } else {
-                    err_offset = 1;
-                }
-
-                // If Z-coordinate is different, draw even when you can see the source
-                const bool diff_z = element.sound.origin.z() != who->bub_pos().z();
-
-                // Enumerate the valid points the player *cannot* see.
-                // Unless the source is on a different z-level, then any point is fine
-                std::vector<tripoint_bub_ms> unseen_points;
-                for( const tripoint_bub_ms &newp : get_map().points_in_radius( element.sound.origin, err_offset ) ) {
-                    if( diff_z || !who->sees( newp ) ) {
-                        unseen_points.emplace_back( newp );
+                if( is_sound_deafening && !who->is_immune_effect( effect_deaf ) ) {
+                    const time_duration deafness_duration = time_duration::from_turns( mdBspl_to_dBspl(
+                            deafening_vol ) - 130 );
+                    who->add_effect( effect_deaf, deafness_duration );
+                    if( who->is_deaf() && !is_deaf ) {
+                        is_deaf = true;
+                        continue;
                     }
                 }
+            }
+            // Direct distance to the sound source. elevation effects are handled by the z level adjust.
+            const int distance_to_sound = rl_dist( loc, element.sound.origin );
 
-                // Then place the sound marker in a random one.
-                if( !unseen_points.empty() ) {
-                    sound_markers.emplace( random_entry( unseen_points ), element.sound );
+            // Secure the flag before wake_up() clears the effect
+            bool slept_through = who->has_effect( effect_slept_through_alarm );
+            // Grab the decibel value of our adjusted vol for use with comparisons etc.
+            const int db_vol = mdBspl_to_dBspl( tile_vol - passive_sound_dampening );
+            // See if we need to wake someone up
+            // Remember we are working with dB spl volumes instead of tile volumes and dB spl is a logarithmic unit. 60dB is normal conversation, 80-100 is a car horn, ~160 is a gunshot, 180+ can kill a human.
+            // We want somewhat less swingy results, so use d10s
+            // Noise past 60dB should automatically wake up not heavy sleepers.
+            // Noise past 100dB should automatically wake up heavy sleepers.
+            // Noise past 120dB will cause pain and should automatically wake up heavy sleeper 2.
+            if( who->has_effect( effect_sleep ) ) {
+                if( ( ( !( who->has_trait( trait_HEAVYSLEEPER ) ||
+                           who->has_trait( trait_HEAVYSLEEPER2 ) ) && dice( 6, 10 ) <= db_vol ) ||
+                      ( who->has_trait( trait_HEAVYSLEEPER ) && dice( 10, 10 ) <= db_vol ) ||
+                      ( who->has_trait( trait_HEAVYSLEEPER2 ) && dice( 12, 10 ) <= db_vol ) ) &&
+                    !who->has_effect( effect_narcosis ) ) {
+                    //Not kidding about sleep-through-firefight
+                    who->wake_up();
+                    who->add_msg_if_player( m_warning, _( "Something is making noise." ) );
+                } else {
+                    continue;
                 }
+            }
+            const std::string &description = element.sound.description.empty() ? _( "a noise" ) :
+                                             element.sound.description;
+
+            // don't print our own noise or things without descriptions
+            if( ( element.sound.from_monster || element.sound.from_player || element.sound.from_npc ) &&
+                ( element.sound.origin != who->bub_pos() ) &&
+                !get_map().pl_sees( element.sound.origin, distance_to_sound ) ) {
+                if( !who->activity->is_distraction_ignored( distraction_type::noise ) &&
+                    !get_safemode().is_sound_safe( element.sound.description, distance_to_sound ) ) {
+                    const std::string final_description = ensure_punctuation( description, '!' );
+                    const std::string query = string_format( _( "Heard %s!" ), final_description );
+                    g->cancel_activity_or_ignore_query( distraction_type::noise, query );
+                }
+            }
+
+            // skip some sounds to avoid message spam
+            if( describe_sound( element.sound.category, element.sound.origin == who->bub_pos() ) ) {
+                game_message_type severity = m_info;
+                if( element.sound.category == sound_t::combat || element.sound.category == sound_t::alarm ) {
+                    severity = m_warning;
+                }
+
+                std::string final_description = ensure_punctuation( description, '.' );
+
+                // if we can see it, don't print a direction
+                if( element.sound.origin == who->bub_pos() ) {
+                    add_msg( severity, _( "From your position you hear %1$s" ), final_description );
+                } else if( who->sees( element.sound.origin ) ) {
+                    add_msg( severity, _( "You hear %1$s" ), final_description );
+                } else {
+                    std::string direction = direction_name( direction_from( who->pos(), element.sound.origin ) );
+                    add_msg( severity, _( "From the %1$s you hear %2$s" ), direction, final_description );
+                }
+            }
+
+            if( !who->has_effect( effect_sleep ) && who->has_effect( effect_alarm_clock ) &&
+                !who->has_bionic( bionic_id( "bio_infolink" ) ) ) {
+                // if we don't have effect_sleep but we're in_sleep_state, either
+                // we were trying to fall asleep for so long our alarm is now going
+                // off or something disturbed us while trying to sleep
+                const bool trying_to_sleep = who->in_sleep_state();
+                if( who->get_effect( effect_alarm_clock ).get_duration() == 1_turns ) {
+                    if( slept_through ) {
+                        add_msg( _( "Your alarm clock finally wakes you up." ) );
+                    } else if( !trying_to_sleep ) {
+                        add_msg( _( "Your alarm clock wakes you up." ) );
+                    } else {
+                        add_msg( _( "Your alarm clock goes off and you haven't slept a wink." ) );
+                        who->activity->set_to_null();
+                    }
+                    add_msg( _( "You turn off your alarm-clock." ) );
+                    who->get_effect( effect_alarm_clock ).set_duration( 0_turns );
+                }
+            }
+
+            const std::string &sfx_id = element.sound.id;
+            const std::string &sfx_variant = element.sound.variant;
+            if( !sfx_id.empty() ) {
+                sfx::play_variant_sound( sfx_id, sfx_variant, sfx::get_heard_volume( element.sound.origin ) );
+            }
+
+            // Place footstep markers.
+            if( element.sound.origin == who->bub_pos() || who->sees( element.sound.origin ) ) {
+                // If we are or can see the source, don't draw a marker.
+                continue;
+            }
+
+            int err_offset;
+            if( ( db_vol + distance_to_sound ) / distance_to_sound < 2 ) {
+                err_offset = 3;
+            } else if( ( db_vol + distance_to_sound ) / distance_to_sound < 3 ) {
+                err_offset = 2;
+            } else {
+                err_offset = 1;
+            }
+
+            // If Z-coordinate is different, draw even when you can see the source
+            const bool diff_z = element.sound.origin.z() != who->bub_pos().z();
+
+            // Enumerate the valid points the player *cannot* see.
+            // Unless the source is on a different z-level, then any point is fine
+            std::vector<tripoint_bub_ms> unseen_points;
+            for( const tripoint_bub_ms &newp : get_map().points_in_radius( element.sound.origin,
+                    err_offset ) ) {
+                if( diff_z || !who->sees( newp ) ) {
+                    unseen_points.emplace_back( newp );
+                }
+            }
+
+            // Then place the sound marker in a random one.
+            if( !unseen_points.empty() ) {
+                sound_markers.emplace( random_entry( unseen_points ), element.sound );
+            }
         }
     }
-    // Volume gets reset to zero later in the turn order after the player has acted. 
+    // Volume gets reset to zero later in the turn order after the player has acted.
     // Keep the volume at the maximum to prevent the volume in the UI from being repeatedly reset to the ambient volume whenever the UI is refreshed.
-    who->volume = std::max( static_cast<int>( mdBspl_to_dBspl( loudest_vol )), who->volume );
+    who->volume = std::max( static_cast<int>( mdBspl_to_dBspl( loudest_vol ) ), who->volume );
 }
 // Use map::cull_sound_instance_caches for managing the sound_instance_caches vector during play.
 void sounds::reset_sounds()

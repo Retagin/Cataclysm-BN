@@ -738,7 +738,7 @@ static void smash()
         } else if( smashskill >= rng( bash_info.str_min, bash_info.str_max ) ) {
             sound_event se;
             se.origin = smashp;
-            se.volume = std::min(80, bash_info.sound_vol.value_or( 0 ));
+            se.volume = std::min( 80, bash_info.sound_vol.value_or( 0 ) );
             se.category = sounds::sound_t::combat;
             se.description = bash_info.sound.translated();
             se.id = "smash";
@@ -753,7 +753,7 @@ static void smash()
         } else {
             sound_event se;
             se.origin = smashp;
-            se.volume = std::min(80, bash_info.sound_fail_vol.value_or( 0 ) );
+            se.volume = std::min( 80, bash_info.sound_fail_vol.value_or( 0 ) );
             se.category = sounds::sound_t::combat;
             se.description = bash_info.sound_fail.translated();
             se.id = "smash";

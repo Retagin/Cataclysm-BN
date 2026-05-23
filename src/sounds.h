@@ -387,17 +387,20 @@ static constexpr auto wall_sdir_invalidation = std::array<std::pair<uint8_t, uin
     For dB, dL = 20 * Log(R1/R2). For use with mdB we just multiply by 2000 instead which is conveniently our minvol for sound propagation constant.
     Tiles are taken at 1 meter. Will give gibberish answers if a non-tile distance is provided.
     @param dist1: Direct distance from the source to the point where we have our volume measurment. Almost always our floodfill radius.
-    @param dist2: Direct distance between the listener and the origin of the sound. 
+    @param dist2: Direct distance between the listener and the origin of the sound.
     @param average_terrain_absorption: Average terrain sound absorption of the terrain between the sound source and the listener in mdB spl.
 */
-static constexpr short get_cumulative_vol_dist_loss(const int &dist1, const int &dist2, const short &t_absorp)
+static constexpr short get_cumulative_vol_dist_loss( const int &dist1, const int &dist2,
+        const short &t_absorp )
 {
     // One of our potential problem cases.
-    if(dist1 == dist2){
+    if( dist1 == dist2 ) {
         return 0;
     }
-    return (std::floor(SOUND_MINIMUM_VOLUME_FOR_PROPAGATION * log10(static_cast<float>(dist2)/static_cast<float>(dist1))) + ((dist2 > dist1) ? ((dist2 - dist1) * t_absorp) : 0));
-    
+    return ( std::floor( SOUND_MINIMUM_VOLUME_FOR_PROPAGATION * log10( static_cast<float>
+                         ( dist2 ) / static_cast<float>( dist1 ) ) ) + ( ( dist2 > dist1 ) ? ( (
+                                     dist2 - dist1 ) * t_absorp ) : 0 ) );
+
 }
 
 /** Returns an int tile distance before the volume in question drops to out minimum volume for propagation, or a seperate optional volume. Will approximate for terrain sound absorption if given a value.
@@ -406,50 +409,53 @@ static constexpr short get_cumulative_vol_dist_loss(const int &dist1, const int 
     @param t_absorp: mdB spl sound absorption of the terrain. Defaults to zero, use a non zero value if you want to approximate for terrain absorption.
     @param vol2: This defaults to the minimum volume for sound propagation, 20dB spl, as a guestimate cutoff threshold
 
-    If we ever get a dist2 that is less than dist1, we just return dist1. 
-*/ 
-static constexpr int average_minvol_distance(const int &dist1, const short &vol1, const short &t_asbsorp = 0, const short &vol2 = SOUND_MINIMUM_VOLUME_FOR_PROPAGATION)
+    If we ever get a dist2 that is less than dist1, we just return dist1.
+*/
+static constexpr int average_minvol_distance( const int &dist1, const short &vol1,
+        const short &t_asbsorp = 0, const short &vol2 = SOUND_MINIMUM_VOLUME_FOR_PROPAGATION )
 {
     // Deal with our undefined behavior.
-    // if vol2 is greater than vol1, that is a very good indication that our sound failed to propagate to the boundary of its envelope. 
+    // if vol2 is greater than vol1, that is a very good indication that our sound failed to propagate to the boundary of its envelope.
     // Just return the envelope radius.
-    if (vol2 >= vol1 ){
+    if( vol2 >= vol1 ) {
         return dist1;
     }
     // How much volume change do we need to get to our minvol.
     // Because we are effectively pre-converting our volume and multiplying by 100, we need to do the same to the other half of our equations down the line.
-    const auto &delta_vol_req = static_cast<double>(vol1 - vol2);
+    const auto &delta_vol_req = static_cast<double>( vol1 - vol2 );
 
     // If t_absorp == 0, we take the blue pill, the function ends, we wake up in our bed and believe that all our math is nice and has closed form analytical solutions that dont require differential equations.
-    
-    if (t_asbsorp == 0){
 
-    // 10^this = R2, our desired distance. Broken out for readability.
-    // As 20*100 is equal to our minvol, just use that. Easy peasy static constexpr squeezy.
-    const auto &coefficient = ( (delta_vol_req/SOUND_MINIMUM_VOLUME_FOR_PROPAGATION) + log10(dist1));
+    if( t_asbsorp == 0 ) {
 
-    return static_cast<int>(std::round(pow(10,coefficient)));
+        // 10^this = R2, our desired distance. Broken out for readability.
+        // As 20*100 is equal to our minvol, just use that. Easy peasy static constexpr squeezy.
+        const auto &coefficient = ( ( delta_vol_req / SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) + log10(
+                                        dist1 ) );
+
+        return static_cast<int>( std::round( pow( 10, coefficient ) ) );
 
     } else {
 
-    // If t_absorp != 0, we take the red pill, we stay in wonderland and I show you how deep the rabit hole goes.
-    
-    // Which is not actually particularly deep. Many "unsolved problems" are solveable for each particular case using a numerical method.
-    // Which is not super ideal when you want to do alot of unique ones in sequence, by hand.
-    // But computers are practically speaking the best counters in the world. 
-    // Taking into consideration our actual required precision which as we are dealing in whole tiles is not much
-    // We can make some very simple assumptions and adjustments that lets us turn unsolvable problems into solveable ones. 
+        // If t_absorp != 0, we take the red pill, we stay in wonderland and I show you how deep the rabit hole goes.
 
-    // In this particular case we have two factors that reduce volume, one that is linear and one that exponentially decays with distance. 
-    // We effectively get out some big equation C = dist2 + log10(dist2). 
-    // Log10(10) = 1, Log10(100) = 2, Log10(1000) = 3, etc. If we would have had a dist2 of 42, our total result is 43.623. 
-    // Discarding the log10(dist2) portion of the equation only results in a relative error of 3.7% 
-    // A true distance of 10 should output 10 + log10(10) = 11, so discarding the log10 portion only results in an error of 10%.
-    // If we just add 1 and discard the log10(dist2) portion, we wont ever accrue enough error to care about it.
+        // Which is not actually particularly deep. Many "unsolved problems" are solveable for each particular case using a numerical method.
+        // Which is not super ideal when you want to do alot of unique ones in sequence, by hand.
+        // But computers are practically speaking the best counters in the world.
+        // Taking into consideration our actual required precision which as we are dealing in whole tiles is not much
+        // We can make some very simple assumptions and adjustments that lets us turn unsolvable problems into solveable ones.
 
-    // If we somehow get an dist2 less than dist1, just return dist1. log10(20) + 1 = ~2.30103
-    const auto &equation = (delta_vol_req/SOUND_MINIMUM_VOLUME_FOR_PROPAGATION) + ((t_asbsorp * dist1)/20.0) + log10(dist1) - log10(t_asbsorp) + 2.30103;
-    return std::max(dist1, static_cast<int>(std::round(equation)));
+        // In this particular case we have two factors that reduce volume, one that is linear and one that exponentially decays with distance.
+        // We effectively get out some big equation C = dist2 + log10(dist2).
+        // Log10(10) = 1, Log10(100) = 2, Log10(1000) = 3, etc. If we would have had a dist2 of 42, our total result is 43.623.
+        // Discarding the log10(dist2) portion of the equation only results in a relative error of 3.7%
+        // A true distance of 10 should output 10 + log10(10) = 11, so discarding the log10 portion only results in an error of 10%.
+        // If we just add 1 and discard the log10(dist2) portion, we wont ever accrue enough error to care about it.
+
+        // If we somehow get an dist2 less than dist1, just return dist1. log10(20) + 1 = ~2.30103
+        const auto &equation = ( delta_vol_req / SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) + ( (
+                                   t_asbsorp * dist1 ) / 20.0 ) + log10( dist1 ) - log10( t_asbsorp ) + 2.30103;
+        return std::max( dist1, static_cast<int>( std::round( equation ) ) );
     }
 
 }

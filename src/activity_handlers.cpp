@@ -3703,9 +3703,10 @@ void activity_handlers::operation_finish( player_activity *act, player *p )
         if( act->values[1] > 0 ) {
             add_msg( m_good,
                      _( "The Autodoc returns to its resting position after successfully performing the operation." ) );
-            const std::list<tripoint_bub_ms> autodocs = here.find_furnitures_or_vparts_with_flag_in_radius( p->bub_pos(),
-                                                 1,
-                                                 flag_AUTODOC );
+            const std::list<tripoint_bub_ms> autodocs = here.find_furnitures_or_vparts_with_flag_in_radius(
+                        p->bub_pos(),
+                        1,
+                        flag_AUTODOC );
             sound_event se;
             se.origin = autodocs.front();
             se.volume = 60;
@@ -3719,9 +3720,10 @@ void activity_handlers::operation_finish( player_activity *act, player *p )
             if( act->str_values[0] == "install" ) {
                 add_msg( m_warning,
                          _( "The Autodoc completes installation and activates bionic but reports about complications during operation." ) );
-                const std::list<tripoint_bub_ms> autodocs = here.find_furnitures_or_vparts_with_flag_in_radius( p->bub_pos(),
-                                                     1,
-                                                     flag_AUTODOC );
+                const std::list<tripoint_bub_ms> autodocs = here.find_furnitures_or_vparts_with_flag_in_radius(
+                            p->bub_pos(),
+                            1,
+                            flag_AUTODOC );
                 sound_event se;
                 se.origin = autodocs.front();
                 se.volume = 60;
@@ -3735,9 +3737,10 @@ void activity_handlers::operation_finish( player_activity *act, player *p )
             } else {
                 add_msg( m_bad,
                          _( "The Autodoc jerks back to its resting position after failing the operation." ) );
-                const std::list<tripoint_bub_ms> autodocs = here.find_furnitures_or_vparts_with_flag_in_radius( p->bub_pos(),
-                                                     1,
-                                                     flag_AUTODOC );
+                const std::list<tripoint_bub_ms> autodocs = here.find_furnitures_or_vparts_with_flag_in_radius(
+                            p->bub_pos(),
+                            1,
+                            flag_AUTODOC );
                 sound_event se;
                 se.origin = autodocs.front();
                 se.volume = 60;

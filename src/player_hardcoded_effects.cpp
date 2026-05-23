@@ -266,7 +266,7 @@ static void eff_fun_hallu( player &u, effect &it )
 
             ///\EFFECT_INT_NPC decreases volume of hallucination sounds
             int loudness = 60 + u.str_cur - u.int_cur;
-            loudness = std::min(90, std::max(30, loudness));
+            loudness = std::min( 90, std::max( 30, loudness ) );
 
             sound_event se;
             se.origin = u.bub_pos();
@@ -794,7 +794,7 @@ void Character::hardcoded_effects( effect &it )
         if( one_in( 5000 ) ) {
             add_msg_if_player( m_bad, _( "A strange sound reverberates around the edges of reality." ) );
             // Comparable to the humming anomaly trap, with a narrower range
-            int volume = rng( 40, 125);
+            int volume = rng( 40, 125 );
             std::string sfx;
             if( volume <= 60 ) {
                 sfx = _( "hrmmm" );

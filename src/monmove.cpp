@@ -1750,7 +1750,7 @@ void monster::footsteps( const tripoint_bub_ms &p )
     }
     switch( type->size ) {
         case creature_size::tiny:
-            volume -= 20; 
+            volume -= 20;
             break;
         case creature_size::small:
             volume -= 10;

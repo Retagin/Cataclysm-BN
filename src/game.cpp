@@ -2054,7 +2054,7 @@ bool game::do_turn()
         overmap_npc_move();
     }
 
-    if ( !soundperf ){
+    if( !soundperf ) {
         // Floodfill any sounds cued up by NPCs during their respective turns or from other sources.
         m.batch_flood_fill_sounds();
     }
@@ -12150,7 +12150,7 @@ bool game::grabbed_furn_move( const tripoint_rel_ms &dp )
     }
     sound_event se;
     se.origin = fdest;
-    se.volume = std::min( 80, 40 + ( furntype.move_str_req * 2 ));
+    se.volume = std::min( 80, 40 + ( furntype.move_str_req * 2 ) );
     se.category = sounds::sound_t::movement;
     se.movement_noise = true;
     se.description = _( "a scraping noise." );

@@ -558,7 +558,7 @@ void map::set_floor_cache_dirty( const int zlev )
     // outside_cache and sheltered_cache at z-1 depend on floor_cache at z.
     set_outside_cache_dirty( zlev - 1 );
     // This also means the absorption and sound wall caches are marked dirty there as well.
-    set_absorption_cache_dirty( zlev -1 );
+    set_absorption_cache_dirty( zlev - 1 );
     set_sound_wall_cache_dirty( zlev - 1 );
 }
 
@@ -576,7 +576,7 @@ void map::set_floor_cache_dirty( const tripoint_bub_ms &p )
     // The 3×3 neighbourhood means adjacent submaps at z-1 may also be affected.
     set_outside_cache_dirty( p + tripoint_rel_ms::below() );
     // Setting the floor cache for a submap dirty should also automatically set the absorption cache and sound_wall caches dirty.
-    set_absorption_cache_dirty( p + tripoint_rel_ms::below()  );
+    set_absorption_cache_dirty( p + tripoint_rel_ms::below() );
     set_sound_wall_cache_dirty( p + tripoint_rel_ms::below() );
 }
 
@@ -4146,7 +4146,8 @@ static int get_sound_volume( const map_bash_info &bash )
     // Set maxvol to 160dB, which is deafening.
     int maxvol = 160;
     // TODO: Consider setting this in finalize instead of calculating here
-    return bash.sound_vol.value_or( std::min(maxvol, std::max( (minvol + (smax * 2 ) ), ( (smin * 3) + minvol ) ) ) );
+    return bash.sound_vol.value_or( std::min( maxvol, std::max( ( minvol + ( smax * 2 ) ),
+                                    ( ( smin * 3 ) + minvol ) ) ) );
 }
 
 bash_results map::bash_ter_success( const tripoint_bub_ms &p, const bash_params &params )
@@ -4517,7 +4518,7 @@ bash_results map::bash_ter_furn( const tripoint_bub_ms &p, const bash_params &pa
 
     if( !result.success ) {
         // Cap out bash volume to 120dB for sanity checking.
-        int sound_volume = std::min( 120, bash->sound_fail_vol.value_or( 70 ));
+        int sound_volume = std::min( 120, bash->sound_fail_vol.value_or( 70 ) );
 
         result.did_bash = true;
         if( !params.silent ) {
@@ -10707,20 +10708,22 @@ sound_instance_cache::sound_instance_cache() = default;
 
 // Normal constructor. Use this in almost all cases, takes the originating sound event.
 // This is done so we can garuntee that the sound is sized to the reality bubble and the level_cache.
-sound_instance_cache::sound_instance_cache(sound_event &input_sound, const sound_vol_for_flood_dist &d_e, const int &f_r )
-    : sound( input_sound), 
-    dist_enum( d_e ),
-    flood_radius( f_r ),
-    origin(input_sound.origin),
-    envelope_index_point(tripoint(origin.x - flood_radius, origin.y - flood_radius, origin.z)),
-    offset_x(envelope_index_point.x),
-    offset_y(envelope_index_point.y),
-    // 4r^2 + 4r + 1 equals our total area, for some (2r + 1) by (2r + 1) flood envelope.
-    volume(static_cast<size_t>( (1 + (4 * flood_radius) + ( 4 * (flood_radius * flood_radius)) )), 0 ),
-    movement_noise(input_sound.movement_noise),
-    from_player(input_sound.from_player),
-    from_monster(input_sound.from_monster),
-    from_npc(input_sound.from_npc)
+sound_instance_cache::sound_instance_cache( sound_event &input_sound,
+        const sound_vol_for_flood_dist &d_e, const int &f_r )
+    : sound( input_sound ),
+      dist_enum( d_e ),
+      flood_radius( f_r ),
+      origin( input_sound.origin ),
+      envelope_index_point( tripoint( origin.x - flood_radius, origin.y - flood_radius, origin.z ) ),
+      offset_x( envelope_index_point.x ),
+      offset_y( envelope_index_point.y ),
+      // 4r^2 + 4r + 1 equals our total area, for some (2r + 1) by (2r + 1) flood envelope.
+      volume( static_cast<size_t>( ( 1 + ( 4 * flood_radius ) + ( 4 * ( flood_radius *
+                                     flood_radius ) ) ) ), 0 ),
+      movement_noise( input_sound.movement_noise ),
+      from_player( input_sound.from_player ),
+      from_monster( input_sound.from_monster ),
+      from_npc( input_sound.from_npc )
 {
 
 }

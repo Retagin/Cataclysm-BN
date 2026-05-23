@@ -1122,7 +1122,7 @@ bool vehicle::start_engine( const int e )
     const double cold_factor = engine_cold_factor( e );
     const int start_moves = engine_start_time( e );
     // Cap the engine noise to 165, midrange for jet turbine noise levels.
-    const int noise = std::min(165, einfo.engine_noise_factor() );
+    const int noise = std::min( 165, einfo.engine_noise_factor() );
 
     const auto pos = bub_part_location( engines[e] );
     if( einfo.engine_backfire_threshold() ) {
@@ -1681,7 +1681,8 @@ void vehicle::operate_scoop()
                 //The scoop gets a lot louder when breaking an item.
                 sound_event se;
                 se.origin = position;
-                se.volume = std::min(90, rng( 30, that_item_there->volume() / units::legacy_volume_factor * 2 + 30 ));
+                se.volume = std::min( 90, rng( 30,
+                                               that_item_there->volume() / units::legacy_volume_factor * 2 + 30 ) );
                 se.category = sounds::sound_t::combat;
                 se.description = _( "BEEEThump" );
                 se.id = "vehicle";
