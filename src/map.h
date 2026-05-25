@@ -23,7 +23,6 @@
 #include "calendar.h"
 #include "coordinates.h"
 #include "dimension_info.h"
-#include "enum_conversions.h"
 #include "enums.h"
 #include "filter_utils.h"
 #include "game_constants.h"
@@ -455,18 +454,19 @@ struct sound_instance_cache {
     int flood_radius = 3;
 
     // Normal tripoint origin of the sound instance.
-    tripoint origin;
+    tripoint_bub_ms origin;
 
     // The tripoint that corresponds to index location 0.
     // Calculated off the origin point - flood radius to x and y.
-    tripoint envelope_index_point;
+    tripoint_bub_ms envelope_index_point;
 
-    // Offsets are used to convert between normal tripoint/point coords to the floodfill coords.
+    // Offsets are used to get the right envelope index when using bubble tripoints.
 
     // The numerical offset between index_point.x and 0. Must be calced on sound instance creation.
     int offset_x;
     // the numerical offset between index_point.y and 0. Must be calced on sound instance creation.
     int offset_y;
+    // T
 
     // Volume in 100ths of a dB (mdB) of the sound in question
     // Indexed as: vec[x * (flood_radius * 2) + y]
@@ -487,28 +487,34 @@ struct sound_instance_cache {
     // vector accesses DOES NOT REFLECT ACTUAL LOADED-AREA DIMENSIONS.
     // auto idx(int x, int y) const -> int { return x * (2 * flood_radius) + y; }
 
-    // Returns corresponding flood envelope volume index provided normal x / y coords
-    auto env_index( int x, int y ) const -> int { return ( ( x - offset_x ) * ( 2 * flood_radius ) + ( y - offset_y ) ); }
+    // Returns corresponding flood envelope volume index provided a relative point.
+    // Use carefully.
+    auto env_index( const point_rel_ms &p ) const -> int { return ( ( p.x() ) * ( 2 * flood_radius ) + ( p.y() ) ); }
 
-    // Returns the corresponding flood envelope volume index provided a normal point.
-    auto p_to_env_index( const point &p ) const -> int { return ( ( p.x - offset_x ) * ( 2 * flood_radius ) + ( p.y - offset_y ) ); }
+    // Returns the corresponding flood envelope volume index provided a bubble point.
+    auto p_to_env_index( const point_bub_ms &p ) const -> int { return ( ( p.x() - offset_x ) * ( 2 * flood_radius ) + ( p.y() - offset_y ) ); }
+    // Returns the corresponding flood envelope volume index provided a bubble tripoint. 
+    auto p_to_env_index(const tripoint_bub_ms &p ) const -> int { return ( ( p.x() - offset_x ) * ( 2 * flood_radius ) + ( p.y() - offset_y ) ); }
 
-    // Checks if a point is in the envelope, returns the volume at that index if true and 0 if not.
-    auto vol_at_tri( const tripoint &tri ) const -> short {return ( in_envelope( tri ) ? volume[p_to_env_index( tri.xy() )] : 0 );}
-
-    // Flat index for submap-coordinate bitsets: bitset[sx * cache_mapsize + sy]
-    // int bidx(int sx, int sy) const { return sx * cache_mapsize + sy; }
-
-    // Returns true if a given tripoint is inside our envelope. X and Y offsets taken from our index point, the bottom left corner of our envelope.
-    bool in_envelope( const tripoint &tp ) const {
-        return ( tp.x - offset_x ) >= 0 && ( tp.y - offset_y ) >= 0 &&
-               ( tp.x - offset_x ) <= ( flood_radius * 2 ) && ( tp.y - offset_y ) <= ( flood_radius * 2 );
-    }
+    // Returns true if a given bubble tripoint is inside our envelope. 
+    // X and Y offsets taken from our index point, the bottom left corner of our envelope.
+    bool in_envelope( const tripoint_bub_ms &tp ) const {
+        return ( tp.x() - offset_x ) >= 0 && ( tp.y() - offset_y ) >= 0 &&
+               ( tp.x() - offset_x ) <= ( flood_radius * 2 ) && ( tp.y() - offset_y ) <= ( flood_radius * 2 ); }
+    // Returns true if a given bubble point is inside our envelope. 
+    // X and Y offsets taken from our index point, the bottom left corner of our envelope.
+    bool in_envelope( const point_bub_ms &tp ) const {
+        return ( tp.x() - offset_x ) >= 0 && ( tp.y() - offset_y ) >= 0 &&
+               ( tp.x() - offset_x ) <= ( flood_radius * 2 ) && ( tp.y() - offset_y ) <= ( flood_radius * 2 ); }
+    
     // Returns true if a given point is on the border of the flood envelope.
-    bool on_envelope_border( const point &p ) const {
-        return ( p.x - offset_x ) == 0 || ( p.x - offset_x ) == ( flood_radius * 2 ) ||
-               ( p.y - offset_y ) == 0 || ( p.y - offset_y ) == ( flood_radius * 2 );
+    bool on_envelope_border( const point_bub_ms &p ) const {
+        return ( p.x() - offset_x ) == 0 || ( p.x() - offset_x ) == ( flood_radius * 2 ) ||
+               ( p.y() - offset_y ) == 0 || ( p.y() - offset_y ) == ( flood_radius * 2 );
     }
+
+    // Checks if a bubble tripoint is within the floodfill envelope. Returns the volume if true, -1 if not.
+    auto vol_at_tri( const tripoint_bub_ms &tri ) const -> short {return ( in_envelope( tri ) ? volume[p_to_env_index( tri.xy() )] : -1 );}
 
     // NPCs/Monsters/the Player all get a chance to hear a sound.
     // After everyone has heard the sound, it is deleted.
@@ -2159,7 +2165,8 @@ class map : public submap_load_listener
         point_bub_ms abs_to_bub( const point_abs_ms &abs ) const { return point_bub_ms( ( abs - project_to<coords::ms>( abs_sub ).xy() ).raw() ); }
         point_abs_sm bub_to_abs( const point_bub_sm &bub ) const { return abs_sub.xy() + point_rel_sm( bub.raw() ); }
         point_bub_sm abs_to_bub( const point_abs_sm &abs ) const { return ( abs - abs_sub.raw().xy() ).reinterpret_as<point_bub_sm>(); }
-        /** Returns true if point p resides along the border of the reality bubble. */
+        /** Returns true if bubble point p resides along the border of the reality bubble. 
+        */
         bool on_bubble_border( const point_bub_ms &p ) const;
 
         bool inbounds_z( const int z ) const {
@@ -2171,6 +2178,10 @@ class map : public submap_load_listener
         }
         virtual bool inbounds( const tripoint_abs_sm &p ) const;
         bool inbounds( const tripoint_abs_ms &p ) const {
+            return inbounds( project_to<coords::sm>( p ) );
+        }
+        bool inbounds(const point_bub_sm &p ) const;
+        bool inbounds(const point_bub_ms &p ) const {
             return inbounds( project_to<coords::sm>( p ) );
         }
 

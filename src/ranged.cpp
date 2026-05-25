@@ -2387,8 +2387,8 @@ static void cycle_action( item &weap, const tripoint_bub_ms &pos )
             } else {
                 vp->vehicle().add_item( *cargo.front(), item::spawn( casing ) );
             }
-
-            sfx::play_variant_sound( "fire_gun", "brass_eject", sfx::get_heard_volume( eject ),
+            // Take the dB volume of ejecting to be 60.
+            sfx::play_variant_sound( "fire_gun", "brass_eject", sfx::get_heard_volume( eject, 60 ),
                                      sfx::get_heard_angle( eject ) );
         }
     }
@@ -2435,8 +2435,11 @@ void ranged::make_gun_sound_effect( const Character &who, bool burst, const item
             se.from_monster = true;
         }
         sounds::sound( se );
+        sfx::generate_gun_sound( who.bub_pos(), gun, se.volume );
     }
-    sfx::generate_gun_sound( who.bub_pos(), gun );
+    // If a perfectly silent gun shoots, does it make a sound?
+    // Yes because weapons like laser rifles or odd modded weapons exist.
+    sfx::generate_gun_sound( who.bub_pos(), gun, 160 );
 }
 
 item::sound_data item::gun_noise( const bool burst ) const

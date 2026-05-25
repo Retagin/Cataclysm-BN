@@ -145,13 +145,13 @@ void play_ambient_variant_sound( const std::string &id, const std::string &varia
                                  channel channel, int fade_in_duration, double pitch = -1.0, int loops = -1 );
 void play_activity_sound( const std::string &id, const std::string &variant, int volume );
 void end_activity_sounds();
-void generate_gun_sound( const tripoint_bub_ms &source, const item &firing );
+void generate_gun_sound( const tripoint_bub_ms &source, const item &firing, const short &origin_vol );
 void generate_melee_sound( const tripoint_bub_ms &source, const tripoint_bub_ms &target, bool hit,
                            bool targ_mon = false, const std::string &material = "flesh" );
 void do_hearing_loss( int turns = -1 );
 void remove_hearing_loss();
 void do_projectile_hit( const Creature &target );
-int get_heard_volume( const tripoint_bub_ms &source );
+int get_heard_volume( const tripoint_bub_ms &source, const short &origin_volume, const bool &in_mdB = false );
 units::angle get_heard_angle( const tripoint_bub_ms &source );
 void do_footstep();
 void do_danger_music();
@@ -269,7 +269,7 @@ struct sound_event {
     short volume = 0;
 
     // What is the position of the sound source?
-    tripoint origin;
+    tripoint_bub_ms origin;
 
     // What enum sound category is this?
     sounds::sound_t category = sounds::sound_t::background;
@@ -321,6 +321,23 @@ static constexpr auto dist_vol_loss = std::array<short, 122>
     12, 12, 12, 12, 11, 11, 11, 11, 11, 11, 11, 10, 10, 10, 10, 10, 10, 10, 10, 9, 9, 9, 9, 9, 9, 9, 9,
     9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7, 7
 };
+
+// Provides an array of the points adjacent to a point. 
+// The index of an adjacent tile is used as the direction index to that tile.
+// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
+// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
+// [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
+static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_bub_ms &p )
+{    
+    return std::array<point_bub_ms, 8>{ { p + point_rel_ms::north_west(), // Direction 0
+        p + point_rel_ms::north(),      // Direction 1
+        p + point_rel_ms::north_east(), // Direction 2
+        p + point_rel_ms::east(),       // Direction 3
+        p + point_rel_ms::south_east(), // Direction 4
+        p + point_rel_ms::south(),      // Direction 5
+        p + point_rel_ms::south_west(), // Direction 6
+        p + point_rel_ms::west() } };   // Direction 7
+}
 
 // Given a source tile's sound direction as the index, provides an array of which directions are valid to propagate sound to.
 // Member entries a listed in clockwise order. First and last members are subject to a distance penalty.
