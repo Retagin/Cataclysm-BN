@@ -422,8 +422,8 @@ auto projectile_attack( const projectile &proj_arg, const tripoint_bub_ms &sourc
         // Don't extend range further, miss here can mean hitting the ground near the target
         range = rl_dist( source, target );
         extend_to_range = range;
-
-        sfx::play_variant_sound( "bullet_hit", "hit_wall", sfx::get_heard_volume( target ),
+        // Take the volume of bullet impacts on walls at 90dB. Loud, but comparatively completely drowned out by the gun firing them.
+        sfx::play_variant_sound( "bullet_hit", "hit_wall", sfx::get_heard_volume( target, 90 ),
                                  sfx::get_heard_angle( target ) );
         // TODO: Z dispersion
         // If we missed, just draw a straight line.
@@ -720,8 +720,9 @@ auto projectile_attack( const projectile &proj_arg, const tripoint_bub_ms &sourc
             add_msg( _( "The attack bounced to %s!" ), z.get_name() );
             z.add_effect( effect_bounced, 1_turns );
             projectile_attack( proj, tp, z.bub_pos(), dispersion, origin, source_weapon, in_veh );
+            // Take the volume of a bio lightening impact at 70dB
             sfx::play_variant_sound( "fire_gun", "bio_lightning_tail",
-                                     sfx::get_heard_volume( z.bub_pos() ), sfx::get_heard_angle( z.bub_pos() ) );
+                                     sfx::get_heard_volume( z.bub_pos(), 70 ), sfx::get_heard_angle( z.bub_pos() ) );
         }
     }
     explosion_handler::get_explosion_queue().execute();

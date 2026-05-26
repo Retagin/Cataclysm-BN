@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -56,6 +57,8 @@ void sound( const sound_event &soundevent );
 
 /* Make sure the sounds are all reset when we start a new game. */
 void reset_sounds();
+/* Clear our floodfill que. */
+void clear_floodfill_que();
 /* Reset the sound markers in the player UI so sounds do not blot out everything else. Call this after processing player input, not at the end of every turn. */
 void reset_markers();
 
@@ -322,7 +325,7 @@ static constexpr auto dist_vol_loss = std::array<short, 122>
     9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7, 7
 };
 
-// Provides an array of the points adjacent to a point. 
+// Provides an array of the bubble points adjacent to a point. 
 // The index of an adjacent tile is used as the direction index to that tile.
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
@@ -339,6 +342,133 @@ static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_bub
         p + point_rel_ms::west() } };   // Direction 7
 }
 
+// Provides an array of the bubble points adjacent to some submap point.
+// The index of an adjacent tile is used as the direction index to that tile.
+// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
+// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
+// [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
+static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_sm_ms &sp, const point_bub_sm &grid_pos )
+{    
+    const point_bub_ms bp = project_combine(grid_pos, sp);
+    return std::array<point_bub_ms, 8>{ { bp + point_rel_ms::north_west(), // Direction 0
+        bp + point_rel_ms::north(),      // Direction 1
+        bp + point_rel_ms::north_east(), // Direction 2
+        bp + point_rel_ms::east(),       // Direction 3
+        bp + point_rel_ms::south_east(), // Direction 4
+        bp + point_rel_ms::south(),      // Direction 5
+        bp + point_rel_ms::south_west(), // Direction 6
+        bp + point_rel_ms::west() } };   // Direction 7
+}
+
+// Provides an array of the tripoints adjacent to some bubble tripoint. 
+// The index of an adjacent tile is used as the direction index to that tile.
+// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
+// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
+// [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
+static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const tripoint_bub_ms &p )
+{    
+    return std::array<tripoint_bub_ms, 8>{ { p + tripoint_rel_ms::north_west(), // Direction 0
+        p + tripoint_rel_ms::north(),      // Direction 1
+        p + tripoint_rel_ms::north_east(), // Direction 2
+        p + tripoint_rel_ms::east(),       // Direction 3
+        p + tripoint_rel_ms::south_east(), // Direction 4
+        p + tripoint_rel_ms::south(),      // Direction 5
+        p + tripoint_rel_ms::south_west(), // Direction 6
+        p + tripoint_rel_ms::west() } };   // Direction 7
+}
+
+// Provides an array of the bubble tripoints adjacent to some submap point.
+// The index of an adjacent tile is used as the direction index to that tile.
+// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
+// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
+// [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
+static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const point_sm_ms &sp, const tripoint_bub_sm &grid_pos )
+{    
+    const tripoint_bub_ms btri = project_combine(grid_pos, sp);
+    return std::array<tripoint_bub_ms, 8>{ { btri + tripoint_rel_ms::north_west(), // Direction 0
+        btri + tripoint_rel_ms::north(),      // Direction 1
+        btri + tripoint_rel_ms::north_east(), // Direction 2
+        btri + tripoint_rel_ms::east(),       // Direction 3
+        btri + tripoint_rel_ms::south_east(), // Direction 4
+        btri + tripoint_rel_ms::south(),      // Direction 5
+        btri + tripoint_rel_ms::south_west(), // Direction 6
+        btri + tripoint_rel_ms::west() } };   // Direction 7
+}
+
+// Provides an array of the bubble tripoints adjacent to some submap point.
+// The index of an adjacent tile is used as the direction index to that tile.
+// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
+// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
+// [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
+// Sorry (not sorry at all) for making this abomination of out of bounds memory access requests.
+// Sanitize your inputs.
+static constexpr std::array<point_sm_ms, 8> get_adjacent_submap_points( const point_sm_ms &sp)
+{    
+
+    return std::array<point_sm_ms, 8>{ { 
+        sp + point_rel_ms::north_west(), // Direction 0
+        sp + point_rel_ms::north(),      // Direction 1
+        sp + point_rel_ms::north_east(), // Direction 2
+        sp + point_rel_ms::east(),       // Direction 3
+        sp + point_rel_ms::south_east(), // Direction 4
+        sp + point_rel_ms::south(),      // Direction 5
+        sp + point_rel_ms::south_west(), // Direction 6
+        sp + point_rel_ms::west() } };   // Direction 7
+}
+
+// All of these values are kept as static constexprs
+// So that we can use compiler optimized and pre-cached results when using sound logic.
+// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]    [ SDI_NW ] [ SDI_N ] [ SDI_NE ]
+// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [8/9] [ 3 ] =  [ SDI_W  ] [SDI_U/D] [ SDI_E  ]
+// [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]    [ SDI_SW ] [ SDI_S ] [ SDI_SE ]
+
+// Sound Direction Index, North West
+static constexpr uint8_t SDI_NW     = 0;
+// Sound Direction Index, North
+static constexpr uint8_t SDI_N      = 1;
+// Sound Direction Index, North East
+static constexpr uint8_t SDI_NE     = 2;
+// Sound Direction Index, East
+static constexpr uint8_t SDI_E      = 3;
+// Sound Direction Index, South East
+static constexpr uint8_t SDI_SE     = 4;
+// Sound Direction Index, South
+static constexpr uint8_t SDI_S      = 5;
+// Sound Direction Index, South West
+static constexpr uint8_t SDI_SW     = 6;
+// Sound Direction Index, West
+static constexpr uint8_t SDI_W      = 7;
+// Sound Direction Index, Down -Z
+static constexpr uint8_t SDI_DOWN   = 8;
+// Sound Direction Index, Up +Z
+static constexpr uint8_t SDI_UP     = 9;
+
+static constexpr auto sanitized_sound_direction_indexes_full = std::array<uint8_t,10> 
+{
+    {SDI_NW,SDI_N,SDI_NE,SDI_E,SDI_SE,SDI_S,SDI_SW,SDI_W,SDI_DOWN,SDI_UP}
+};
+
+static constexpr auto sanitized_sound_direction_indexes = std::array<uint8_t,8> 
+{
+    {SDI_NW,SDI_N,SDI_NE,SDI_E,SDI_SE,SDI_S,SDI_SW,SDI_W}
+};
+// Provides the cartesion sound direction indexes in clockwise order starting from zero.
+static constexpr auto sanitized_sound_direction_indexes_cartesian = std::array<uint8_t,4> 
+{
+    { SDI_N, SDI_E, SDI_S, SDI_W }
+};
+
+// Return the static constexpr version of given direction index. 
+// Useful for sanitizing index inputs to use faster logic.
+static constexpr auto get_sound_direction_index( const uint8_t &dir)
+{
+    if ( dir > SDI_UP ){
+        return SDI_UP;
+    } else {
+    return sanitized_sound_direction_indexes_full[dir];
+    }
+}
+
 // Given a source tile's sound direction as the index, provides an array of which directions are valid to propagate sound to.
 // Member entries a listed in clockwise order. First and last members are subject to a distance penalty.
 // Direction index and adjacent tile index are set such that direction 0 refers to adjacent tile 0, etc.
@@ -350,14 +480,14 @@ static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_bub
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
 static constexpr auto spropagation_tiles_by_sdirection = std::array<std::array<uint8_t, 5>, 8 >
 {
-    { {6, 7, 0, 1, 2}, //Direction "0"
-        {7, 0, 1, 2, 3}, //Direction "1"
-        {0, 1, 2, 3, 4}, //Direction "2"
-        {1, 2, 3, 4, 5}, //Direction "3"
-        {2, 3, 4, 5, 6}, //Direction "4"
-        {3, 4, 5, 6, 7}, //Direction "5"
-        {4, 5, 6, 7, 0}, //Direction "6"
-        {5, 6, 7, 0, 1} //Direction "7"
+    { {SDI_SW, SDI_W, SDI_NW, SDI_N, SDI_NE},   //Direction "0"
+        {SDI_W, SDI_NW, SDI_N, SDI_NE, SDI_E},  //Direction "1"
+        {SDI_NW, SDI_N, SDI_NE, SDI_E, SDI_SE}, //Direction "2"
+        {SDI_N, SDI_NE, SDI_E, SDI_SE, SDI_S},  //Direction "3"
+        {SDI_NE, SDI_E, SDI_SE, SDI_S, SDI_SW}, //Direction "4"
+        {SDI_E, SDI_SE, SDI_S, SDI_SW, SDI_W},  //Direction "5"
+        {SDI_SE, SDI_S, SDI_SW, SDI_W, SDI_NW}, //Direction "6"
+        {SDI_S, SDI_SW, SDI_W, SDI_NW, SDI_N}   //Direction "7"
     }
 };
 
@@ -370,14 +500,14 @@ static constexpr auto spropagation_tiles_by_sdirection = std::array<std::array<u
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
 static constexpr auto wall_check_by_sdirection = std::array<std::pair<uint8_t, uint8_t >, 8>
 {
-    { {7, 1}, //Direction "0"
-        {7, 3}, //Direction "1"
-        {1, 3}, //Direction "2"
-        {1, 5}, //Direction "3"
-        {3, 5}, //Direction "4"
-        {3, 7}, //Direction "5"
-        {5, 7}, //Direction "6"
-        {5, 1} //Direction "7"
+    { {SDI_W, SDI_N},   //Direction "0"
+        {SDI_W, SDI_E}, //Direction "1"
+        {SDI_N, SDI_E}, //Direction "2"
+        {SDI_N, SDI_S}, //Direction "3"
+        {SDI_E, SDI_S}, //Direction "4"
+        {SDI_E, SDI_W}, //Direction "5"
+        {SDI_S, SDI_W}, //Direction "6"
+        {SDI_S, SDI_N}  //Direction "7"
     }
 };
 // Conversely, A wall at the given adjacent tile/direction index invalidates propagation through the listed direction index
@@ -385,20 +515,51 @@ static constexpr auto wall_check_by_sdirection = std::array<std::pair<uint8_t, u
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
+// This is also used when building out the absorption and sound wall caches.
 static constexpr auto wall_sdir_invalidation = std::array<std::pair<uint8_t, uint8_t >, 8>
 {
-    { {7, 1}, //Direction "0"
-        {0, 2}, //Direction "1"
-        {1, 3}, //Direction "2"
-        {2, 4}, //Direction "3"
-        {3, 5}, //Direction "4"
-        {4, 6}, //Direction "5"
-        {5, 7}, //Direction "6"
-        {6, 0} //Direction "7"
+    { {SDI_W, SDI_N},       //Direction "0"
+        {SDI_NW, SDI_NE},   //Direction "1"
+        {SDI_N, SDI_E},     //Direction "2"
+        {SDI_NE, SDI_SE},   //Direction "3"
+        {SDI_E, SDI_S},     //Direction "4"
+        {SDI_SE, SDI_SW},   //Direction "5"
+        {SDI_S, SDI_W},     //Direction "6"
+        {SDI_SW, SDI_NW}    //Direction "7"
     }
 };
 
-
+// A simple array that provides the opposite tile index by sound direction index
+// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
+// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
+// [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
+static constexpr auto opposite_tile_by_sdir = std::array<uint8_t, 8>
+{
+    {   SDI_SE, //Direction "0"
+        SDI_S,  //Direction "1"
+        SDI_SW, //Direction "2"
+        SDI_W,  //Direction "3"
+        SDI_NW, //Direction "4"
+        SDI_N,  //Direction "5"
+        SDI_NE, //Direction "6"
+        SDI_E   //Direction "7"
+    }
+};
+// We only actually check this on cardinal directions
+// Provides an array of 3 sdir indexes to check for a roof clockwise of a given direction index.
+static constexpr auto roof_to_check_by_sdir = std::array<std::array<uint8_t, 3>, 8>
+{
+    {
+        {SDI_N, SDI_NE, SDI_E},     //Direction "0"
+        {SDI_NE, SDI_E, SDI_SE},    //Direction "1"
+        {SDI_E, SDI_SE, SDI_S},     //Direction "2"
+        {SDI_SE, SDI_S, SDI_SW},    //Direction "3"
+        {SDI_S, SDI_SW, SDI_W},     //Direction "4"
+        {SDI_SW, SDI_W, SDI_NW},    //Direction "5"
+        {SDI_W, SDI_NW, SDI_N},     //Direction "6"
+        {SDI_NW, SDI_N, SDI_NE}     //Direction "7"
+    }
+};
 
 /** Returns cumulative volume lost over some distance in mdB SPL.  For use getting the heard volume of a sound outside of its floodfill radius.
     For dB, dL = 20 * Log(R1/R2). For use with mdB we just multiply by 2000 instead which is conveniently our minvol for sound propagation constant.
@@ -453,7 +614,6 @@ static constexpr int average_minvol_distance( const int &dist1, const short &vol
         return static_cast<int>( std::round( pow( 10, coefficient ) ) );
 
     } else {
-
         // If t_absorp != 0, we take the red pill, we stay in wonderland and I show you how deep the rabit hole goes.
 
         // Which is not actually particularly deep. Many "unsolved problems" are solveable for each particular case using a numerical method.

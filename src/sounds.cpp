@@ -31,6 +31,7 @@
 #include "line.h"
 #include "map.h"
 #include "map_iterator.h"
+#include "mapdata.h"
 #include "messages.h"
 #include "monfaction.h"
 #include "monster.h"
@@ -124,7 +125,6 @@ static constexpr short AMBIENT_VOLUME_UNDERGROUND = 3500;
 static constexpr short dBspl_to_mdBspl_coeff = 100;
 static constexpr double mdBspl_to_dBspl_coeff = 0.01;
 
-
 // Converts decibels sound pressure level to milli-decibels sound pressure level.
 // We do this often enough its worth it to have a constexpr even though its just *100
 static constexpr short dBspl_to_mdBspl( const short &dB )
@@ -191,9 +191,9 @@ static constexpr uint8_t dir_index_to_sound_source( const tripoint_bub_ms &sourc
 {
     if( source.x() == listener.x() && source.y() == listener.y() ) {
         if( source.z() > listener.z() ) {
-            return 8;
+            return SDI_DOWN;
         } else {
-            return 9;
+            return SDI_UP;
         }
     }
     // We take our source at 0,0, and adjust our listener z/y accordingly.
@@ -201,32 +201,32 @@ static constexpr uint8_t dir_index_to_sound_source( const tripoint_bub_ms &sourc
     const float radians = std::atan2( listener.x() - source.x(), listener.y() - source.y() );
     // We have 8 directions, at 45 degrees or pi/4 radians each. Because our result ranges from -pi to pi east for example is a result of pi/8 > angle > -pi/8
     if( radians == 0 ) {
-        return 3;
+        return SDI_E;
     } else if( radians > 0 ) {
         //Some variety of north.
         if( radians >= RADIAN_THRESHOLD_WEST ) {
-            return 7;
+            return SDI_W;
         } else if( radians > RADIAN_THRESHOLD_NORTHW_SOUTHW ) {
-            return 0;
+            return SDI_NW;
         } else if( radians >= RADIAN_THRESHOLD_NORTH_SOUTH ) {
-            return 1;
+            return SDI_N;
         } else if( radians > RADIAN_THRESHOLD_EAST ) {
-            return 2;
+            return SDI_NE;
         } else {
-            return 3;
+            return SDI_W;
         }
     } else {
         //Some variety of south.
         if( radians <= -RADIAN_THRESHOLD_WEST ) {
-            return 7;
+            return SDI_W;
         } else if( radians < -RADIAN_THRESHOLD_NORTHW_SOUTHW ) {
-            return 6;
+            return SDI_SW;
         } else if( radians <= RADIAN_THRESHOLD_NORTH_SOUTH ) {
-            return 5;
+            return SDI_S;
         } else if( radians < RADIAN_THRESHOLD_EAST ) {
-            return 4;
+            return SDI_SE;
         } else {
-            return 3;
+            return SDI_E;
         }
     }
 }
@@ -300,8 +300,8 @@ static constexpr short svol_at( const sound_instance_cache &sound_inst, const tr
     // Determine if we can use the up escape.
     // Broken out for readability. If we are not on the same Z level we can use the vertical escape, or if we are outside, the sound is indoors and escaped.
     const auto &use_vert_escape = ( !samez ) ? true : ( lineofsight &&
-                                  samez ) ? false : ( ( !listener_indoors && sound_inst.source_indoors &&
-                                          sound_inst.escaped_indoors && !lineofsight ) ? true : false );
+                                  samez ) ? false : ( !listener_indoors && sound_inst.source_indoors &&
+                                          sound_inst.escaped_indoors && !lineofsight );
 
     const auto &vol_escape = ( use_vert_escape ) ? std::max( vertical_escape_vol,
                              sound_inst.base_distance_vol_by_dir[dir_index] ) : sound_inst.base_distance_vol_by_dir[dir_index];
@@ -417,7 +417,9 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
 
         const auto vol_enum = m_sound_cache.flood_dist_enum_by_volume( soundevent.volume );
         const auto f_radius = m_sound_cache.flood_radius_by_enum( vol_enum );
-        sound_instance_cache temp_sound_cache( soundevent, vol_enum, f_radius );
+        // We need a non-const version to hand to our sound_instance_cache.
+        sound_event sound_event_copy = soundevent;
+        sound_instance_cache temp_sound_cache( sound_event_copy, vol_enum, f_radius );
         auto &svol = temp_sound_cache.volume;
 
         temp_sound_cache.source_indoors = !outside_cache[map_cache.idx( temp_sound_cache.origin.x(),
@@ -768,24 +770,20 @@ void map::batch_flood_fill_sounds()
 
                 auto check_escape = [&]( const point_bub_ms & p, const short & tile_vol, const uint8_t &dist ) {
                     if( map_cache.outside_cache[map_cache.idx( p.x(), p.y() )] && check_up_valid ) {
-                        if( up_map_cache.floor_cache[map_cache.idx( p.x(), p.y() )] == 0 && tile_vol > escape_vol[9] ) {
+                        if( up_map_cache.floor_cache[map_cache.idx( p.x(), p.y() )] == 0 && tile_vol > escape_vol[SDI_UP] ) {
                             short vol = tile_vol;
-                            if( dist < temp_sound_cache.flood_radius ) {
-                                for( uint8_t i = dist; i < temp_sound_cache.flood_radius; i++ ) {
-                                    vol -= dist_vol_loss[i + 1];
-                                }
+                            if( dist < f_radius ) {
+                                    vol -= get_cumulative_vol_dist_loss(dist, f_radius, temp_sound_cache.terrain_sound_absorbtion_at_source);          
                             }
-                            escape_vol[9] = std::max( vol, escape_vol[9] );
+                            escape_vol[SDI_UP] = std::max( vol, escape_vol[SDI_UP] );
                         }
                     }
-                    if( map_cache.floor_cache[map_cache.idx( p.x(), p.y() )] == 0 && tile_vol > escape_vol[8] ) {
+                    if( map_cache.floor_cache[map_cache.idx( p.x(), p.y() )] == 0 && tile_vol > escape_vol[SDI_DOWN] ) {
                         short vol = tile_vol;
-                        if( dist < temp_sound_cache.flood_radius ) {
-                            for( uint8_t i = dist; i < temp_sound_cache.flood_radius; i++ ) {
-                                vol -= dist_vol_loss[i + 1];
-                            }
+                        if( dist < f_radius ) {
+                                vol -= get_cumulative_vol_dist_loss(dist, f_radius, temp_sound_cache.terrain_sound_absorbtion_at_source);
                         }
-                        escape_vol[8] = std::max( vol, escape_vol[8] );
+                        escape_vol[SDI_DOWN] = std::max( vol, escape_vol[SDI_DOWN] );
                     }
                 };
                 // Set our initial conditions. We want 100ths of a decibel for the volume
@@ -800,7 +798,7 @@ void map::batch_flood_fill_sounds()
 
                 // This propagates the sounds from the source tile to the 8 adjacent tiles, setting initial directions, distances and volumes.
                 // Adj tiles are 0-7
-                for( short i = 0; i < 8; i++ ) {
+                for( uint8_t i : sanitized_sound_direction_indexes ) {
                     const auto tile = adjacent_tiles[i];
                     // Lets make sure that we only propagate inbounds, and not along the map border. After this we can just check !tile_along_map_border
                     // We know that our initial adjacent tiles will always be inside the envelope.
@@ -839,9 +837,7 @@ void map::batch_flood_fill_sounds()
                                                                                         adjacent_tiles[wall_dirs.second].y() ];
                     // Iterate through adjacent tiles.
                     const auto &dirs_to_check = spropagation_tiles_by_sdirection[ptile.dir];
-                    for( short index = 0; index < 5; index++ ) {
-
-                        auto &adj_tile_dir = dirs_to_check[index];
+                    for( uint8_t adj_tile_dir : dirs_to_check ) {
                         // Only check if we know a wall is present.
                         if( wall1 || wall2 ) {
                             if( skip_due_to_wall( wall1, wall2, ptile.dir, adj_tile_dir ) ) {
@@ -854,8 +850,8 @@ void map::batch_flood_fill_sounds()
                             auto &adj_tile_vol = svol[v_index_from_p( adj_tile )];
                             // Cap our tile distance between 1 and 121 to prevent overflow. We dont have or need distance loss values past dist_vol_loss[121]
                             // as the change in distance loss values past this point are negligible for gameplay scale.
-                            const uint8_t dist_for_vol_loss = get_distance_for_volume_loss( ptile.dist, ( index == 0 ||
-                                                              index == 4 ) );
+                            const uint8_t dist_for_vol_loss = get_distance_for_volume_loss( ptile.dist, ( adj_tile_dir = dirs_to_check.front() ||
+                                                              adj_tile_dir == dirs_to_check.back()) );
                             const short vol_to_check = ( ptile.vol - ( absorption_cache[map_cache.idx( adj_tile.x(),
                                                          adj_tile.y() )] ) - ( dist_vol_loss[dist_for_vol_loss] ) );
                             // General priority goes loudest volume, then largest distance. Smaller distances loose volume more quickly.
@@ -985,6 +981,336 @@ void map::batch_flood_fill_sounds()
              num_processed_sounds, num_invalidated_sounds );
 }
 
+// Rebuild the sound absorption cache of a given submap
+// This will also build out the sound wall cache of the given submap.
+auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid_pos ) -> void
+{
+    if( !absorption_dirty ) {
+        return;
+    }
+    // outside_cache must be current before building the absorption cache. 
+    // We still want the level cache above us to grab our floor checks with.
+    const level_cache *above = ( grid_pos.z() < OVERMAP_HEIGHT )
+                                   ? &m.get_cache_ref( grid_pos.z() + 1 )
+                                   : nullptr;
+
+    if( outside_dirty ) {
+        // Fortunatly there is a nullptr catch in rebuild_outside_cache.
+        rebuild_outside_cache( above, grid_pos );
+    }
+    
+    const season_type &season = season_of_year( calendar::turn );
+    // If we are at max zlev, always assume the tile above us has no floor.
+    // Very important so that we dont try to access a nullptr
+    const bool at_max_zlev = !(grid_pos.z() < OVERMAP_HEIGHT);
+    const auto &ms_conversion = coords::project_to<coords::ms>(grid_pos);
+    const auto &abs_conversion = bub_to_abs(ms_conversion);
+    const auto &abs_omt = coords::project_to<coords::omt>( abs_conversion );
+    // The default sound absorption for this submap based upon the land use code.
+    const short default_terrain_absorption = terrain_sound_attenuation( abs_omt, season );
+
+    // Fill out our absorption cache to the default terrain value.
+    std::ranges::fill( std::span( &absorption_cache[0][0], SEEX * SEEY ), default_terrain_absorption );
+    // We are by neccesity rebuilding the sound wall cache as well, so lets zero that out.
+    std::ranges::fill( std::span( &sound_wall_cache[0][0], SEEX * SEEY ), false );
+    
+    const auto abs_p = project_to<coords::ms>( grid_pos ).xy();
+    const int submap_boundary_max_x = SEEX - 1;
+    const int submap_boundary_max_y = SEEY - 1;
+
+    // So we can use constexpr array values
+    const auto &san_sdir = sanitized_sound_direction_indexes;
+    
+    // Instead of repeatedly checking for properties on all sm tiles upwards of 9 time each, 
+    // just do it once for the whole submap and store the results as a uint8_t we decode later.
+    // If we have a roof, + 1
+    // If we have windblocking furniture, + 10
+    // If we have wind blocking or connect to wall terrain, + 100
+    // Modulo 10 will tell us if there is a roof or not
+    // If our remainder is not zero and our value is > 10, the tile counts for adjacency
+    // If our remainder is not zero and our value is > 100, we get the full absorption.
+    uint8_t check_vars[SEEX][SEEY] = { { 0 } };
+    for( const auto &sp : submap_tiles() ) {
+        auto &vars_tile = check_vars[sp.x()][sp.y()];
+        // Every time we try to poll a nullptr level cache the map cries. And we dont want that, so dont.
+        if (!at_max_zlev){
+            const auto &ap = abs_p + sp.raw();
+            const auto &idx = above->idx( ap.x(), ap.y() );
+            if((above->floor_cache[idx]) > 0){
+                vars_tile += 1;
+            }
+        }
+        const auto &tile_furn = get_furn( sp ).obj();
+        if ( tile_furn.has_flag( "BLOCK_WIND" ) ){
+            vars_tile += 10;
+        }
+        const auto &tile_ter = get_ter( sp ).obj();
+        if ( tile_ter.has_flag( "BLOCK_WIND" ) || tile_ter.has_flag( "CONNECT_TO_WALL" ) ){
+            vars_tile += 100;
+        }
+        // If we are indoors, we dont get the default terrain sound attenuation.
+        if (!outside_cache[sp.x()][sp.y()]){
+            absorption_cache[sp.x()][sp.y()] = SOUND_ABSORPTION_OPEN_FIELD;
+        }
+    }
+    
+    // If we are on the border of the submap, we CANNOT use an array of our adjacent submap points safely.
+    auto on_sm_border = [&](const point_sm_ms &sp) -> bool {
+        return sp.x() == 0 || sp.x() == SEEX - 1 || sp.y() == 0 || sp.y() == SEEY - 1;
+    };
+
+    auto out_of_submap = [&](const point_sm_ms &sp) -> bool {
+        return (sp.x() < 0) || (sp.x() > submap_boundary_max_x) || (sp.y() < 0) || (sp.y() > submap_boundary_max_y);
+    };
+
+    auto check_if_in_submap = [&](const std::array<point_sm_ms,8> &adj_tiles, std::array<bool, 8> &in_submap ) -> void {
+        for (uint8_t i : san_sdir ) {
+            if (out_of_submap(adj_tiles[i]) ){
+                continue;
+            }
+            in_submap[i] = true;
+        }
+    };
+
+    // Check which tiles may be out of bounds.
+    auto check_out_of_bounds = [&](const std::array<tripoint_bub_ms, 8> &adj_tiles, std::array<bool, 8> &out_of_bounds ) -> void {
+        for (uint8_t i : san_sdir){
+            const auto &tile = adj_tiles[i];
+            if (!m.inbounds(tile)){
+                out_of_bounds[i] = true;
+            }
+        }
+    };
+
+    std::array<tripoint_bub_ms,8> tris_to_check;
+    std::array<point_sm_ms, 8> points_to_check;
+    std::array<bool, 8> point_valid = { {false, false, false, false, false, false, false, false} };
+    std::array<bool, 8> roof_cover = { {false, false, false, false, false, false, false, false} };
+    std::array<bool, 8> out_of_bounds = { {false, false, false, false, false, false, false, false} };
+    std::array<bool, 8> in_submap = { {false, false, false, false, false, false, false, false} };
+
+    auto check_contiguous_roof = [&](const uint8_t &dir, const bool &OOB = false) -> bool {
+        const auto &indexes_to_check = roof_to_check_by_sdir[dir];
+        // If we are checking an out of bounds tile, we dont check the first member of our roof cover.
+        // We use the static constexpr values for our requests.
+        // SDI_NW = 0, SDI_N = 1, SDI_NE = 2
+        if ( OOB ) {
+            return roof_cover[indexes_to_check[SDI_N]] && roof_cover[indexes_to_check[SDI_NE]];
+        } else {
+            return roof_cover[indexes_to_check[SDI_NW]] && roof_cover[indexes_to_check[SDI_N]] && roof_cover[indexes_to_check[SDI_NE]];
+        }
+    };
+
+    // Dont call this at max Z, no tiles would be valid anyways.
+    auto pol_adjacent = [&](const point_sm_ms &sp) -> void {
+        // Zero and update our arrays based upon the adjacent tiles to the provided submap tile.
+        point_valid = { {false, false, false, false, false, false, false, false} };
+        out_of_bounds = { {false, false, false, false, false, false, false, false} };
+        in_submap = { {false, false, false, false, false, false, false, false} };
+        roof_cover = { {false, false, false, false, false, false, false, false} };
+        points_to_check = get_adjacent_submap_points(sp);
+        // Two cases, on the submap boundary, and inside the submap.
+        // Our checkvars are already filled out, so the only things we might have to grab are from inbounds but out of submap tiles.
+        if (on_sm_border(sp)) {
+            // We are on the border of the submap. Lets first figure out which tiles are in our submap or are out of bounds.
+            tris_to_check = get_adjacent_tripoints( sp, grid_pos );
+            check_out_of_bounds(tris_to_check, out_of_bounds);
+            check_if_in_submap(points_to_check, in_submap);
+            for (uint8_t i : san_sdir ) {
+                if ( !out_of_bounds[i] ) {
+                    if ( in_submap[i] ) {
+                        const auto &adj_tile = points_to_check[i];
+                        const auto &checkvars = check_vars[adj_tile.x()][adj_tile.y()];
+                        if ( checkvars == 0 ) {
+                            // Avoid any potential divide by zero errors.
+                            continue;
+                        } else {
+                            // If our remainder is not zero we have a roof.
+                            roof_cover[i] = ((checkvars % 10) != 0);
+                            point_valid[i] = (checkvars > 10) && roof_cover[i];
+                        }
+                        
+                    } else {
+                        // We need to poll the map for our terrain and furniture in this case unfortunantly.
+                        const auto &adj_tile = tris_to_check[i];
+                        const auto &adj_furn = m.furn( adj_tile ).obj();
+                        const auto &adj_terrain = m.ter( adj_tile ).obj();
+                        const auto &idx = above->idx( adj_tile.x(), adj_tile.y() );
+                        roof_cover[i] = ( (above->floor_cache[idx]) > 0);
+                        point_valid[i] = ( roof_cover[i] && ( adj_furn.has_flag( "BLOCK_WIND" ) || adj_terrain.has_flag( "BLOCK_WIND" ) ||
+                                                adj_terrain.has_flag( "CONNECT_TO_WALL" ) ) );
+                    }
+                }
+            }
+
+        } else {
+            // We are fully inside our submap, so we can take things easy and just use the checkvars.
+            for (uint8_t i : san_sdir ) {
+                const auto &adj_tile = points_to_check[i];
+                const auto &checkvars = check_vars[adj_tile.x()][adj_tile.y()];
+                if ( checkvars == 0 ) {
+                    // Avoid any potential divide by zero errors, points valid and roof cover set to false already.
+                    continue;
+                } else {
+                    // If our remainder is not zero we have a roof.
+                    roof_cover[i] = ((checkvars % 10) != 0);
+                    point_valid[i] = (checkvars > 10) && roof_cover[i];
+                }
+            }
+        } 
+    };
+
+    // We have our checkvars, so lets assign the right absorption and sound wall values to each tile.
+    for( const auto &sp : submap_tiles() ) {
+        const tripoint_bub_ms btri = project_combine(grid_pos, sp);
+        // See if there is a vehicle in our given tripoint.
+        // If there is, if there is a full board or a closed door, return thick barrier sound absorption.
+        // We could technically run through checking adjacent tiles as we do below, but vehicles are dynamic and rechecking all of the vehicles tiles every turn would not provide enough benifit.
+        if( const auto vp = m.veh_at( btri ) ) {
+            if( vp.part_with_feature( "FULL_BOARD", true ) || ( vp.obstacle_at_part() &&
+                    vp.part_with_feature( "OPENABLE", true ) ) ) {
+                absorption_cache[sp.x()][sp.y()] = SOUND_ABSORPTION_THICK_BARRIER;
+                continue;
+            }
+        }
+
+        const auto &tile_ter = get_ter( sp ).obj();
+        // Count as a barrier if its furniture with block wind. These tend to be lighter things
+        // like tent walls or sandbags, so they count as a barrier
+        const auto &center_checkvar = check_vars[sp.x()][sp.y()];
+
+        const bool roof_above_center_tile = ( check_vars[sp.x()][sp.y()] == 0 ) ? false : ( (check_vars[sp.x()][sp.y()] % 10) != 0);
+        // Now lets take our easy outs
+        if ( !roof_above_center_tile || outside_cache[sp.x()][sp.y()] ) {
+            // If we are outside or have no roof, assign values and continue.
+            if (center_checkvar >= 100){
+                absorption_cache[sp.x()][sp.y()] += SOUND_ABSORPTION_THICK_BARRIER;
+            } else if (center_checkvar == 10){
+                absorption_cache[sp.x()][sp.y()] += SOUND_ABSORPTION_BARRIER;
+            }
+            continue;
+        }
+        // Do this last as it involves the most calcs.
+        // Store which type of sound block we are using. If true we have a windblocker, if false we have a barrier
+        const bool blockswind = tile_ter.has_flag( "BLOCK_WIND" );
+        // Alrighty, here we go. Queary the adjacent terrain to see if it blocks sound or connects to a wall.
+        // Lets build out the bool indexes.
+        pol_adjacent(sp);
+        // points to check and tris to check both follow this index direction scheme.
+        // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
+        // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
+        // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
+        
+        // We have a few valid conditions. For the terrain to provide its full sound absorption, it must have at least two directly (x/y, no diagonals) adjacent wind blocking or connect_to_wall buddies which must be roofed,
+        // And all of the adjacent valid terrain features must have an adjacent rooved tile that is also adjacent to the center tile.
+        // In effect, we are looking for solid lines, or L shapes. There will be some oddities with this, if it becomes a significant issue we can look into making it more granular.
+        //
+        // 0 0 0                W R R    R W 0     W R W                     W R 0                         R 0 R    R 0 R
+        // W W W works, as does W W W or W W 0 but 0 W 0 will not, nor would 0 W W      As a special rule, W W W or W W W and any rotation/inversion therein will not work.
+        // R R R                0 0 R    0 0 0     W R W                     0 R W                         0 R 0    0 0 0
+        //
+        // The terrain would have to properly prevent creature movement, and if there is a straight line of walls they must have a contiguous roof.
+        // Out of bounds tiles are treated as wildcards for roof cover and point validity.
+        // We dont care if there are more valid points than nessesary.
+
+        // Does our terrain have enough buddies?
+        uint8_t buddynumber = 0;
+        // We check each of our adjacent terrain to see if it is properly rooved. ( 1, 3, 5, 7)
+        // Could probably find a more elegant way to do this, but this is relatively quick.
+
+        // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
+        // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
+        // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
+        // Lets step through our direction index and add buddies or invalidate based on adjacent roofing.
+        for ( uint8_t i : sanitized_sound_direction_indexes_cartesian ) {
+            if ( point_valid[i] ) {
+                // This gives us the direction indexes to check for a roof or out of bounds.
+                const auto &r_dirs = wall_sdir_invalidation[i];
+                if ( roof_cover[r_dirs.first] || roof_cover[r_dirs.second] || out_of_bounds[r_dirs.first] || out_of_bounds[r_dirs.second] ) {
+                    buddynumber++;
+                } else {
+                    // If we have no adjacent roof or out of bound tiles, invalidate this point.
+                    point_valid[i] = false;
+                }
+            }
+        }
+        // Now we account for out of bounds tiles if they have an opposite wall.
+        // Generally if a tile is out of bounds the tiles immediatly adjacent to it will also tend to be out of bounds
+        // We only want to check walls on the cartesian directions
+        for ( uint8_t i : sanitized_sound_direction_indexes_cartesian ) {
+            if ( out_of_bounds[i] ) {
+                // This gives us the direction indexes to check for a roof or out of bounds.
+                const auto &opp_dir = opposite_tile_by_sdir[i];
+                if ( point_valid[opp_dir] ) {
+                    buddynumber++;
+                }
+            }
+        }
+
+        // At one or zero buddies sound dampening is reduced.
+        if( buddynumber < 2 ) {
+            if ( buddynumber == 0 ){
+                if ( blockswind ) {
+                    absorption_cache[sp.x()][sp.y()] += SOUND_ABSORPTION_BARRIER;
+                }
+                continue;
+            } else {
+                absorption_cache[sp.x()][sp.y()] += (blockswind) ? (SOUND_ABSORPTION_THICK_BARRIER) : SOUND_ABSORPTION_BARRIER;
+                sound_wall_cache[sp.x()][sp.y()] = blockswind;
+                continue;
+            }
+        } else if ( buddynumber >= 3 ) {
+            // If a tile does not block wind it is likely something like a open door or window.
+            absorption_cache[sp.x()][sp.y()] += (blockswind) ? SOUND_ABSORPTION_WALL : SOUND_ABSORPTION_BARRIER;
+            // If we have a windblocking tile, declare it a sound wall.
+            sound_wall_cache[sp.x()][sp.y()] = blockswind;
+            continue;
+        }
+        // At this point we have explicitly two buddies. We need to check for straight walls and corners.
+        else {
+            for ( uint8_t i : sanitized_sound_direction_indexes_cartesian ) {
+                if ( point_valid[i] ) {
+                    // This gives us the direction indexes to check for a roof or out of bounds.
+                    const auto &opp_dir = opposite_tile_by_sdir[i];
+                    if ( point_valid[opp_dir] || out_of_bounds[opp_dir] ) {
+                        // We have a potential straight wall. Lets see if we have a contiguous roof.
+                        if ( point_valid[opp_dir] ) {
+                            if (check_contiguous_roof(i) || check_contiguous_roof(opp_dir)) {
+                                absorption_cache[sp.x()][sp.y()] += (blockswind) ? SOUND_ABSORPTION_WALL : SOUND_ABSORPTION_BARRIER;
+                                sound_wall_cache[sp.x()][sp.y()] = blockswind;
+                                continue;
+                            }
+                        } else if ( out_of_bounds[opp_dir] ) {
+                            // If the far tile is out of bounds, we only care about the near and middle roof
+                            if (check_contiguous_roof(i,true) || check_contiguous_roof(opp_dir,true)){
+                                absorption_cache[sp.x()][sp.y()] += (blockswind) ? SOUND_ABSORPTION_WALL : SOUND_ABSORPTION_BARRIER;
+                                sound_wall_cache[sp.x()][sp.y()] = blockswind;
+                                continue;
+                            }
+                        }
+                    }
+                    // If we dont have a valid opposite wall, lets check to see if we have a valid corner.
+                    const auto &cclockwise_wall = point_valid[wall_check_by_sdirection[i].first];
+                    const auto &clockwise_wall = point_valid[wall_check_by_sdirection[i].second];
+                    const auto &cclockwise_roof = roof_cover[wall_sdir_invalidation[i].first];
+                    const auto &clockwise_roof = roof_cover[wall_sdir_invalidation[i].second];
+                    if ( (cclockwise_wall && cclockwise_roof) || (clockwise_wall && clockwise_roof) ) {
+                        absorption_cache[sp.x()][sp.y()] += (blockswind) ? SOUND_ABSORPTION_WALL : SOUND_ABSORPTION_BARRIER;
+                        sound_wall_cache[sp.x()][sp.y()] = blockswind;
+                        continue;
+                    }
+                }
+            }
+            // At this point we have run through all our possible valid outcomes.
+            absorption_cache[sp.x()][sp.y()] += (blockswind) ? SOUND_ABSORPTION_THICK_BARRIER : SOUND_ABSORPTION_BARRIER;
+            sound_wall_cache[sp.x()][sp.y()] = blockswind;
+            continue;
+        }
+
+    }
+    // Mark our cache clean.
+    absorption_dirty = false;
+}
 
 // Nominally ground effect varies by terrain, sound frequency, and distance from source.
 // The ranges we are dealing with are short (at most ~120m)
@@ -1002,10 +1328,7 @@ bool map::build_absorption_cache( const int zlev )
 
     auto &map_cache = get_cache( zlev );
     auto &absorption_cache = map_cache.absorption_cache;
-    // We use this to determine if wind blocking terrain gives its full 20 dB reduction,
-    // or only counts as a barrier with a 5dB reduction
-    // Indoors is false, outdoors is true.
-    auto &outside_cache = map_cache.outside_cache;
+    auto &sound_wall_cache = map_cache.sound_wall_cache;
 
     if( map_cache.absorption_cache_dirty.none() ) {
         return false;
@@ -1021,176 +1344,60 @@ bool map::build_absorption_cache( const int zlev )
         std::fill( absorption_cache.begin(), absorption_cache.end(),
                    static_cast<short>( SOUND_ABSORPTION_OPEN_FIELD ) );
     }
-
-    const season_type season = season_of_year( calendar::turn );
-
     // Traverse the submaps in order
     for( int smx = 0; smx < my_MAPSIZE; ++smx ) {
         for( int smy = 0; smy < my_MAPSIZE; ++smy ) {
-            const auto cur_submap = get_submap_at_grid( { smx, smy, zlev } );
 
-            const point sm_offset = sm_to_ms_copy( point( smx, smy ) );
+            const auto sm_pos = tripoint_bub_sm( smx, smy, zlev );
+            auto *cur_submap = get_submap_at_grid( sm_pos );
+            const auto sm_offset = project_to<coords::ms>( sm_pos );
 
-            if( !rebuild_all && !map_cache.absorption_cache_dirty[smx * MAPSIZE + smy] ) {
+            if( cur_submap == nullptr ) {
+                // Null slots occur at bounded-dimension edges.
+                // Treat as open air so they don't block sound propagation
+                if( !rebuild_all ) {
+                    for( int sx = 0; sx < SEEX; ++sx ) {
+                        std::fill_n( absorption_cache.data() + map_cache.idx( sm_offset.x() + sx, sm_offset.y() ),
+                                     SEEY, SOUND_ABSORPTION_OPEN_FIELD );
+                    }
+                }
                 continue;
             }
-            //submap tripoint, do not use for normal coords!
-            const tripoint sm( smx, smy, zlev );
-            const auto abs_sm = map::abs_sub + sm;
-            const tripoint_abs_omt abs_omt( sm_to_omt_copy( abs_sm ) );
-            const auto default_terrain_absorption = terrain_sound_attenuation( abs_omt, season );
+            
+            if( !rebuild_all && !map_cache.absorption_cache_dirty.test(
+                    static_cast<size_t>( map_cache.bidx( smx, smy ) ) ) ) {
+                continue;
+            }
+            cur_submap->absorption_dirty = true;
+            cur_submap->rebuild_absorption_cache(*this, tripoint_bub_sm( smx, smy, zlev ) );
 
-            // calculates absorption of a single tile
-            // x,y - coords in map local coords
-            // Used below
-            auto calc_absorption = [&]( point  p ) {
-                const point sp = p - sm_offset;
-                // If we are indoors, we dont get terrain sound attenuation.
-                short value = ( outside_cache[map_cache.idx( p.x, p.y )] ) ? default_terrain_absorption :
-                              SOUND_ABSORPTION_OPEN_FIELD;
-
-                // See if there is a vehicle in our given tripoint.
-                // If there is, if there is a full board or a closed door, return thick barrier sound absorption.
-                // We could technically run through checking adjacent tiles as we do below, but vehicles are dynamic and rechecking all of the vehicles tiles every turn would not provide enough benifit.
-                if( const auto vp = veh_at( tripoint( p.x, p.y, zlev ) ) ) {
-                    if( vp.part_with_feature( "FULL_BOARD", true ) || ( vp.obstacle_at_part() &&
-                            vp.part_with_feature( "OPENABLE", true ) ) ) {
-                        return SOUND_ABSORPTION_THICK_BARRIER;
-                    }
-                }
-                const auto &tile_furn = cur_submap->get_furn( sp ).obj();
-                const auto &tile_ter = cur_submap->get_ter( sp ).obj();
-                // Count as a barrier if its furniture with block wind. These tend to be lighter things
-                // like tent walls or sandbags, so they count as a barrier
-                if( tile_furn.has_flag( "BLOCK_WIND" ) ) {
-                    value += SOUND_ABSORPTION_BARRIER;
-                    return value;
-                }
-
-                // Do this last as it involves the most calcs.
-                if( ( tile_ter.has_flag( "BLOCK_WIND" ) ||
-                      tile_ter.has_flag( "CONNECT_TO_WALL" ) ) &&
-                    !outside_cache[map_cache.idx( p.x, p.y )] ) {
-                    // Store which type of sound block we are using. If true we have a windblocker, if false we have a barrier
-                    const bool blockswind = tile_ter.has_flag( "BLOCK_WIND" );
-
-                    // TODO: Turn into static constexpr and make
-                    // Make an array for points, and two for bools (valid terrain, and if there is a roof).
-                    // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
-                    // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 3 ] [ 4 ] [ 5 ]
-                    // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 7 ] [ 8 ]
-                    // A bit ugly, apologies. We use the normal point instead of subgrid point because checking adjacent at subgrid boundry will result in checking negative subgrid coords
-                    const std::array<point, 9> points_to_check = { point( p.x - 1, p.y + 1 ), point( p.x, p.y + 1 ), point( p.x + 1, p.y + 1 ), point( p.x - 1, p.y ), p, point( p.x + 1, p.y ), point( p.x - 1, p.y - 1 ), point( p.x, p.y - 1 ), point( p.x + 1, p.y - 1 )};
-
-                    // Alrighty, here we go. Queary the adjacent terrain to see if it blocks sound or connects to a wall.
-                    // Lets build out the bool indexes. We need these bool indexes for actually calcing the terrain absorption.
-                    std::array<bool, 9> point_valid = { {false, false, false, false, false, false, false, false, false} };
-                    std::array<bool, 9> roof_cover = { {false, false, false, false, false, false, false, false, false} };
-                    for( short i = 0; i < 9; i++ ) {
-
-                        // Because checking adjacent tiles can result in us attempting to check a negative subgrid point,
-                        // We have to convert back over to normal tripoints.
-                        const tripoint temp_point = tripoint( points_to_check[i].x, points_to_check[i].y, zlev );
-
-                        // Does the point in question have a roof?
-                        // Remember, outside cache returns true if something counts as outdoors and has no roof.
-                        roof_cover[i] = !outside_cache[map_cache.idx( temp_point.x, temp_point.y ) ];
-                        //( outside_cache[temp_point.x][temp_point.y] ) ? roof_cover[i] = false : roof_cover[i] = true;
-
-                        // Does the point in question have terrain that blocks wind or connects to wall, and does it have a roof?
-                        // Adjacent furniture that blocks wind can count for the purposes of if this tile is valid.
-                        // TODO: Eval this check, expecially the furniture check, to see if it needs to be improved or removed.
-                        const auto &adj_terrain = ter( temp_point ).obj();
-                        const auto &adj_furn = furn( temp_point ).obj();
-                        ( roof_cover[i] && ( adj_furn.has_flag( "BLOCK_WIND" ) || adj_terrain.has_flag( "BLOCK_WIND" ) ||
-                                             adj_terrain.has_flag( "CONNECT_TO_WALL" ) ) ) ? point_valid[i] = true :
-                                                     point_valid[i] = false;
-                    }
-
-                    // We have a few valid conditions. For the terrain to provide its full sound absorption, it must have at least two directly (x/y, no diagonals) adjacent wind blocking or connect_to_wall buddies which must be roofed,
-                    // And all of the adjacent valid terrain features must have an adjacent rooved tile that is also adjacent to the center tile.
-                    // In effect, we are looking for solid lines, or L shapes. There will be some oddities with this, if it becomes a significant issue we can look into making it more granular.
-                    //
-                    // 0 0 0                W R R    R W 0     W R W                     W R 0                         R 0 R    R 0 R
-                    // W W W works, as does W W W or W W 0 but 0 W 0 will not, nor would 0 W W      As a special rule, W W W or W W W and any rotation/inversion therein will not work.
-                    // R R R                0 0 R    0 0 0     W R W                     0 R W                         0 R 0    0 0 0
-                    //
-                    // In effect, the terrain would have to properly prevent creature movement, and if there is a straight line of walls they must have a contiguous roof.
-                    // We dont care if there are more valid points than nessesary.
-
-                    // Does our terrain have enough buddies?
-                    short buddynumber = 0;
-                    // In effect, we check each of our adjacent terrain to see if it is properly rooved. ( 1, 3, 5, 7)
-                    // Could probably find a more elegant way to do this, but this is relatively quick.
-                    // If a valid point does not have a directly adjacent roof, set it to not valid for a future check.
-                    if( point_valid[1] && ( roof_cover[0] || roof_cover[2] ) ) {
-                        buddynumber++;
-                    }
-                    if( point_valid[3] && ( roof_cover[0] || roof_cover[6] ) ) {
-                        buddynumber++;
-                    }
-                    if( point_valid[5] && ( roof_cover[2] || roof_cover[8] ) ) {
-                        buddynumber++;
-                    }
-                    if( point_valid[7] && ( roof_cover[6] || roof_cover[8] ) ) {
-                        buddynumber++;
-                    }
-                    // At one or zero buddies sound dampening is reduced.
-                    if( buddynumber < 2 ) {
-                        return ( buddynumber == 0 ) ? value : ( blockswind ) ?
-                               SOUND_ABSORPTION_BARRIER : value;
-                    } else if( buddynumber >= 3 ) {
-                        return ( blockswind ) ? SOUND_ABSORPTION_WALL : SOUND_ABSORPTION_BARRIER;
-                    }
-                    // Our special rule, this one is a bit of a doozy.
-                    // This case can only happen with 2 valid directly adjacent terrain,
-                    // and we have invalidated any terrain pieces without an adjacent roof.
-                    // so we can check to see if we only have a straight line.
-                    else if( point_valid[3] && point_valid[5] ) {
-                        // Only grant full value if we have contiguous roof.
-                        return ( ( roof_cover[0] && roof_cover[1] && roof_cover[2] ) || ( roof_cover[6] && roof_cover[7] &&
-                                 roof_cover[8] ) ) ? ( ( blockswind ) ? SOUND_ABSORPTION_WALL : SOUND_ABSORPTION_THICK_BARRIER ) :
-                               ( blockswind ) ?
-                               SOUND_ABSORPTION_THICK_BARRIER : SOUND_ABSORPTION_BARRIER;
-
-                    } else if( point_valid[1] && point_valid[7] ) {
-                        return ( ( roof_cover[0] && roof_cover[3] && roof_cover[6] ) || ( roof_cover[2] && roof_cover[5] &&
-                                 roof_cover[8] ) ) ? ( ( blockswind ) ? SOUND_ABSORPTION_WALL : SOUND_ABSORPTION_THICK_BARRIER ) :
-                               ( blockswind ) ?
-                               SOUND_ABSORPTION_THICK_BARRIER : SOUND_ABSORPTION_BARRIER;
-                    }
-                }
-                // If none of the above
-                return value;
-            };
+            
 
             if( cur_submap->is_uniform ) {
-                const short value = calc_absorption( sm_offset );
+                const short value = cur_submap->absorption_cache[0][0];
                 // if rebuild_all==true all values were already set to 0
                 if( !rebuild_all || value != SOUND_ABSORPTION_OPEN_FIELD ) {
                     for( int sx = 0; sx < SEEX; ++sx ) {
-                        // init all sy indices in one go. Our absorption cache should already be initialized. If it is not, something REALLY wierd has happened.
-                        std::fill_n( &absorption_cache[map_cache.idx( sm_offset.x + sx, sm_offset.y )], SEEY, value );
-                        if( value >= SOUND_ABSORPTION_THICK_BARRIER ) {
-                            const int x = sx + sm_offset.x;
-                            for( int sy = 0; sy < SEEY; ++sy ) {
-                                const int y = sy + sm_offset.y;
-                                map_cache.sound_wall_cache[map_cache.idx( x, y )] = true;
-                            }
-                        }
+                        std::fill_n( absorption_cache.data() + map_cache.idx( sm_offset.x() + sx, sm_offset.y() ),
+                                     SEEY, value );
                     }
                 }
             } else {
                 for( int sx = 0; sx < SEEX; ++sx ) {
-                    const int x = sx + sm_offset.x;
+                    const int x = sx + sm_offset.x();
                     for( int sy = 0; sy < SEEY; ++sy ) {
-                        const int y = sy + sm_offset.y;
-                        absorption_cache[map_cache.idx( x, y )] = calc_absorption( { x, y } );
-                        if( absorption_cache[map_cache.idx( x, y )] >= SOUND_ABSORPTION_THICK_BARRIER ) {
-                            map_cache.sound_wall_cache[map_cache.idx( x, y )] = true;
-                        }
+                        const int y = sy + sm_offset.y();
+                        absorption_cache[map_cache.idx( x, y )] = cur_submap->absorption_cache[sx][sy];
+                        //if( absorption_cache[map_cache.idx( x, y )] >= SOUND_ABSORPTION_THICK_BARRIER ) {
+                        //    map_cache.sound_wall_cache[map_cache.idx( x, y )] = true;
+                        //}
                     }
                 }
+            }
+            for( const auto sm_ms : submap_tiles() ) {
+                const auto ms_pos = project_combine( sm_pos, sm_ms );
+                sound_wall_cache[static_cast<size_t>( map_cache.idx( ms_pos.x(), ms_pos.y() ) )] =
+                    cur_submap->sound_wall_cache[sm_ms.x()][sm_ms.y()];
             }
         }
     }
@@ -2192,6 +2399,15 @@ void sounds::reset_sounds()
     map.m_sound_cache.sound_instances.clear();
     sound_markers.clear();
     map.m_sound_cache.sound_list_filtered.clear();
+    sound_batch_floodfill_que.clear();
+}
+
+void sounds::clear_floodfill_que()
+{
+    auto &map = get_map();
+    // Also kill our filtered sound lists, just in case.
+    map.m_sound_cache.sound_list_filtered.clear();
+    sound_batch_floodfill_que.clear();
 }
 
 void sounds::reset_markers()

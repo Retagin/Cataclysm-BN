@@ -436,8 +436,8 @@ struct sound_instance_cache {
     // Default constructor creates a zero-sized cache used as a null sentinel only.
     sound_instance_cache();
 
-    explicit sound_instance_cache( sound_event input_sound, const sound_vol_for_flood_dist d_e,
-                                   const int f_r );
+    explicit sound_instance_cache( sound_event &input_sound, const sound_vol_for_flood_dist &d_e,
+                                   const int &f_r );
     sound_instance_cache( const sound_instance_cache &other ) = default;
     sound_instance_cache &operator=( const sound_instance_cache &other ) = default;
 
@@ -844,11 +844,6 @@ class map : public submap_load_listener
         void set_absorption_cache_dirty( const tripoint_bub_ms &p );
         // Set an entire zlevel's sound absorption cache to dirty.
         void set_absorption_cache_dirty( const int zlev );
-
-        // Sets a tile's sound wall cache to true. The sound_wall (sometimes refered to as sound_corner) cache is used while floodfilling sounds.
-        // We precalculate and cache this as it checked potentially tens of thousands of times for a single sound if it is maximum volume in a complicated area.
-        void set_sound_wall_cache_dirty( const int zlev );
-        void set_sound_wall_cache_dirty( const tripoint_bub_ms &p );
 
         // invalidates seen cache for the whole zlevel unconditionally
 

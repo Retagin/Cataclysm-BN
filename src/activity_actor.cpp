@@ -474,7 +474,7 @@ void dig_activity_actor::do_turn( player_activity &/*act*/, Character &who )
         progress.pop();
         return;
     }
-    sfx::play_activity_sound( "tool", "shovel", sfx::get_heard_volume( location ) );
+    sfx::play_activity_sound( "tool", "shovel", sfx::get_heard_volume( location, 60 ) );
     if( calendar::once_every( 1_minutes ) ) {
         //~ Sound of a shovel digging a pit at work!
         sound_event se;
@@ -591,7 +591,7 @@ void dig_channel_activity_actor::do_turn( player_activity &/*act*/, Character &w
         progress.pop();
         return;
     }
-    sfx::play_activity_sound( "tool", "shovel", sfx::get_heard_volume( location ) );
+    sfx::play_activity_sound( "tool", "shovel", sfx::get_heard_volume( location, 70 ) );
     if( calendar::once_every( 1_minutes ) ) {
         //~ Sound of a shovel digging a pit at work!
         sound_event se;
@@ -943,7 +943,7 @@ void hacking_activity_actor::finish( player_activity &act, Character &who )
             se.id = "environment";
             se.variant = "alarm";
             sounds::sound( se );
-            if( examp.z > 0 && !g->timed_events.queued( TIMED_EVENT_WANTED ) ) {
+            if( examp.z() > 0 && !g->timed_events.queued( TIMED_EVENT_WANTED ) ) {
                 g->timed_events.add( TIMED_EVENT_WANTED, calendar::turn + 30_minutes, 0,
                                      who.abs_sm_pos() );
             }
@@ -1226,7 +1226,7 @@ void hacksaw_activity_actor::do_turn( player_activity &/* act */, Character &who
     }
     if( tool->ammo_sufficient() ) {
         tool->ammo_consume( tool->ammo_required(), tool->position() );
-        sfx::play_activity_sound( "tool", "hacksaw", sfx::get_heard_volume( target ) );
+        sfx::play_activity_sound( "tool", "hacksaw", sfx::get_heard_volume( target, 80 ) );
         if( calendar::once_every( 1_minutes ) ) {
             //~ Sound of a metal sawing tool at work!
             sound_event se;
@@ -1814,7 +1814,7 @@ void oxytorch_activity_actor::do_turn( player_activity &/*act*/, Character &who 
     // We check available charges when first starting the cut, but this prevents abnormal behavior if torch status changes mid-activity.
     if( tool->ammo_sufficient() ) {
         tool->ammo_consume( tool->ammo_required(), tool->position() );
-        sfx::play_activity_sound( "tool", "oxytorch", sfx::get_heard_volume( target ) );
+        sfx::play_activity_sound( "tool", "oxytorch", sfx::get_heard_volume( target, 65 ) );
         if( calendar::once_every( 2_turns ) ) {
             sound_event se;
             se.origin = target;

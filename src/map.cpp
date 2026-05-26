@@ -559,7 +559,6 @@ void map::set_floor_cache_dirty( const int zlev )
     set_outside_cache_dirty( zlev - 1 );
     // This also means the absorption and sound wall caches are marked dirty there as well.
     set_absorption_cache_dirty( zlev - 1 );
-    set_sound_wall_cache_dirty( zlev - 1 );
 }
 
 void map::set_floor_cache_dirty( const tripoint_bub_ms &p )
@@ -577,7 +576,6 @@ void map::set_floor_cache_dirty( const tripoint_bub_ms &p )
     set_outside_cache_dirty( p + tripoint_rel_ms::below() );
     // Setting the floor cache for a submap dirty should also automatically set the absorption cache and sound_wall caches dirty.
     set_absorption_cache_dirty( p + tripoint_rel_ms::below() );
-    set_sound_wall_cache_dirty( p + tripoint_rel_ms::below() );
 }
 
 void map::set_seen_cache_dirty( const int &zlevel )
@@ -605,6 +603,39 @@ void map::set_absorption_cache_dirty( const tripoint_bub_ms &p )
         const auto smp = project_to<coords::sm>( p );
         level_cache &ch = get_cache( smp.z() );
         ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x(), smp.y() ) ) );
+        // Check if the point is on the submap border.
+        const auto abs_p = project_to<coords::ms>( smp ).xy();
+        if(p.x() == abs_p.x() || p.x() == (abs_p.x() + SEEX - 1) || p.y() == abs_p.y() || p.y() == (abs_p.y() + SEEY - 1)){
+            // Now figure out which border we are on.
+            if ( p.x() == abs_p.x() && p.y() == abs_p.y() ) {
+                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x()-1, smp.y() ) ) );
+                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x()-1, smp.y()-1 ) ) );
+                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x(), smp.y()-1 ) ) );
+            } else if (p.x() == abs_p.x() && p.y() == (abs_p.y() + SEEY - 1 ) ) {
+                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x()-1, smp.y() ) ) );
+                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x()-1, smp.y()+1 ) ) );
+                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x(), smp.y()+1 ) ) );
+            }else if ( p.x() == (abs_p.x() + SEEX - 1) && p.y() == abs_p.y() ) {
+                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x(), smp.y()-1 ) ) );
+                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x()+1, smp.y()-1 ) ) );
+                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x()+1, smp.y() ) ) );
+            } else if (p.x() == (abs_p.x() + SEEX - 1) && p.y() == (abs_p.y() + SEEY - 1) ) {
+                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x()+1, smp.y() ) ) );
+                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x()+1, smp.y()+1 ) ) );
+                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x(), smp.y()+1 ) ) );
+            } else {
+                if (p.x() == abs_p.x()){
+                    ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x()-1, smp.y() ) ) );
+                }else if (p.x() == (abs_p.x() + SEEX - 1)){
+                    ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x()+1, smp.y() ) ) );
+                }else if (p.y() == abs_p.y()){
+                    ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x(), smp.y()-1 ) ) );
+                }else if (p.y() == (abs_p.y() + SEEY - 1)){
+                    ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x(), smp.y()+1 ) ) );
+                }
+            }
+        }
+
     }
 }
 
@@ -612,22 +643,6 @@ void map::set_absorption_cache_dirty( const int zlev )
 {
     if( inbounds_z( zlev ) ) {
         get_cache( zlev ).absorption_cache_dirty.set();
-    }
-}
-
-void map::set_sound_wall_cache_dirty( const int zlev )
-{
-    if( inbounds_z( zlev ) ) {
-        get_cache( zlev ).sound_wall_cache_dirty.set();
-    }
-}
-
-void map::set_sound_wall_cache_dirty( const tripoint_bub_ms &p )
-{
-    if( inbounds( p ) ) {
-        const auto smp = project_to<coords::sm>( p );
-        level_cache &ch = get_cache( smp.z() );
-        ch.sound_wall_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x(), smp.y() ) ) );
     }
 }
 
@@ -9964,7 +9979,7 @@ void map::build_map_cache( const int zlev, bool skip_lightmap )
         } else {
             for( int z = minz; z <= maxz; ++z ) {
                 level_cache &ch = get_cache( z );
-                build_absorption_cache( z );
+
                 // vehicle_floor_cache is written by vehicles one level below (via
                 // vehicle_caching_internal_above), so it must be cleared unconditionally —
                 // not gated on veh_in_active_range — to prevent stale entries after shifts.
@@ -9974,7 +9989,7 @@ void map::build_map_cache( const int zlev, bool skip_lightmap )
                     std::fill( ch.vehicle_obscured_cache.begin(), ch.vehicle_obscured_cache.end(), fill );
                     std::fill( ch.vehicle_obstructed_cache.begin(), ch.vehicle_obstructed_cache.end(), fill );
                 }
-
+                
                 const bool level_seen_dirty = ch.seen_cache_dirty;
                 if( level_seen_dirty ) {
                     seen_cache_dirty = true;
@@ -10004,6 +10019,14 @@ void map::build_map_cache( const int zlev, bool skip_lightmap )
                 do_vehicle_caching( z );
             }
         }
+    }
+
+    {
+        ZoneScopedN( "Phase3_sound_absorption" )
+        // Absorption cache relies upon the floor, outside, and vehicle caches all being completed.
+        for( int z = minz; z <= maxz; z++ ) {
+            build_absorption_cache( z );
+        }        
     }
 
     seen_cache_dirty |= build_vision_transparency_cache( get_player_character() );
@@ -10720,9 +10743,9 @@ sound_instance_cache::sound_instance_cache( sound_event &input_sound,
       dist_enum( d_e ),
       flood_radius( f_r ),
       origin( input_sound.origin ),
-      envelope_index_point( tripoint( origin.x - flood_radius, origin.y - flood_radius, origin.z ) ),
-      offset_x( envelope_index_point.x ),
-      offset_y( envelope_index_point.y ),
+      envelope_index_point( tripoint( origin.x() - flood_radius, origin.y() - flood_radius, origin.z() ) ),
+      offset_x( envelope_index_point.x() ),
+      offset_y( envelope_index_point.y() ),
       // 4r^2 + 4r + 1 equals our total area, for some (2r + 1) by (2r + 1) flood envelope.
       volume( static_cast<size_t>( ( 1 + ( 4 * flood_radius ) + ( 4 * ( flood_radius *
                                      flood_radius ) ) ) ), 0 ),

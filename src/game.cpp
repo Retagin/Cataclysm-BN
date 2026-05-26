@@ -2058,6 +2058,8 @@ bool game::do_turn()
         // Floodfill any sounds cued up by NPCs during their respective turns or from other sources.
         m.batch_flood_fill_sounds();
     }
+    // We want to clear our floodfill que anyways, so that sounds dont accumulate in the que if soundperf is on.
+    sounds::clear_floodfill_que();
 
     update_stair_monsters();
     mon_info_update();
