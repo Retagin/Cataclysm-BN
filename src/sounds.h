@@ -148,13 +148,15 @@ void play_ambient_variant_sound( const std::string &id, const std::string &varia
                                  channel channel, int fade_in_duration, double pitch = -1.0, int loops = -1 );
 void play_activity_sound( const std::string &id, const std::string &variant, int volume );
 void end_activity_sounds();
-void generate_gun_sound( const tripoint_bub_ms &source, const item &firing, const short &origin_vol );
+void generate_gun_sound( const tripoint_bub_ms &source, const item &firing,
+                         const short &origin_vol );
 void generate_melee_sound( const tripoint_bub_ms &source, const tripoint_bub_ms &target, bool hit,
                            bool targ_mon = false, const std::string &material = "flesh" );
 void do_hearing_loss( int turns = -1 );
 void remove_hearing_loss();
 void do_projectile_hit( const Creature &target );
-int get_heard_volume( const tripoint_bub_ms &source, const short &origin_volume, const bool &in_mdB = false );
+int get_heard_volume( const tripoint_bub_ms &source, const short &origin_volume,
+                      const bool &in_mdB = false );
 units::angle get_heard_angle( const tripoint_bub_ms &source );
 void do_footstep();
 void do_danger_music();
@@ -325,21 +327,24 @@ static constexpr auto dist_vol_loss = std::array<short, 122>
     9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7, 7
 };
 
-// Provides an array of the bubble points adjacent to a point. 
+// Provides an array of the bubble points adjacent to a point.
 // The index of an adjacent tile is used as the direction index to that tile.
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
 static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_bub_ms &p )
-{    
-    return std::array<point_bub_ms, 8>{ { p + point_rel_ms::north_west(), // Direction 0
-        p + point_rel_ms::north(),      // Direction 1
-        p + point_rel_ms::north_east(), // Direction 2
-        p + point_rel_ms::east(),       // Direction 3
-        p + point_rel_ms::south_east(), // Direction 4
-        p + point_rel_ms::south(),      // Direction 5
-        p + point_rel_ms::south_west(), // Direction 6
-        p + point_rel_ms::west() } };   // Direction 7
+{
+    return std::array<point_bub_ms, 8> { {
+            p + point_rel_ms::north_west(), // Direction 0
+            p + point_rel_ms::north(),      // Direction 1
+            p + point_rel_ms::north_east(), // Direction 2
+            p + point_rel_ms::east(),       // Direction 3
+            p + point_rel_ms::south_east(), // Direction 4
+            p + point_rel_ms::south(),      // Direction 5
+            p + point_rel_ms::south_west(), // Direction 6
+            p + point_rel_ms::west()
+        }
+    };   // Direction 7
 }
 
 // Provides an array of the bubble points adjacent to some submap point.
@@ -347,34 +352,41 @@ static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_bub
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
-static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_sm_ms &sp, const point_bub_sm &grid_pos )
-{    
-    const point_bub_ms bp = project_combine(grid_pos, sp);
-    return std::array<point_bub_ms, 8>{ { bp + point_rel_ms::north_west(), // Direction 0
-        bp + point_rel_ms::north(),      // Direction 1
-        bp + point_rel_ms::north_east(), // Direction 2
-        bp + point_rel_ms::east(),       // Direction 3
-        bp + point_rel_ms::south_east(), // Direction 4
-        bp + point_rel_ms::south(),      // Direction 5
-        bp + point_rel_ms::south_west(), // Direction 6
-        bp + point_rel_ms::west() } };   // Direction 7
+static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_sm_ms &sp,
+        const point_bub_sm &grid_pos )
+{
+    const point_bub_ms bp = project_combine( grid_pos, sp );
+    return std::array<point_bub_ms, 8> { {
+            bp + point_rel_ms::north_west(), // Direction 0
+            bp + point_rel_ms::north(),      // Direction 1
+            bp + point_rel_ms::north_east(), // Direction 2
+            bp + point_rel_ms::east(),       // Direction 3
+            bp + point_rel_ms::south_east(), // Direction 4
+            bp + point_rel_ms::south(),      // Direction 5
+            bp + point_rel_ms::south_west(), // Direction 6
+            bp + point_rel_ms::west()
+        }
+    };   // Direction 7
 }
 
-// Provides an array of the tripoints adjacent to some bubble tripoint. 
+// Provides an array of the tripoints adjacent to some bubble tripoint.
 // The index of an adjacent tile is used as the direction index to that tile.
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
 static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const tripoint_bub_ms &p )
-{    
-    return std::array<tripoint_bub_ms, 8>{ { p + tripoint_rel_ms::north_west(), // Direction 0
-        p + tripoint_rel_ms::north(),      // Direction 1
-        p + tripoint_rel_ms::north_east(), // Direction 2
-        p + tripoint_rel_ms::east(),       // Direction 3
-        p + tripoint_rel_ms::south_east(), // Direction 4
-        p + tripoint_rel_ms::south(),      // Direction 5
-        p + tripoint_rel_ms::south_west(), // Direction 6
-        p + tripoint_rel_ms::west() } };   // Direction 7
+{
+    return std::array<tripoint_bub_ms, 8> { {
+            p + tripoint_rel_ms::north_west(), // Direction 0
+            p + tripoint_rel_ms::north(),      // Direction 1
+            p + tripoint_rel_ms::north_east(), // Direction 2
+            p + tripoint_rel_ms::east(),       // Direction 3
+            p + tripoint_rel_ms::south_east(), // Direction 4
+            p + tripoint_rel_ms::south(),      // Direction 5
+            p + tripoint_rel_ms::south_west(), // Direction 6
+            p + tripoint_rel_ms::west()
+        }
+    };   // Direction 7
 }
 
 // Provides an array of the bubble tripoints adjacent to some submap point.
@@ -382,17 +394,21 @@ static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const tr
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
-static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const point_sm_ms &sp, const tripoint_bub_sm &grid_pos )
-{    
-    const tripoint_bub_ms btri = project_combine(grid_pos, sp);
-    return std::array<tripoint_bub_ms, 8>{ { btri + tripoint_rel_ms::north_west(), // Direction 0
-        btri + tripoint_rel_ms::north(),      // Direction 1
-        btri + tripoint_rel_ms::north_east(), // Direction 2
-        btri + tripoint_rel_ms::east(),       // Direction 3
-        btri + tripoint_rel_ms::south_east(), // Direction 4
-        btri + tripoint_rel_ms::south(),      // Direction 5
-        btri + tripoint_rel_ms::south_west(), // Direction 6
-        btri + tripoint_rel_ms::west() } };   // Direction 7
+static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const point_sm_ms &sp,
+        const tripoint_bub_sm &grid_pos )
+{
+    const tripoint_bub_ms btri = project_combine( grid_pos, sp );
+    return std::array<tripoint_bub_ms, 8> { {
+            btri + tripoint_rel_ms::north_west(), // Direction 0
+            btri + tripoint_rel_ms::north(),      // Direction 1
+            btri + tripoint_rel_ms::north_east(), // Direction 2
+            btri + tripoint_rel_ms::east(),       // Direction 3
+            btri + tripoint_rel_ms::south_east(), // Direction 4
+            btri + tripoint_rel_ms::south(),      // Direction 5
+            btri + tripoint_rel_ms::south_west(), // Direction 6
+            btri + tripoint_rel_ms::west()
+        }
+    };   // Direction 7
 }
 
 // Provides an array of the bubble tripoints adjacent to some submap point.
@@ -402,18 +418,20 @@ static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const po
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
 // Sorry (not sorry at all) for making this abomination of out of bounds memory access requests.
 // Sanitize your inputs.
-static constexpr std::array<point_sm_ms, 8> get_adjacent_submap_points( const point_sm_ms &sp)
-{    
+static constexpr std::array<point_sm_ms, 8> get_adjacent_submap_points( const point_sm_ms &sp )
+{
 
-    return std::array<point_sm_ms, 8>{ { 
-        sp + point_rel_ms::north_west(), // Direction 0
-        sp + point_rel_ms::north(),      // Direction 1
-        sp + point_rel_ms::north_east(), // Direction 2
-        sp + point_rel_ms::east(),       // Direction 3
-        sp + point_rel_ms::south_east(), // Direction 4
-        sp + point_rel_ms::south(),      // Direction 5
-        sp + point_rel_ms::south_west(), // Direction 6
-        sp + point_rel_ms::west() } };   // Direction 7
+    return std::array<point_sm_ms, 8> { {
+            sp + point_rel_ms::north_west(), // Direction 0
+            sp + point_rel_ms::north(),      // Direction 1
+            sp + point_rel_ms::north_east(), // Direction 2
+            sp + point_rel_ms::east(),       // Direction 3
+            sp + point_rel_ms::south_east(), // Direction 4
+            sp + point_rel_ms::south(),      // Direction 5
+            sp + point_rel_ms::south_west(), // Direction 6
+            sp + point_rel_ms::west()
+        }
+    };   // Direction 7
 }
 
 // All of these values are kept as static constexprs
@@ -443,29 +461,29 @@ static constexpr uint8_t SDI_DOWN   = 8;
 // Sound Direction Index, Up +Z
 static constexpr uint8_t SDI_UP     = 9;
 
-static constexpr auto sanitized_sound_direction_indexes_full = std::array<uint8_t,10> 
+static constexpr auto sanitized_sound_direction_indexes_full = std::array<uint8_t, 10>
 {
-    {SDI_NW,SDI_N,SDI_NE,SDI_E,SDI_SE,SDI_S,SDI_SW,SDI_W,SDI_DOWN,SDI_UP}
+    {SDI_NW, SDI_N, SDI_NE, SDI_E, SDI_SE, SDI_S, SDI_SW, SDI_W, SDI_DOWN, SDI_UP}
 };
 
-static constexpr auto sanitized_sound_direction_indexes = std::array<uint8_t,8> 
+static constexpr auto sanitized_sound_direction_indexes = std::array<uint8_t, 8>
 {
-    {SDI_NW,SDI_N,SDI_NE,SDI_E,SDI_SE,SDI_S,SDI_SW,SDI_W}
+    {SDI_NW, SDI_N, SDI_NE, SDI_E, SDI_SE, SDI_S, SDI_SW, SDI_W}
 };
 // Provides the cartesion sound direction indexes in clockwise order starting from zero.
-static constexpr auto sanitized_sound_direction_indexes_cartesian = std::array<uint8_t,4> 
+static constexpr auto sanitized_sound_direction_indexes_cartesian = std::array<uint8_t, 4>
 {
     { SDI_N, SDI_E, SDI_S, SDI_W }
 };
 
-// Return the static constexpr version of given direction index. 
+// Return the static constexpr version of given direction index.
 // Useful for sanitizing index inputs to use faster logic.
-static constexpr auto get_sound_direction_index( const uint8_t &dir)
+static constexpr auto get_sound_direction_index( const uint8_t &dir )
 {
-    if ( dir > SDI_UP ){
+    if( dir > SDI_UP ) {
         return SDI_UP;
     } else {
-    return sanitized_sound_direction_indexes_full[dir];
+        return sanitized_sound_direction_indexes_full[dir];
     }
 }
 
@@ -535,7 +553,8 @@ static constexpr auto wall_sdir_invalidation = std::array<std::pair<uint8_t, uin
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
 static constexpr auto opposite_tile_by_sdir = std::array<uint8_t, 8>
 {
-    {   SDI_SE, //Direction "0"
+    {
+        SDI_SE, //Direction "0"
         SDI_S,  //Direction "1"
         SDI_SW, //Direction "2"
         SDI_W,  //Direction "3"

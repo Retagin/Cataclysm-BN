@@ -239,11 +239,11 @@ static constexpr short vol_z_adjust( const tripoint_bub_ms &source, const tripoi
     const auto &map = get_map();
     if( source.z() == listener.z() ) {
         return 0;
-    } else if(lineofsight){
+    } else if( lineofsight ) {
         // If we have direct line of sight, the horizontal volume loss over distance most likely wont be that far off from the amount that would have been lost straight line.
         // Just assign a 1dB penalty per zlevel difference.
-        return static_cast<short>(100 * std::abs(source.z() - listener.z()));
-    }else if (map.inbounds(listener)) {
+        return static_cast<short>( 100 * std::abs( source.z() - listener.z() ) );
+    } else if( map.inbounds( listener ) ) {
         short vol_adjust = 0;
         // We want to work our way down from the top.
         const int c_index = map.get_cache_ref( 0 ).idx( listener.x(), listener.y() );
@@ -258,9 +258,9 @@ static constexpr short vol_z_adjust( const tripoint_bub_ms &source, const tripoi
         }
         return std::min( mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ),
                          ( for_horde_signal ) ? mdBspl_to_dBspl( vol_adjust ) : vol_adjust );
-    }else{
+    } else {
         //Well, the listener is out of bounds. Just assign a 1dB penalty per zlevel difference.
-        return static_cast<short>(100 * std::abs(source.z() - listener.z()));
+        return static_cast<short>( 100 * std::abs( source.z() - listener.z() ) );
     }
 };
 
@@ -276,7 +276,7 @@ static constexpr short svol_at( const sound_instance_cache &sound_inst, const tr
     // Good idea to track this.
     const bool samez = sound_inst.origin.z() == tri.z();
     // Lets go for our easy solution first.
-    if( sound_inst.in_envelope( tri ) && map.inbounds(tri) ) {
+    if( sound_inst.in_envelope( tri ) && map.inbounds( tri ) ) {
         if( samez ) {
             return sound_inst.vol_at_tri( tri );
         } else {
@@ -307,7 +307,7 @@ static constexpr short svol_at( const sound_instance_cache &sound_inst, const tr
                              sound_inst.base_distance_vol_by_dir[dir_index] ) : sound_inst.base_distance_vol_by_dir[dir_index];
 
     return std::max( 0, ( vol_escape - get_cumulative_vol_dist_loss( sound_inst.flood_radius, distance,
-                          t_absorp ) - vol_z_adjust( sound_inst.origin, tri ,lineofsight) ) );
+                          t_absorp ) - vol_z_adjust( sound_inst.origin, tri, lineofsight ) ) );
 }
 
 // For use when flood filling sounds to allow for Dijkstra-like max-heap processing instead of breadth first, not preserved.
@@ -493,7 +493,8 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                     if( svol[v_index_from_p( tile )] > origin_volume ) {
                         debugmsg( "Sound with description [ %1s ] attempted to propagate from %i:%i at %i mdB to %i:%i at %i mdB, a louder volume than the origin volume of %i mdB!"
                                   , soundevent.description, soundevent.origin.x(), soundevent.origin.y(),
-                                  svol[temp_sound_cache.p_to_env_index(soundevent.origin)], tile.x(), tile.y(), svol[temp_sound_cache.p_to_env_index( tile )],
+                                  svol[temp_sound_cache.p_to_env_index( soundevent.origin )], tile.x(), tile.y(),
+                                  svol[temp_sound_cache.p_to_env_index( tile )],
                                   origin_volume );
                         // Dont break the laws of physics
                         continue;
@@ -521,9 +522,9 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
             const auto &wall_dirs = wall_check_by_sdirection[ptile.dir];
             // We only have two walls to check for, and we know what order they are in.
             const bool wall1 = wall_present[ adjacent_tiles[wall_dirs.first].x() * MAPSIZE_X +
-                                                                               adjacent_tiles[wall_dirs.first].y() ];
+                                                                                 adjacent_tiles[wall_dirs.first].y() ];
             const bool wall2 = wall_present[ adjacent_tiles[wall_dirs.second].x() * MAPSIZE_X +
-                                                                                adjacent_tiles[wall_dirs.second].y() ];
+                                                                                  adjacent_tiles[wall_dirs.second].y() ];
             // Iterate through adjacent tiles.
             const auto &dirs_to_check = spropagation_tiles_by_sdirection[ptile.dir];
             for( short index = 0; index < 5; index++ ) {
@@ -552,7 +553,8 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                         // Check this if sound propagation is acting up. Comment out if things are playing nice.
                         if( vol_to_check > origin_volume ) {
                             debugmsg( "Sound with description [ %1s ] attempted to propagate from %i:%i at %i mdB to %i:%i at %i mdB, a louder volume than the origin volume of %i mdB!"
-                                      , soundevent.description, ptile.pos.x(), ptile.pos.y(), ptile.vol, adj_tile.x(), adj_tile.y(), vol_to_check,
+                                      , soundevent.description, ptile.pos.x(), ptile.pos.y(), ptile.vol, adj_tile.x(), adj_tile.y(),
+                                      vol_to_check,
                                       origin_volume );
                             // Dont break the laws of physics
                             continue;
@@ -764,16 +766,18 @@ void map::batch_flood_fill_sounds()
 
                 // Given some point, return the corresponding volume vector index.
                 // Only use after confirming that the tile is within the envelope using in_envelope().
-                auto v_index_from_p = [&]( const point_bub_ms &p ) {
+                auto v_index_from_p = [&]( const point_bub_ms & p ) {
                     return temp_sound_cache.p_to_env_index( p );
                 };
 
                 auto check_escape = [&]( const point_bub_ms & p, const short & tile_vol, const uint8_t &dist ) {
                     if( map_cache.outside_cache[map_cache.idx( p.x(), p.y() )] && check_up_valid ) {
-                        if( up_map_cache.floor_cache[map_cache.idx( p.x(), p.y() )] == 0 && tile_vol > escape_vol[SDI_UP] ) {
+                        if( up_map_cache.floor_cache[map_cache.idx( p.x(), p.y() )] == 0 &&
+                            tile_vol > escape_vol[SDI_UP] ) {
                             short vol = tile_vol;
                             if( dist < f_radius ) {
-                                    vol -= get_cumulative_vol_dist_loss(dist, f_radius, temp_sound_cache.terrain_sound_absorbtion_at_source);          
+                                vol -= get_cumulative_vol_dist_loss( dist, f_radius,
+                                                                     temp_sound_cache.terrain_sound_absorbtion_at_source );
                             }
                             escape_vol[SDI_UP] = std::max( vol, escape_vol[SDI_UP] );
                         }
@@ -781,7 +785,8 @@ void map::batch_flood_fill_sounds()
                     if( map_cache.floor_cache[map_cache.idx( p.x(), p.y() )] == 0 && tile_vol > escape_vol[SDI_DOWN] ) {
                         short vol = tile_vol;
                         if( dist < f_radius ) {
-                                vol -= get_cumulative_vol_dist_loss(dist, f_radius, temp_sound_cache.terrain_sound_absorbtion_at_source);
+                            vol -= get_cumulative_vol_dist_loss( dist, f_radius,
+                                                                 temp_sound_cache.terrain_sound_absorbtion_at_source );
                         }
                         escape_vol[SDI_DOWN] = std::max( vol, escape_vol[SDI_DOWN] );
                     }
@@ -832,9 +837,9 @@ void map::batch_flood_fill_sounds()
                     const auto &wall_dirs = wall_check_by_sdirection[ptile.dir];
                     // We only have two walls to check for, and we know what order they are in.
                     const bool wall1 = wall_present[ adjacent_tiles[wall_dirs.first].x() * MAPSIZE_X +
-                                                                                       adjacent_tiles[wall_dirs.first].y() ];
+                                                                                         adjacent_tiles[wall_dirs.first].y() ];
                     const bool wall2 = wall_present[ adjacent_tiles[wall_dirs.second].x() * MAPSIZE_X +
-                                                                                        adjacent_tiles[wall_dirs.second].y() ];
+                                                                                          adjacent_tiles[wall_dirs.second].y() ];
                     // Iterate through adjacent tiles.
                     const auto &dirs_to_check = spropagation_tiles_by_sdirection[ptile.dir];
                     for( uint8_t adj_tile_dir : dirs_to_check ) {
@@ -850,8 +855,9 @@ void map::batch_flood_fill_sounds()
                             auto &adj_tile_vol = svol[v_index_from_p( adj_tile )];
                             // Cap our tile distance between 1 and 121 to prevent overflow. We dont have or need distance loss values past dist_vol_loss[121]
                             // as the change in distance loss values past this point are negligible for gameplay scale.
-                            const uint8_t dist_for_vol_loss = get_distance_for_volume_loss( ptile.dist, ( adj_tile_dir = dirs_to_check.front() ||
-                                                              adj_tile_dir == dirs_to_check.back()) );
+                            const uint8_t dist_for_vol_loss = get_distance_for_volume_loss( ptile.dist,
+                                                              ( adj_tile_dir = dirs_to_check.front() ||
+                                                                      adj_tile_dir == dirs_to_check.back() ) );
                             const short vol_to_check = ( ptile.vol - ( absorption_cache[map_cache.idx( adj_tile.x(),
                                                          adj_tile.y() )] ) - ( dist_vol_loss[dist_for_vol_loss] ) );
                             // General priority goes loudest volume, then largest distance. Smaller distances loose volume more quickly.
@@ -862,7 +868,8 @@ void map::batch_flood_fill_sounds()
                                 if( vol_to_check > dBspl_to_mdBspl( temp_sound_cache.sound.volume ) ) {
                                     const int origin_volume = dBspl_to_mdBspl( temp_sound_cache.sound.volume );
                                     debugmsg( "Sound with description [ %1s ] attempted to propagate from %i:%i at %i mdB to %i:%i at %i mdB, a louder volume than the origin volume of %i mdB!"
-                                              , temp_sound_cache.sound.description, ptile.pos.x(), ptile.pos.y(), ptile.vol, adj_tile.x(), adj_tile.y(),
+                                              , temp_sound_cache.sound.description, ptile.pos.x(), ptile.pos.y(), ptile.vol, adj_tile.x(),
+                                              adj_tile.y(),
                                               vol_to_check, origin_volume );
                                     // Dont break the laws of physics
                                     continue;
@@ -988,23 +995,23 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
     if( !absorption_dirty ) {
         return;
     }
-    // outside_cache must be current before building the absorption cache. 
+    // outside_cache must be current before building the absorption cache.
     // We still want the level cache above us to grab our floor checks with.
     const level_cache *above = ( grid_pos.z() < OVERMAP_HEIGHT )
-                                   ? &m.get_cache_ref( grid_pos.z() + 1 )
-                                   : nullptr;
+                               ? &m.get_cache_ref( grid_pos.z() + 1 )
+                               : nullptr;
 
     if( outside_dirty ) {
         // Fortunatly there is a nullptr catch in rebuild_outside_cache.
         rebuild_outside_cache( above, grid_pos );
     }
-    
+
     const season_type &season = season_of_year( calendar::turn );
     // If we are at max zlev, always assume the tile above us has no floor.
     // Very important so that we dont try to access a nullptr
-    const bool at_max_zlev = !(grid_pos.z() < OVERMAP_HEIGHT);
-    const auto &ms_conversion = coords::project_to<coords::ms>(grid_pos);
-    const auto &abs_conversion = bub_to_abs(ms_conversion);
+    const bool at_max_zlev = !( grid_pos.z() < OVERMAP_HEIGHT );
+    const auto &ms_conversion = coords::project_to<coords::ms>( grid_pos );
+    const auto &abs_conversion = bub_to_abs( ms_conversion );
     const auto &abs_omt = coords::project_to<coords::omt>( abs_conversion );
     // The default sound absorption for this submap based upon the land use code.
     const short default_terrain_absorption = terrain_sound_attenuation( abs_omt, season );
@@ -1013,15 +1020,15 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
     std::ranges::fill( std::span( &absorption_cache[0][0], SEEX * SEEY ), default_terrain_absorption );
     // We are by neccesity rebuilding the sound wall cache as well, so lets zero that out.
     std::ranges::fill( std::span( &sound_wall_cache[0][0], SEEX * SEEY ), false );
-    
+
     const auto abs_p = project_to<coords::ms>( grid_pos ).xy();
     const int submap_boundary_max_x = SEEX - 1;
     const int submap_boundary_max_y = SEEY - 1;
 
     // So we can use constexpr array values
     const auto &san_sdir = sanitized_sound_direction_indexes;
-    
-    // Instead of repeatedly checking for properties on all sm tiles upwards of 9 time each, 
+
+    // Instead of repeatedly checking for properties on all sm tiles upwards of 9 time each,
     // just do it once for the whole submap and store the results as a uint8_t we decode later.
     // If we have a roof, + 1
     // If we have windblocking furniture, + 10
@@ -1033,39 +1040,41 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
     for( const auto &sp : submap_tiles() ) {
         auto &vars_tile = check_vars[sp.x()][sp.y()];
         // Every time we try to poll a nullptr level cache the map cries. And we dont want that, so dont.
-        if (!at_max_zlev){
+        if( !at_max_zlev ) {
             const auto &ap = abs_p + sp.raw();
             const auto &idx = above->idx( ap.x(), ap.y() );
-            if((above->floor_cache[idx]) > 0){
+            if( ( above->floor_cache[idx] ) > 0 ) {
                 vars_tile += 1;
             }
         }
         const auto &tile_furn = get_furn( sp ).obj();
-        if ( tile_furn.has_flag( "BLOCK_WIND" ) ){
+        if( tile_furn.has_flag( "BLOCK_WIND" ) ) {
             vars_tile += 10;
         }
         const auto &tile_ter = get_ter( sp ).obj();
-        if ( tile_ter.has_flag( "BLOCK_WIND" ) || tile_ter.has_flag( "CONNECT_TO_WALL" ) ){
+        if( tile_ter.has_flag( "BLOCK_WIND" ) || tile_ter.has_flag( "CONNECT_TO_WALL" ) ) {
             vars_tile += 100;
         }
         // If we are indoors, we dont get the default terrain sound attenuation.
-        if (!outside_cache[sp.x()][sp.y()]){
+        if( !outside_cache[sp.x()][sp.y()] ) {
             absorption_cache[sp.x()][sp.y()] = SOUND_ABSORPTION_OPEN_FIELD;
         }
     }
-    
+
     // If we are on the border of the submap, we CANNOT use an array of our adjacent submap points safely.
-    auto on_sm_border = [&](const point_sm_ms &sp) -> bool {
+    auto on_sm_border = [&]( const point_sm_ms & sp ) -> bool {
         return sp.x() == 0 || sp.x() == SEEX - 1 || sp.y() == 0 || sp.y() == SEEY - 1;
     };
 
-    auto out_of_submap = [&](const point_sm_ms &sp) -> bool {
-        return (sp.x() < 0) || (sp.x() > submap_boundary_max_x) || (sp.y() < 0) || (sp.y() > submap_boundary_max_y);
+    auto out_of_submap = [&]( const point_sm_ms & sp ) -> bool {
+        return ( sp.x() < 0 ) || ( sp.x() > submap_boundary_max_x ) || ( sp.y() < 0 ) || ( sp.y() > submap_boundary_max_y );
     };
 
-    auto check_if_in_submap = [&](const std::array<point_sm_ms,8> &adj_tiles, std::array<bool, 8> &in_submap ) -> void {
-        for (uint8_t i : san_sdir ) {
-            if (out_of_submap(adj_tiles[i]) ){
+    auto check_if_in_submap = [&]( const std::array<point_sm_ms, 8> &adj_tiles,
+    std::array<bool, 8> &in_submap ) -> void {
+        for( uint8_t i : san_sdir )
+        {
+            if( out_of_submap( adj_tiles[i] ) ) {
                 continue;
             }
             in_submap[i] = true;
@@ -1073,96 +1082,104 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
     };
 
     // Check which tiles may be out of bounds.
-    auto check_out_of_bounds = [&](const std::array<tripoint_bub_ms, 8> &adj_tiles, std::array<bool, 8> &out_of_bounds ) -> void {
-        for (uint8_t i : san_sdir){
+    auto check_out_of_bounds = [&]( const std::array<tripoint_bub_ms, 8> &adj_tiles,
+    std::array<bool, 8> &out_of_bounds ) -> void {
+        for( uint8_t i : san_sdir )
+        {
             const auto &tile = adj_tiles[i];
-            if (!m.inbounds(tile)){
+            if( !m.inbounds( tile ) ) {
                 out_of_bounds[i] = true;
             }
         }
     };
 
-    std::array<tripoint_bub_ms,8> tris_to_check;
+    std::array<tripoint_bub_ms, 8> tris_to_check;
     std::array<point_sm_ms, 8> points_to_check;
     std::array<bool, 8> point_valid = { {false, false, false, false, false, false, false, false} };
     std::array<bool, 8> roof_cover = { {false, false, false, false, false, false, false, false} };
     std::array<bool, 8> out_of_bounds = { {false, false, false, false, false, false, false, false} };
     std::array<bool, 8> in_submap = { {false, false, false, false, false, false, false, false} };
 
-    auto check_contiguous_roof = [&](const uint8_t &dir, const bool &OOB = false) -> bool {
+    auto check_contiguous_roof = [&]( const uint8_t &dir, const bool &OOB = false ) -> bool {
         const auto &indexes_to_check = roof_to_check_by_sdir[dir];
         // If we are checking an out of bounds tile, we dont check the first member of our roof cover.
         // We use the static constexpr values for our requests.
         // SDI_NW = 0, SDI_N = 1, SDI_NE = 2
-        if ( OOB ) {
+        if( OOB )
+        {
             return roof_cover[indexes_to_check[SDI_N]] && roof_cover[indexes_to_check[SDI_NE]];
-        } else {
-            return roof_cover[indexes_to_check[SDI_NW]] && roof_cover[indexes_to_check[SDI_N]] && roof_cover[indexes_to_check[SDI_NE]];
+        } else
+        {
+            return roof_cover[indexes_to_check[SDI_NW]] && roof_cover[indexes_to_check[SDI_N]] &&
+            roof_cover[indexes_to_check[SDI_NE]];
         }
     };
 
     // Dont call this at max Z, no tiles would be valid anyways.
-    auto pol_adjacent = [&](const point_sm_ms &sp) -> void {
+    auto pol_adjacent = [&]( const point_sm_ms & sp ) -> void {
         // Zero and update our arrays based upon the adjacent tiles to the provided submap tile.
         point_valid = { {false, false, false, false, false, false, false, false} };
         out_of_bounds = { {false, false, false, false, false, false, false, false} };
         in_submap = { {false, false, false, false, false, false, false, false} };
         roof_cover = { {false, false, false, false, false, false, false, false} };
-        points_to_check = get_adjacent_submap_points(sp);
+        points_to_check = get_adjacent_submap_points( sp );
         // Two cases, on the submap boundary, and inside the submap.
         // Our checkvars are already filled out, so the only things we might have to grab are from inbounds but out of submap tiles.
-        if (on_sm_border(sp)) {
+        if( on_sm_border( sp ) )
+        {
             // We are on the border of the submap. Lets first figure out which tiles are in our submap or are out of bounds.
             tris_to_check = get_adjacent_tripoints( sp, grid_pos );
-            check_out_of_bounds(tris_to_check, out_of_bounds);
-            check_if_in_submap(points_to_check, in_submap);
-            for (uint8_t i : san_sdir ) {
-                if ( !out_of_bounds[i] ) {
-                    if ( in_submap[i] ) {
+            check_out_of_bounds( tris_to_check, out_of_bounds );
+            check_if_in_submap( points_to_check, in_submap );
+            for( uint8_t i : san_sdir ) {
+                if( !out_of_bounds[i] ) {
+                    if( in_submap[i] ) {
                         const auto &adj_tile = points_to_check[i];
                         const auto &checkvars = check_vars[adj_tile.x()][adj_tile.y()];
-                        if ( checkvars == 0 ) {
+                        if( checkvars == 0 ) {
                             // Avoid any potential divide by zero errors.
                             continue;
                         } else {
                             // If our remainder is not zero we have a roof.
-                            roof_cover[i] = ((checkvars % 10) != 0);
-                            point_valid[i] = (checkvars > 10) && roof_cover[i];
+                            roof_cover[i] = ( ( checkvars % 10 ) != 0 );
+                            point_valid[i] = ( checkvars > 10 ) && roof_cover[i];
                         }
-                        
+
                     } else {
                         // We need to poll the map for our terrain and furniture in this case unfortunantly.
                         const auto &adj_tile = tris_to_check[i];
                         const auto &adj_furn = m.furn( adj_tile ).obj();
                         const auto &adj_terrain = m.ter( adj_tile ).obj();
                         const auto &idx = above->idx( adj_tile.x(), adj_tile.y() );
-                        roof_cover[i] = ( (above->floor_cache[idx]) > 0);
-                        point_valid[i] = ( roof_cover[i] && ( adj_furn.has_flag( "BLOCK_WIND" ) || adj_terrain.has_flag( "BLOCK_WIND" ) ||
-                                                adj_terrain.has_flag( "CONNECT_TO_WALL" ) ) );
+                        roof_cover[i] = ( ( above->floor_cache[idx] ) > 0 );
+                        point_valid[i] = ( roof_cover[i] && ( adj_furn.has_flag( "BLOCK_WIND" ) ||
+                                                              adj_terrain.has_flag( "BLOCK_WIND" ) ||
+                                                              adj_terrain.has_flag( "CONNECT_TO_WALL" ) ) );
                     }
                 }
             }
 
-        } else {
+        } else
+        {
             // We are fully inside our submap, so we can take things easy and just use the checkvars.
-            for (uint8_t i : san_sdir ) {
+            for( uint8_t i : san_sdir ) {
                 const auto &adj_tile = points_to_check[i];
                 const auto &checkvars = check_vars[adj_tile.x()][adj_tile.y()];
-                if ( checkvars == 0 ) {
+                if( checkvars == 0 ) {
                     // Avoid any potential divide by zero errors, points valid and roof cover set to false already.
                     continue;
                 } else {
                     // If our remainder is not zero we have a roof.
-                    roof_cover[i] = ((checkvars % 10) != 0);
-                    point_valid[i] = (checkvars > 10) && roof_cover[i];
+                    roof_cover[i] = ( ( checkvars % 10 ) != 0 );
+                    point_valid[i] = ( checkvars > 10 ) && roof_cover[i];
                 }
             }
-        } 
+        }
     };
 
     // We have our checkvars, so lets assign the right absorption and sound wall values to each tile.
     for( const auto &sp : submap_tiles() ) {
-        const tripoint_bub_ms btri = project_combine(grid_pos, sp);
+        const tripoint_bub_ms btri = project_combine( grid_pos, sp );
         // See if there is a vehicle in our given tripoint.
         // If there is, if there is a full board or a closed door, return thick barrier sound absorption.
         // We could technically run through checking adjacent tiles as we do below, but vehicles are dynamic and rechecking all of the vehicles tiles every turn would not provide enough benifit.
@@ -1179,13 +1196,14 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
         // like tent walls or sandbags, so they count as a barrier
         const auto &center_checkvar = check_vars[sp.x()][sp.y()];
 
-        const bool roof_above_center_tile = ( check_vars[sp.x()][sp.y()] == 0 ) ? false : ( (check_vars[sp.x()][sp.y()] % 10) != 0);
+        const bool roof_above_center_tile = ( check_vars[sp.x()][sp.y()] == 0 ) ? false : ( (
+                                                check_vars[sp.x()][sp.y()] % 10 ) != 0 );
         // Now lets take our easy outs
-        if ( !roof_above_center_tile || outside_cache[sp.x()][sp.y()] ) {
+        if( !roof_above_center_tile || outside_cache[sp.x()][sp.y()] ) {
             // If we are outside or have no roof, assign values and continue.
-            if (center_checkvar >= 100){
+            if( center_checkvar >= 100 ) {
                 absorption_cache[sp.x()][sp.y()] += SOUND_ABSORPTION_THICK_BARRIER;
-            } else if (center_checkvar == 10){
+            } else if( center_checkvar == 10 ) {
                 absorption_cache[sp.x()][sp.y()] += SOUND_ABSORPTION_BARRIER;
             }
             continue;
@@ -1195,12 +1213,12 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
         const bool blockswind = tile_ter.has_flag( "BLOCK_WIND" );
         // Alrighty, here we go. Queary the adjacent terrain to see if it blocks sound or connects to a wall.
         // Lets build out the bool indexes.
-        pol_adjacent(sp);
+        pol_adjacent( sp );
         // points to check and tris to check both follow this index direction scheme.
         // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
         // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
         // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
-        
+
         // We have a few valid conditions. For the terrain to provide its full sound absorption, it must have at least two directly (x/y, no diagonals) adjacent wind blocking or connect_to_wall buddies which must be roofed,
         // And all of the adjacent valid terrain features must have an adjacent rooved tile that is also adjacent to the center tile.
         // In effect, we are looking for solid lines, or L shapes. There will be some oddities with this, if it becomes a significant issue we can look into making it more granular.
@@ -1222,11 +1240,12 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
         // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
         // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
         // Lets step through our direction index and add buddies or invalidate based on adjacent roofing.
-        for ( uint8_t i : sanitized_sound_direction_indexes_cartesian ) {
-            if ( point_valid[i] ) {
+        for( uint8_t i : sanitized_sound_direction_indexes_cartesian ) {
+            if( point_valid[i] ) {
                 // This gives us the direction indexes to check for a roof or out of bounds.
                 const auto &r_dirs = wall_sdir_invalidation[i];
-                if ( roof_cover[r_dirs.first] || roof_cover[r_dirs.second] || out_of_bounds[r_dirs.first] || out_of_bounds[r_dirs.second] ) {
+                if( roof_cover[r_dirs.first] || roof_cover[r_dirs.second] || out_of_bounds[r_dirs.first] ||
+                    out_of_bounds[r_dirs.second] ) {
                     buddynumber++;
                 } else {
                     // If we have no adjacent roof or out of bound tiles, invalidate this point.
@@ -1237,11 +1256,11 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
         // Now we account for out of bounds tiles if they have an opposite wall.
         // Generally if a tile is out of bounds the tiles immediatly adjacent to it will also tend to be out of bounds
         // We only want to check walls on the cartesian directions
-        for ( uint8_t i : sanitized_sound_direction_indexes_cartesian ) {
-            if ( out_of_bounds[i] ) {
+        for( uint8_t i : sanitized_sound_direction_indexes_cartesian ) {
+            if( out_of_bounds[i] ) {
                 // This gives us the direction indexes to check for a roof or out of bounds.
                 const auto &opp_dir = opposite_tile_by_sdir[i];
-                if ( point_valid[opp_dir] ) {
+                if( point_valid[opp_dir] ) {
                     buddynumber++;
                 }
             }
@@ -1249,41 +1268,45 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
 
         // At one or zero buddies sound dampening is reduced.
         if( buddynumber < 2 ) {
-            if ( buddynumber == 0 ){
-                if ( blockswind ) {
+            if( buddynumber == 0 ) {
+                if( blockswind ) {
                     absorption_cache[sp.x()][sp.y()] += SOUND_ABSORPTION_BARRIER;
                 }
                 continue;
             } else {
-                absorption_cache[sp.x()][sp.y()] += (blockswind) ? (SOUND_ABSORPTION_THICK_BARRIER) : SOUND_ABSORPTION_BARRIER;
+                absorption_cache[sp.x()][sp.y()] += ( blockswind ) ? ( SOUND_ABSORPTION_THICK_BARRIER ) :
+                                                    SOUND_ABSORPTION_BARRIER;
                 sound_wall_cache[sp.x()][sp.y()] = blockswind;
                 continue;
             }
-        } else if ( buddynumber >= 3 ) {
+        } else if( buddynumber >= 3 ) {
             // If a tile does not block wind it is likely something like a open door or window.
-            absorption_cache[sp.x()][sp.y()] += (blockswind) ? SOUND_ABSORPTION_WALL : SOUND_ABSORPTION_BARRIER;
+            absorption_cache[sp.x()][sp.y()] += ( blockswind ) ? SOUND_ABSORPTION_WALL :
+                                                SOUND_ABSORPTION_BARRIER;
             // If we have a windblocking tile, declare it a sound wall.
             sound_wall_cache[sp.x()][sp.y()] = blockswind;
             continue;
         }
         // At this point we have explicitly two buddies. We need to check for straight walls and corners.
         else {
-            for ( uint8_t i : sanitized_sound_direction_indexes_cartesian ) {
-                if ( point_valid[i] ) {
+            for( uint8_t i : sanitized_sound_direction_indexes_cartesian ) {
+                if( point_valid[i] ) {
                     // This gives us the direction indexes to check for a roof or out of bounds.
                     const auto &opp_dir = opposite_tile_by_sdir[i];
-                    if ( point_valid[opp_dir] || out_of_bounds[opp_dir] ) {
+                    if( point_valid[opp_dir] || out_of_bounds[opp_dir] ) {
                         // We have a potential straight wall. Lets see if we have a contiguous roof.
-                        if ( point_valid[opp_dir] ) {
-                            if (check_contiguous_roof(i) || check_contiguous_roof(opp_dir)) {
-                                absorption_cache[sp.x()][sp.y()] += (blockswind) ? SOUND_ABSORPTION_WALL : SOUND_ABSORPTION_BARRIER;
+                        if( point_valid[opp_dir] ) {
+                            if( check_contiguous_roof( i ) || check_contiguous_roof( opp_dir ) ) {
+                                absorption_cache[sp.x()][sp.y()] += ( blockswind ) ? SOUND_ABSORPTION_WALL :
+                                                                    SOUND_ABSORPTION_BARRIER;
                                 sound_wall_cache[sp.x()][sp.y()] = blockswind;
                                 continue;
                             }
-                        } else if ( out_of_bounds[opp_dir] ) {
+                        } else if( out_of_bounds[opp_dir] ) {
                             // If the far tile is out of bounds, we only care about the near and middle roof
-                            if (check_contiguous_roof(i,true) || check_contiguous_roof(opp_dir,true)){
-                                absorption_cache[sp.x()][sp.y()] += (blockswind) ? SOUND_ABSORPTION_WALL : SOUND_ABSORPTION_BARRIER;
+                            if( check_contiguous_roof( i, true ) || check_contiguous_roof( opp_dir, true ) ) {
+                                absorption_cache[sp.x()][sp.y()] += ( blockswind ) ? SOUND_ABSORPTION_WALL :
+                                                                    SOUND_ABSORPTION_BARRIER;
                                 sound_wall_cache[sp.x()][sp.y()] = blockswind;
                                 continue;
                             }
@@ -1294,15 +1317,17 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
                     const auto &clockwise_wall = point_valid[wall_check_by_sdirection[i].second];
                     const auto &cclockwise_roof = roof_cover[wall_sdir_invalidation[i].first];
                     const auto &clockwise_roof = roof_cover[wall_sdir_invalidation[i].second];
-                    if ( (cclockwise_wall && cclockwise_roof) || (clockwise_wall && clockwise_roof) ) {
-                        absorption_cache[sp.x()][sp.y()] += (blockswind) ? SOUND_ABSORPTION_WALL : SOUND_ABSORPTION_BARRIER;
+                    if( ( cclockwise_wall && cclockwise_roof ) || ( clockwise_wall && clockwise_roof ) ) {
+                        absorption_cache[sp.x()][sp.y()] += ( blockswind ) ? SOUND_ABSORPTION_WALL :
+                                                            SOUND_ABSORPTION_BARRIER;
                         sound_wall_cache[sp.x()][sp.y()] = blockswind;
                         continue;
                     }
                 }
             }
             // At this point we have run through all our possible valid outcomes.
-            absorption_cache[sp.x()][sp.y()] += (blockswind) ? SOUND_ABSORPTION_THICK_BARRIER : SOUND_ABSORPTION_BARRIER;
+            absorption_cache[sp.x()][sp.y()] += ( blockswind ) ? SOUND_ABSORPTION_THICK_BARRIER :
+                                                SOUND_ABSORPTION_BARRIER;
             sound_wall_cache[sp.x()][sp.y()] = blockswind;
             continue;
         }
@@ -1363,15 +1388,15 @@ bool map::build_absorption_cache( const int zlev )
                 }
                 continue;
             }
-            
+
             if( !rebuild_all && !map_cache.absorption_cache_dirty.test(
                     static_cast<size_t>( map_cache.bidx( smx, smy ) ) ) ) {
                 continue;
             }
             cur_submap->absorption_dirty = true;
-            cur_submap->rebuild_absorption_cache(*this, tripoint_bub_sm( smx, smy, zlev ) );
+            cur_submap->rebuild_absorption_cache( *this, tripoint_bub_sm( smx, smy, zlev ) );
 
-            
+
 
             if( cur_submap->is_uniform ) {
                 const short value = cur_submap->absorption_cache[0][0];
@@ -1484,18 +1509,19 @@ void sounds::sound( const sound_event &soundevent )
 {
     // Make sure our sound came from a valid inbounds location.
     auto &map = get_map();
-    if (map.inbounds(soundevent.origin)){
-        debugmsg( "Sound with description [ %1s ] attempted to propagate from out of bounds location %i:%i!", soundevent.description ,soundevent.origin.x(),
+    if( map.inbounds( soundevent.origin ) ) {
+        debugmsg( "Sound with description [ %1s ] attempted to propagate from out of bounds location %i:%i!",
+                  soundevent.description, soundevent.origin.x(),
                   soundevent.origin.y() );
         return;
     }
-    
+
     // Error out if volume is negative, or bail out if volume is less than 16dB.
     // There are not anechoic chambers in game, so actually hearing such sounds after even 1 tile of distance (16dB -> 10dB 1 tile away) is very unlikely for the vast majority of creatures.
     // A good threshold for sounds that should only really be faintly audible to the player in a quiet room is 20dB.
     // Most sounds intended to be quiet but still audible to the player, and maybe to creatures very close, is 35-45dB.
     // Ambient volume minimum is usually between 35 and 55dB in game. A player with normal hearing can notice sounds 20dB below ambient.
-    
+
     if( soundevent.volume < 16 ) {
 
         add_msg( m_debug,
@@ -1504,14 +1530,14 @@ void sounds::sound( const sound_event &soundevent )
                  soundevent.volume );
 
         return;
-    } 
-        // Reduction in size of the flood filled area and filtered list for monster checking allows us to have more permissive flood fill restrictions.
-        //else if( temp_sound_event.volume < ( ( temp_sound_event.origin.z() < 0 ) ? mdBspl_to_dBspl(
-        //    AMBIENT_VOLUME_UNDERGROUND ) : mdBspl_to_dBspl( AMBIENT_VOLUME_ABOVEGROUND ) +
-        //                                   get_weather().weather_id->sound_attn ) - 19 ) {
-        // Dont propagate sounds that are too quiet to be heard.
-        //return;
-        //} 
+    }
+    // Reduction in size of the flood filled area and filtered list for monster checking allows us to have more permissive flood fill restrictions.
+    //else if( temp_sound_event.volume < ( ( temp_sound_event.origin.z() < 0 ) ? mdBspl_to_dBspl(
+    //    AMBIENT_VOLUME_UNDERGROUND ) : mdBspl_to_dBspl( AMBIENT_VOLUME_ABOVEGROUND ) +
+    //                                   get_weather().weather_id->sound_attn ) - 19 ) {
+    // Dont propagate sounds that are too quiet to be heard.
+    //return;
+    //}
     else if( soundevent.volume > mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ) ) {
         add_msg( m_debug,
                  _( "Sound with description [ %1s ] at %i:%i attempted to propagate with a volume of %i dB which is louder than possible in atmosphere!" ),
@@ -1533,7 +1559,7 @@ void sounds::sound( const sound_event &soundevent )
         return;
     }
     sound_event temp_sound_event = soundevent;
-    
+
 
     // Maximum possible sound pressure level in atmosphere is 191 dB, cap our volume for sanity.
     // Sound volumes above 191dB are not sound pressure waves, they are supersonic blast/shock waves and should be modeled as damaging explosions.
@@ -1699,14 +1725,15 @@ void sounds::process_sounds()
         // We assume that we dont have a direct line of sight so we actually check for floors and walls.
         const short alt_adjust = vol_z_adjust( s_origin, s_origin, false, true );
         if( ( ( sound.sound.volume ) - alt_adjust ) >= 110 ) {
-            const auto abs_omt = project_to<coords::omt>(bub_to_abs(s_origin) );
+            const auto abs_omt = project_to<coords::omt>( bub_to_abs( s_origin ) );
             const short default_terrain_absorption = terrain_sound_attenuation( abs_omt, season, true );
 
             const int sig_power = get_signal_for_hordes( sound.sound, ground_ambient_vol,
                                   default_terrain_absorption,
                                   alt_adjust );
             if( sig_power > 0 ) {
-                get_overmapbuffer( get_avatar().get_dimension() ).signal_hordes(  project_to<coords::sm>(bub_to_abs(s_origin)), sig_power );
+                get_overmapbuffer( get_avatar().get_dimension() ).signal_hordes( project_to<coords::sm>( bub_to_abs(
+                            s_origin ) ), sig_power );
 
             }
         }
@@ -2155,8 +2182,8 @@ void sounds::process_sound_markers( Character *who )
     const bool pcunderground = loc.z() < 0;
     const bool pcoutdoors = map.is_outside( loc.xy() );
     const weather_manager &weather = get_weather();
-    const short player_t_absorp = level_cache.absorption_cache[level_cache.idx(loc.x(),loc.y())];
-    const bool  player_indoors = !level_cache.outside_cache[level_cache.idx(loc.x(),loc.y())];
+    const short player_t_absorp = level_cache.absorption_cache[level_cache.idx( loc.x(), loc.y() )];
+    const bool  player_indoors = !level_cache.outside_cache[level_cache.idx( loc.x(), loc.y() )];
 
     // Ambient underground is 20dB, ambient in a above ground building is 40. The assumption is that there are zombies making noise, and its not perfectly dead quiet.
     // Weather sound attenuation ranges from 0 - 8. We add this to existing ambient if applicable to approximate the sound of rain, snow, etc.
@@ -2351,7 +2378,8 @@ void sounds::process_sound_markers( Character *who )
             const std::string &sfx_id = element.sound.id;
             const std::string &sfx_variant = element.sound.variant;
             if( !sfx_id.empty() ) {
-                sfx::play_variant_sound( sfx_id, sfx_variant, sfx::get_heard_volume( element.sound.origin, element.sound.volume ) );
+                sfx::play_variant_sound( sfx_id, sfx_variant, sfx::get_heard_volume( element.sound.origin,
+                                         element.sound.volume ) );
             }
 
             // Place footstep markers.
@@ -2606,24 +2634,29 @@ void sfx::do_vehicle_exterior_engine_sfx()
     vehicle *veh = nullptr;
 
 
-    const short t_absorp_player = map.get_cache_ref(ploc.z()).absorption_cache[map.get_cache_ref(ploc.z()).idx(ploc.x(),ploc.y())];
+    const short t_absorp_player = map.get_cache_ref( ploc.z() ).absorption_cache[map.get_cache_ref(
+                                      ploc.z() ).idx( ploc.x(), ploc.y() )];
 
     for( wrapped_vehicle vehicle : vehs ) {
-        if(vehicle.v->vehicle_noise > 0){
+        if( vehicle.v->vehicle_noise > 0 ) {
             const auto &veh_loc = vehicle.v->bub_ms_location();
             // This is a jank fix to get vehicles to not be deafening from accross the map.
-            const int dist = rl_dist(ploc, veh_loc);
-            const short unadjusted_vol = std::min(MAXIMUM_VOLUME_ATMOSPHERE,dBspl_to_mdBspl(static_cast<short>(vehicle.v->vehicle_noise)));
-            const auto &veh_idx = map.get_cache_ref(veh_loc.z()).idx(veh_loc.x(), veh_loc.y());
-            const auto &t_absorp_avg = static_cast<short>(std::round((t_absorp_player + (map.get_cache_ref(veh_loc.z()).absorption_cache[veh_idx]))/2));
-            const short adjusted_vol = mdBspl_to_dBspl(std::max(0,unadjusted_vol - get_cumulative_vol_dist_loss(1, dist, t_absorp_avg) - vol_z_adjust(veh_loc, ploc,player_character.sees(veh_loc))));
-            if( adjusted_vol > noise_factor) {
+            const int dist = rl_dist( ploc, veh_loc );
+            const short unadjusted_vol = std::min( MAXIMUM_VOLUME_ATMOSPHERE,
+                                                   dBspl_to_mdBspl( static_cast<short>( vehicle.v->vehicle_noise ) ) );
+            const auto &veh_idx = map.get_cache_ref( veh_loc.z() ).idx( veh_loc.x(), veh_loc.y() );
+            const auto &t_absorp_avg = static_cast<short>( std::round( ( t_absorp_player + ( map.get_cache_ref(
+                                           veh_loc.z() ).absorption_cache[veh_idx] ) ) / 2 ) );
+            const short adjusted_vol = mdBspl_to_dBspl( std::max( 0,
+                                       unadjusted_vol - get_cumulative_vol_dist_loss( 1, dist, t_absorp_avg ) - vol_z_adjust( veh_loc,
+                                               ploc, player_character.sees( veh_loc ) ) ) );
+            if( adjusted_vol > noise_factor ) {
 
                 noise_factor = adjusted_vol;
                 veh = vehicle.v;
             }
         }
-        
+
     }
     if( !noise_factor || !veh ) {
         fade_audio_channel( ch, 300 );
@@ -2631,7 +2664,8 @@ void sfx::do_vehicle_exterior_engine_sfx()
         return;
     }
     // we only want volume going from 0 - 100. Our dB level goes from 0 - 191, but we want to hit the top of our range near 120.
-    vol = static_cast<unsigned char>( (noise_factor >= 120)? 100 : (noise_factor > 90)? std::round(noise_factor * 0.8) : noise_factor );
+    vol = static_cast<unsigned char>( ( noise_factor >= 120 ) ? 100 : ( noise_factor > 90 ) ?
+                                      std::round( noise_factor * 0.8 ) : noise_factor );
     std::pair<std::string, std::string> id_and_variant;
 
     for( size_t e = 0; e < veh->engines.size(); ++e ) {
@@ -2694,7 +2728,7 @@ void sfx::do_ambient()
     const bool is_deaf = player_character.is_deaf();
     // If the source is the player avatar, our ambient volume is returned as 100 * g_sfx_volume_multiplier anyways.
     // const int heard_volume = get_heard_volume( player_character.bub_pos(), 100 );
-    const int heard_volume = std::ceil(100 * g_sfx_volume_multiplier);
+    const int heard_volume = std::ceil( 100 * g_sfx_volume_multiplier );
     const bool is_underground = player_character.bub_pos().z() < 0;
     const bool is_sheltered = g->is_sheltered( player_character.bub_pos() );
     const bool weather_changed = get_weather().weather_id != previous_weather;
@@ -2791,7 +2825,8 @@ void sfx::do_ambient()
 
 // firing is the item that is fired. It may be the wielded gun, but it can also be an attached
 // gunmod.
-void sfx::generate_gun_sound( const tripoint_bub_ms &source, const item &firing, const short &origin_vol )
+void sfx::generate_gun_sound( const tripoint_bub_ms &source, const item &firing,
+                              const short &origin_vol )
 {
     if( test_mode ) {
         return;
@@ -2894,7 +2929,7 @@ sfx::sound_thread::sound_thread( const tripoint_bub_ms &source, const tripoint_b
     // Take melee strikes at 80dB
     const player *p = g->critter_at<npc>( source );
     const int heard_volume = get_heard_volume( source, 80 );
-    
+
     if( !p ) {
         p = &g->u;
         // sound comes from the same place as the player is, calculation of angle wouldn't work
@@ -3422,16 +3457,17 @@ void sfx::do_obstacle( const std::string & ) { }
 #endif // if defined(SDL_SOUND)
 
 /** Functions from sfx that do not use the SDL_mixer API at all. They can be used in builds
-  * without sound support. 
+  * without sound support.
   * @param source: bubble tripoint of the source of the sound.
   * @param origin_volume: Volume at the origin in dB spl. The originating sound even should have a origin volume in dB that can be converted from.
   * @param in_mdB: Was the origin volume supplied in mdB spl instead of dB spl?
   */
 /*@{*/
-int sfx::get_heard_volume( const tripoint_bub_ms &source, const short &origin_volume, const bool &in_mdB)
+int sfx::get_heard_volume( const tripoint_bub_ms &source, const short &origin_volume,
+                           const bool &in_mdB )
 {
     // Dont play any sfx if a sound is out of bounds or if it has no volume.
-    if (!get_map().inbounds(source) || origin_volume == 0){
+    if( !get_map().inbounds( source ) || origin_volume == 0 ) {
         return 0;
     }
     if( source == get_avatar().bub_pos() ) {
@@ -3439,22 +3475,24 @@ int sfx::get_heard_volume( const tripoint_bub_ms &source, const short &origin_vo
     }
     const int distance = rl_dist( get_avatar().bub_pos(), source );
     const auto &ploc = get_avatar().bub_pos();
-    const auto &lev_cache = get_map().get_cache_ref(ploc.z());
+    const auto &lev_cache = get_map().get_cache_ref( ploc.z() );
     const auto &absorp_cache = lev_cache.absorption_cache;
-    const auto &avg_t_absorp = static_cast<short>(std::round(0.5 * (absorp_cache[lev_cache.idx(ploc.x(), ploc.y())] + absorp_cache[lev_cache.idx(source.x(),source.y())])));
-    const auto &o_vol = (in_mdB) ? origin_volume : dBspl_to_mdBspl(origin_volume);
+    const auto &avg_t_absorp = static_cast<short>( std::round( 0.5 * ( absorp_cache[lev_cache.idx(
+                                   ploc.x(), ploc.y() )] + absorp_cache[lev_cache.idx( source.x(), source.y() )] ) ) );
+    const auto &o_vol = ( in_mdB ) ? origin_volume : dBspl_to_mdBspl( origin_volume );
     // We are currently working in mdB spl. We will need to convert this to our sfx volume, which is 0 - 100.
-    int heard_volume = std::max(0, o_vol - get_cumulative_vol_dist_loss(1, distance, avg_t_absorp) - vol_z_adjust(source,ploc, get_avatar().sees(source)));
+    int heard_volume = std::max( 0, o_vol - get_cumulative_vol_dist_loss( 1, distance,
+                                 avg_t_absorp ) - vol_z_adjust( source, ploc, get_avatar().sees( source ) ) );
     // Return 0 if we were too far to hear it to avoid a divide by zero error.
-    if (heard_volume == 0){
+    if( heard_volume == 0 ) {
         return 0;
     }
     // We need to scale our sfx volume output based upon the ratio of the heard sound to its origin volume
     // If a sound is supposed to be played at 100 sfx vol at 60dB, if we hear it at 54dB we want to hear it at close to 90 sfx vol
     // But if a sound is supposed to play at 100sfx vol at 180dB, if we hear it at 60dB we should be hearing it at a sfx vol of ~33
-    const float vol_ratio = (static_cast<float>(o_vol) / heard_volume);
+    const float vol_ratio = ( static_cast<float>( o_vol ) / heard_volume );
     // Convert our volume and bound it to 1-100. It was loud enough to be heard, but our conversions might round it to 0 and we want it to be played.
-    heard_volume = std::min(100,std::max(1,static_cast<int>(std::round(100 * vol_ratio))));
+    heard_volume = std::min( 100, std::max( 1, static_cast<int>( std::round( 100 * vol_ratio ) ) ) );
     heard_volume *= g_sfx_volume_multiplier;
     return ( heard_volume );
 }

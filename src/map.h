@@ -495,20 +495,22 @@ struct sound_instance_cache {
 
     // Returns the corresponding flood envelope volume index provided a bubble point.
     auto p_to_env_index( const point_bub_ms &p ) const -> int { return ( ( p.x() - offset_x ) * ( 2 * flood_radius ) + ( p.y() - offset_y ) ); }
-    // Returns the corresponding flood envelope volume index provided a bubble tripoint. 
-    auto p_to_env_index(const tripoint_bub_ms &p ) const -> int { return ( ( p.x() - offset_x ) * ( 2 * flood_radius ) + ( p.y() - offset_y ) ); }
+    // Returns the corresponding flood envelope volume index provided a bubble tripoint.
+    auto p_to_env_index( const tripoint_bub_ms &p ) const -> int { return ( ( p.x() - offset_x ) * ( 2 * flood_radius ) + ( p.y() - offset_y ) ); }
 
-    // Returns true if a given bubble tripoint is inside our envelope. 
+    // Returns true if a given bubble tripoint is inside our envelope.
     // X and Y offsets taken from our index point, the bottom left corner of our envelope.
     bool in_envelope( const tripoint_bub_ms &tp ) const {
         return ( tp.x() - offset_x ) >= 0 && ( tp.y() - offset_y ) >= 0 &&
-               ( tp.x() - offset_x ) <= ( flood_radius * 2 ) && ( tp.y() - offset_y ) <= ( flood_radius * 2 ); }
-    // Returns true if a given bubble point is inside our envelope. 
+               ( tp.x() - offset_x ) <= ( flood_radius * 2 ) && ( tp.y() - offset_y ) <= ( flood_radius * 2 );
+    }
+    // Returns true if a given bubble point is inside our envelope.
     // X and Y offsets taken from our index point, the bottom left corner of our envelope.
     bool in_envelope( const point_bub_ms &tp ) const {
         return ( tp.x() - offset_x ) >= 0 && ( tp.y() - offset_y ) >= 0 &&
-               ( tp.x() - offset_x ) <= ( flood_radius * 2 ) && ( tp.y() - offset_y ) <= ( flood_radius * 2 ); }
-    
+               ( tp.x() - offset_x ) <= ( flood_radius * 2 ) && ( tp.y() - offset_y ) <= ( flood_radius * 2 );
+    }
+
     // Returns true if a given point is on the border of the flood envelope.
     bool on_envelope_border( const point_bub_ms &p ) const {
         return ( p.x() - offset_x ) == 0 || ( p.x() - offset_x ) == ( flood_radius * 2 ) ||
@@ -2166,7 +2168,7 @@ class map : public submap_load_listener
         point_bub_ms abs_to_bub( const point_abs_ms &abs ) const { return point_bub_ms( ( abs - project_to<coords::ms>( abs_sub ).xy() ).raw() ); }
         point_abs_sm bub_to_abs( const point_bub_sm &bub ) const { return abs_sub.xy() + point_rel_sm( bub.raw() ); }
         point_bub_sm abs_to_bub( const point_abs_sm &abs ) const { return ( abs - abs_sub.raw().xy() ).reinterpret_as<point_bub_sm>(); }
-        /** Returns true if bubble point p resides along the border of the reality bubble. 
+        /** Returns true if bubble point p resides along the border of the reality bubble.
         */
         bool on_bubble_border( const point_bub_ms &p ) const;
 
@@ -2181,8 +2183,8 @@ class map : public submap_load_listener
         bool inbounds( const tripoint_abs_ms &p ) const {
             return inbounds( project_to<coords::sm>( p ) );
         }
-        bool inbounds(const point_bub_sm &p ) const;
-        bool inbounds(const point_bub_ms &p ) const {
+        bool inbounds( const point_bub_sm &p ) const;
+        bool inbounds( const point_bub_ms &p ) const {
             return inbounds( project_to<coords::sm>( p ) );
         }
 

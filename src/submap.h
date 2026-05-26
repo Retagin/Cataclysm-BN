@@ -324,7 +324,7 @@ class submap : maptile_soa<SEEX, SEEY>
         bool floor_dirty        = true;
         bool pf_dirty           = true;
         bool absorption_dirty   = true;
-        
+
         // Since we rebuild the sound_wall_cache at the same time as the absorption cache, we dont need this.
         // bool sound_wall_dirty   = true;
 
