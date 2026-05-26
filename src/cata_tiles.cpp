@@ -65,7 +65,6 @@
 #include "overlay_ordering.h"
 #include "overmap_location.h"
 #include "path_info.h"
-#include "path_utils.h"
 #include "pixel_minimap.h"
 #include "player.h"
 #include "rect_range.h"
@@ -269,6 +268,7 @@ struct tile_render_info {
     tripoint_bub_ms pos;
     // accumulator for 3d tallness of sprites rendered here so far;
     int height_3d = 0;
+    int screen_row = 0;
     lit_level ll;
     bool invisible[5];
     tile_render_info( const tripoint_bub_ms &pos, const int height_3d, const lit_level ll,
@@ -427,11 +427,11 @@ void cata_tiles::reinit()
     RenderClear( renderer );
 }
 
-static void get_tile_information( const fs::path &config_path, fs::path &json_path,
-                                  fs::path &tileset_path )
+static void get_tile_information( const std::string &config_path, std::string &json_path,
+                                  std::string &tileset_path )
 {
-    const auto default_json = PATH_INFO::defaulttilejson();
-    const auto default_tileset = PATH_INFO::defaulttilepng();
+    const std::string default_json = PATH_INFO::defaulttilejson();
+    const std::string default_tileset = PATH_INFO::defaulttilepng();
 
     // Get JSON and TILESET vars from config
     const auto reader = [&]( std::istream & fin ) {
@@ -446,12 +446,10 @@ static void get_tile_information( const fs::path &config_path, fs::path &json_pa
                 getline( fin, sOption );
             } else if( sOption.find( "JSON" ) != std::string::npos ) {
                 fin >> json_path;
-                dbg( DL::Info ) << "JSON path set to [" <<
-                                cata_files::path_to_generic_utf8( json_path ) << "].";
+                dbg( DL::Info ) << "JSON path set to [" << json_path << "].";
             } else if( sOption.find( "TILESET" ) != std::string::npos ) {
                 fin >> tileset_path;
-                dbg( DL::Info ) << "TILESET path set to [" <<
-                                cata_files::path_to_generic_utf8( tileset_path ) << "].";
+                dbg( DL::Info ) << "TILESET path set to [" << tileset_path << "].";
             } else {
                 getline( fin, sOption );
             }
@@ -465,13 +463,11 @@ static void get_tile_information( const fs::path &config_path, fs::path &json_pa
 
     if( json_path.empty() ) {
         json_path = default_json;
-        dbg( DL::Info ) << "JSON set to default [" <<
-                        cata_files::path_to_generic_utf8( json_path ) << "].";
+        dbg( DL::Info ) << "JSON set to default [" << json_path << "].";
     }
     if( tileset_path.empty() ) {
         tileset_path = default_tileset;
-        dbg( DL::Info ) << "TILESET set to default [" <<
-                        cata_files::path_to_generic_utf8( tileset_path ) << "].";
+        dbg( DL::Info ) << "TILESET set to default [" << tileset_path << "].";
     }
 }
 
@@ -1778,10 +1774,9 @@ static void extend_vector_by( std::vector<T> &vec, const size_t additional_size 
     vec.resize( vec.size() + additional_size );
 }
 
-void tileset_loader::load_tileset( const fs::path &img_path, const bool pump_events )
+void tileset_loader::load_tileset( const std::string &img_path, const bool pump_events )
 {
-    const auto img_path_string = cata_files::path_to_generic_utf8( img_path );
-    const SDL_Surface_Ptr tile_atlas = load_image( img_path_string.c_str() );
+    const SDL_Surface_Ptr tile_atlas = load_image( img_path.c_str() );
     assert( tile_atlas );
     tile_atlas_width = tile_atlas->w;
 
@@ -2123,15 +2118,16 @@ std::optional<tile_search_result> cata_tiles::tile_type_search( const tile_searc
 void tileset_loader::load( const std::string &tileset_id, const bool precheck,
                            const bool pump_events )
 {
-    auto json_conf = fs::path{};
-    auto tileset_path = fs::path{};
-    auto tileset_root = fs::path{};
+    std::string json_conf;
+    std::string tileset_path;
+    std::string tileset_root;
 
     const auto tset_iter = TILESETS.find( tileset_id );
     if( tset_iter != TILESETS.end() ) {
         tileset_root = tset_iter->second;
         dbg( DL::Info ) << '"' << tileset_id << '"' << " tileset: found config file path: " << tileset_root;
-        get_tile_information( tileset_root / PATH_INFO::tileset_conf(), json_conf, tileset_path );
+        get_tile_information( tileset_root + '/' + PATH_INFO::tileset_conf(),
+                              json_conf, tileset_path );
         dbg( DL::Info ) << "Current tileset is: " << tileset_id;
     } else {
         dbg( DL::Error ) << "Tileset \"" << tileset_id << "\" from options is invalid";
@@ -2139,16 +2135,14 @@ void tileset_loader::load( const std::string &tileset_id, const bool precheck,
         tileset_path = PATH_INFO::defaulttilepng();
     }
 
-    auto json_path = tileset_root / json_conf;
-    const auto img_path = tileset_root / tileset_path;
+    std::string json_path = tileset_root + '/' + json_conf;
+    std::string img_path = tileset_root + '/' + tileset_path;
 
-    dbg( DL::Info ) << "Attempting to Load JSON file " <<
-                    cata_files::path_to_generic_utf8( json_path );
-    std::ifstream config_file( json_path, std::ifstream::in | std::ifstream::binary );
+    dbg( DL::Info ) << "Attempting to Load JSON file " << json_path;
+    std::ifstream config_file( json_path.c_str(), std::ifstream::in | std::ifstream::binary );
 
     if( !config_file.good() ) {
-        throw std::runtime_error( std::string( "Failed to open tile info json: " ) +
-                                  cata_files::path_to_generic_utf8( json_path ) );
+        throw std::runtime_error( std::string( "Failed to open tile info json: " ) + json_path );
     }
 
     JsonIn config_json( config_file );
@@ -2191,17 +2185,14 @@ void tileset_loader::load( const std::string &tileset_id, const bool precheck,
         json_path = mts.get_full_path();
 
         if( !mts.is_compatible( tileset_id ) ) {
-            dbg( DL::Info ) << "Mod tileset in \"" << cata_files::path_to_generic_utf8( json_path )
-                            << "\" is not compatible.";
+            dbg( DL::Info ) << "Mod tileset in \"" << json_path << "\" is not compatible.";
             continue;
         }
-        dbg( DL::Info ) << "Attempting to Load JSON file " <<
-                        cata_files::path_to_generic_utf8( json_path );
-        std::ifstream mod_config_file( json_path, std::ifstream::in | std::ifstream::binary );
+        dbg( DL::Info ) << "Attempting to Load JSON file " << json_path;
+        std::ifstream mod_config_file( json_path.c_str(), std::ifstream::in | std::ifstream::binary );
 
         if( !mod_config_file.good() ) {
-            throw std::runtime_error( std::string( "Failed to open tile info json: " ) +
-                                      cata_files::path_to_generic_utf8( json_path ) );
+            throw std::runtime_error( std::string( "Failed to open tile info json: " ) + json_path );
         }
 
         JsonIn mod_config_json( mod_config_file );
@@ -2264,15 +2255,15 @@ void tileset_loader::load( const std::string &tileset_id, const bool precheck,
 #endif
 }
 
-void tileset_loader::load_internal( const JsonObject &config, const fs::path &tileset_root,
-                                    const fs::path &img_path, const bool pump_events )
+void tileset_loader::load_internal( const JsonObject &config, const std::string &tileset_root,
+                                    const std::string &img_path, const bool pump_events )
 {
     if( config.has_array( "tiles-new" ) ) {
         // new system, several entries
         // When loading multiple tileset images this defines where
         // the tiles from the most recently loaded image start from.
         for( const JsonObject &tile_part_def : config.get_array( "tiles-new" ) ) {
-            const auto tileset_image_path = tileset_root / tile_part_def.get_string( "file" );
+            const std::string tileset_image_path = tileset_root + '/' + tile_part_def.get_string( "file" );
             R = -1;
             G = -1;
             B = -1;
@@ -2338,8 +2329,7 @@ void tileset_loader::load_internal( const JsonObject &config, const fs::path &ti
         R = -1;
         G = -1;
         B = -1;
-        dbg( DL::Info ) << "Attempting to Load Tileset file " <<
-                        cata_files::path_to_generic_utf8( img_path );
+        dbg( DL::Info ) << "Attempting to Load Tileset file " << img_path;
         load_tileset( img_path, pump_events );
         load_tilejson_from_file( config );
         offset = size;
@@ -3148,10 +3138,10 @@ void cata_tiles::draw( point dest, const tripoint_bub_ms &center, int width, int
 
     std::vector<tile_render_info> &draw_points = *draw_points_cache;
     int min_z = OVERMAP_HEIGHT;
+    draw_points.clear();
 
     for( int row = min_row; row < max_row; row ++ ) {
 
-        draw_points.clear();
         for( int col = min_col; col < max_col; col ++ ) {
             int temp_x;
             int temp_y;
@@ -3333,6 +3323,25 @@ void cata_tiles::draw( point dest, const tripoint_bub_ms &center, int width, int
             bool had_visible_open_air = false;
             const int &x = temp_x;
             const int &y = temp_y;
+            const auto queue_draw_point = [&]( tile_render_info info ) {
+                info.screen_row = row;
+                draw_points.push_back( info );
+            };
+            const auto seen_through_air_light = [&]( const tripoint_bub_ms & pos ) {
+                const auto &light_cache = here.access_cache( pos.z() );
+                if( light_cache.inbounds( pos.xy() ) &&
+                    light_cache.sm[light_cache.idx( pos.x(), pos.y() )] > 0.0f ) {
+                    return lit_level::BRIGHT;
+                }
+                const auto light = here.ambient_light_at( pos );
+                if( light > LIGHT_SOURCE_BRIGHT ) {
+                    return lit_level::BRIGHT;
+                }
+                if( light > LIGHT_AMBIENT_LIT ) {
+                    return lit_level::LIT;
+                }
+                return lit_level::LOW;
+            };
 
             const bool in_vis_bounds = ( y >= min_visible_y && y <= max_visible_y && x >= min_visible_x &&
                                          x <= max_visible_x );
@@ -3359,7 +3368,8 @@ void cata_tiles::draw( point dest, const tripoint_bub_ms &center, int width, int
                             had_visible_open_air = true;
                         }
                     } else if( !has_memory && z < center.z() &&
-                               visibility == visibility_type::VIS_HIDDEN ) {
+                               visibility == visibility_type::VIS_HIDDEN &&
+                               !( fov_3d && had_visible_open_air && z < center.z() - fov_3d_z_range ) ) {
                         if( !drew_occluded_overlay ) {
                             drew_occluded_overlay = true;
                             // Draw a depth-faded semi-transparent overlay for the topmost occluded tile.
@@ -3395,12 +3405,16 @@ void cata_tiles::draw( point dest, const tripoint_bub_ms &center, int width, int
 
                     const auto height_3d = ( pos.z() - center.z() ) * tileset_ptr->get_zlevel_height();
 
+                    const auto render_seen_through_air = fov_3d && had_visible_open_air && in_map_bounds &&
+                                                         z < center.z() - fov_3d_z_range;
+
                     for( int i = 0; i < 4; i++ ) {
                         const tripoint np = pos.raw() + neighborhood[i];
                         invisible[1 + i] = np.y < min_visible_y || np.y > max_visible_y ||
                                            np.x < min_visible_x || np.x > max_visible_x ||
-                                           would_apply_vision_effects( here.get_visibility( ch.visibility_cache[ch.idx( np.x, np.y )],
-                                                   cache ) );
+                                           ( !render_seen_through_air &&
+                                             would_apply_vision_effects( here.get_visibility( ch.visibility_cache[ch.idx( np.x, np.y )],
+                                                     cache ) ) );
                     }
 
                     if( !invisible[0] && apply_vision_effects( pos, visibility ) ) {
@@ -3413,12 +3427,22 @@ void cata_tiles::draw( point dest, const tripoint_bub_ms &center, int width, int
                             const lit_level above_ll = ch_above.inbounds( { pos.x(), pos.y() } )
                                                        ? ch_above.visibility_cache[ch_above.idx( pos.x(), pos.y() )]
                                                        : lit_level::BLANK;
-                            invisible[0] = above_ll == lit_level::BLANK;
+                            invisible[0] = !render_seen_through_air && above_ll == lit_level::BLANK;
+                            const auto vehicle_ll = above_ll != lit_level::BLANK ? above_ll :
+                                                    render_seen_through_air ? seen_through_air_light( pos ) : ll;
+                            if( render_seen_through_air ) {
+                                here.set_memory_seen_cache_dirty( pos );
+                            }
                             min_z = std::min( pos.z(), min_z );
-                            draw_points.emplace_back( pos, height_3d,
-                                                      above_ll != lit_level::BLANK ? above_ll : ll,
-                                                      invisible );
+                            queue_draw_point( tile_render_info( pos, height_3d, vehicle_ll, invisible ) );
                         } else {
+                            if( render_seen_through_air ) {
+                                here.set_memory_seen_cache_dirty( pos );
+                                min_z = std::min( pos.z(), min_z );
+                                queue_draw_point( tile_render_info( pos, height_3d,
+                                                                    seen_through_air_light( pos ), invisible ) );
+                                break;
+                            }
                             if( has_draw_override( pos ) || has_memory ) {
                                 invisible[0] = true;
                             }
@@ -3431,135 +3455,144 @@ void cata_tiles::draw( point dest, const tripoint_bub_ms &center, int width, int
                             }
                             if( invisible[0] ) {
                                 min_z = std::min( pos.z(), min_z );
-                                draw_points.emplace_back( pos, height_3d, ll, invisible );
+                                queue_draw_point( tile_render_info( pos, height_3d, ll, invisible ) );
                             } else if( last_vis != center.z() + 1 ) {
-                                if( in_map_bounds && z < center.z() - fov_3d_z_range ) {
-                                    // The floor is below the 3D FOV limit, but the loop only
-                                    // reaches here through a fully transparent column above.
-                                    // Treat it as seen-through-sky: render and memorize at the
-                                    // floor's actual position with surface lighting + depth tint.
+                                if( fov_3d && in_map_bounds && z < center.z() - fov_3d_z_range ) {
                                     here.set_memory_seen_cache_dirty( pos );
                                     min_z = std::min( pos.z(), min_z );
-                                    //invisible[0] = true;
-                                    draw_points.emplace_back( pos, height_3d, lit_level::MEMORIZED, invisible );
-                                    //const ter_id &t = here.ter( pos );
-                                    //const auto tile = tile_search_params{ t.id().str(), C_TERRAIN, empty_string, 0, 0 };
-                                    //draw_from_id_string( tile, pos, std::nullopt, std::nullopt, lit_level::MEMORIZED, false, center.z - z, false );
+                                    queue_draw_point( tile_render_info( pos, height_3d,
+                                                                        seen_through_air_light( pos ),
+                                                                        invisible ) );
                                 } else {
                                     min_z = std::min( last_vis, min_z );
-                                    draw_points.emplace_back( tripoint_bub_ms( pos.xy(), last_vis ), height_3d,
-                                                              last_vis_ll, invisible );
+                                    queue_draw_point( tile_render_info( tripoint_bub_ms( pos.xy(), last_vis ),
+                                                                        height_3d, last_vis_ll, invisible ) );
                                 }
                             } else if( had_visible_open_air && in_map_bounds ) {
                                 // No vehicle and no solid last_vis — placeholder so cross-z
                                 // sprite draws (player character above) still execute.
                                 min_z = std::min( pos.z(), min_z );
                                 invisible[0] = true;
-                                draw_points.emplace_back( pos, height_3d, ll, invisible );
+                                queue_draw_point( tile_render_info( pos, height_3d, ll, invisible ) );
                             }
                         }
 
                     } else {
                         min_z = std::min( pos.z(), min_z );
-                        draw_points.emplace_back( pos, height_3d, ll, invisible );
+                        queue_draw_point( tile_render_info( pos, height_3d, ll, invisible ) );
                     }
                     break;
                 }
             }
         }
 
-        auto compare_z = [&]( tile_render_info a, tile_render_info b ) -> bool {
-            return ( a.pos.z() < b.pos.z() );
-        };
+    }
 
-        const std::array<decltype( &cata_tiles::draw_furniture ), 3> base_drawing_layers = {{
-                &cata_tiles::draw_furniture, &cata_tiles::draw_graffiti, &cata_tiles::draw_trap
-            }
-        };
-        struct zlevel_layer {
-            bool hide_unseen;
-            decltype( &cata_tiles::draw_furniture ) function;
-        };
-        const std::array<zlevel_layer, 3> zlevel_drawing_layers = {{
-                {true, &cata_tiles::draw_field_or_item}, {false, &cata_tiles::draw_vpart}, {true, &cata_tiles::draw_critter_at}
-            }
-        };
-        const std::array<decltype( &cata_tiles::draw_furniture ), 2> final_drawing_layers = {{
-                &cata_tiles::draw_zone_mark, &cata_tiles::draw_zombie_revival_indicators
-            }
-        };
+    struct zlevel_layer {
+        bool hide_unseen;
+        decltype( &cata_tiles::draw_furniture ) function;
+    };
+    const auto base_drawing_layers = std::array{
+        &cata_tiles::draw_furniture, &cata_tiles::draw_graffiti, &cata_tiles::draw_trap
+    };
+    const auto zlevel_drawing_layers = std::array{
+        zlevel_layer{ true, &cata_tiles::draw_field_or_item },
+        zlevel_layer{ false, &cata_tiles::draw_vpart },
+        zlevel_layer{ true, &cata_tiles::draw_critter_at }
+    };
+    const auto final_drawing_layers = std::array{
+        &cata_tiles::draw_zone_mark, &cata_tiles::draw_zombie_revival_indicators
+    };
 
-        std::ranges::stable_sort( draw_points, compare_z );
-        for( tile_render_info &p : draw_points ) {
-            draw_terrain( p.pos, p.ll, p.height_3d, p.invisible, center.z() - p.pos.z() );
-            if( p.pos.z() == center.z() ) {
-                const point screen_tl = player_to_screen( p.pos.xy() );
-                const SDL_Rect tile_rect{ screen_tl.x, screen_tl.y, tile_width, tile_height };
-                const bool in_selected_zone = has_selected_zone && p.pos.z() == selected_z &&
-                                              ( has_custom_selected_zone
-                                                ? zone_point_lookup.contains( p.pos )
-                                                : ( p.pos.x() >= selected_min.x() && p.pos.x() <= selected_max.x() &&
-                                                    p.pos.y() >= selected_min.y() && p.pos.y() <= selected_max.y() ) );
-                bool selected_drawn = false;
-                if( show_zones_overlay ) {
-                    for( const zone_render_data &zone : zones_to_draw ) {
-                        if( !zone.tiles.contains( p.pos.xy() ) ) {
-                            continue;
+    const auto draw_zone_overlay_for = [&]( const tile_render_info & p ) {
+        if( p.pos.z() != center.z() ) {
+            return;
+        }
+        const auto screen_tl = player_to_screen( p.pos.xy() );
+        const auto tile_rect = SDL_Rect{ screen_tl.x, screen_tl.y, tile_width, tile_height };
+        const auto in_selected_zone = has_selected_zone && p.pos.z() == selected_z &&
+                                      ( has_custom_selected_zone
+                                        ? zone_point_lookup.contains( p.pos )
+                                        : ( p.pos.x() >= selected_min.x() && p.pos.x() <= selected_max.x() &&
+                                            p.pos.y() >= selected_min.y() && p.pos.y() <= selected_max.y() ) );
+        auto selected_drawn = false;
+        if( show_zones_overlay ) {
+            for( const zone_render_data &zone : zones_to_draw ) {
+                if( !zone.tiles.contains( p.pos.xy() ) ) {
+                    continue;
+                }
+                draw_zone_overlay( {
+                    .renderer = renderer,
+                    .rect = tile_rect,
+                    .color = zone.color,
+                    .overlay_strings = overlay_strings,
+                    .alpha = in_selected_zone ? 128 : 64,
+                    .draw_label = false
+                } );
+                selected_drawn = selected_drawn || in_selected_zone;
+            }
+        }
+        if( in_selected_zone && !selected_drawn ) {
+            draw_zone_overlay( {
+                .renderer = renderer,
+                .rect = tile_rect,
+                .color = curses_color_to_SDL( c_light_green ),
+                .overlay_strings = overlay_strings,
+                .alpha = 128,
+                .draw_label = false
+            } );
+        }
+    };
+
+    if( !draw_points.empty() ) {
+        for( const auto z : std::views::iota( min_z, center.z() + 1 ) ) {
+            auto row_begin = draw_points.begin();
+            while( row_begin != draw_points.end() ) {
+                const auto row = row_begin->screen_row;
+                const auto row_end = std::find_if_not( row_begin, draw_points.end(),
+                [row]( const tile_render_info & info ) {
+                    return info.screen_row == row;
+                } );
+                const auto row_points = std::ranges::subrange( row_begin, row_end );
+                for( tile_render_info &p : row_points ) {
+                    if( p.pos.z() == z ) {
+                        draw_terrain( p.pos, p.ll, p.height_3d, p.invisible, center.z() - p.pos.z() );
+                        draw_zone_overlay_for( p );
+                    }
+                }
+                for( tile_render_info &p : row_points ) {
+                    if( p.pos.z() == z ) {
+                        for( const auto f : base_drawing_layers ) {
+                            ( this->*f )( p.pos, p.ll, p.height_3d, p.invisible, center.z() - p.pos.z() );
                         }
-                        draw_zone_overlay( {
-                            .renderer = renderer,
-                            .rect = tile_rect,
-                            .color = zone.color,
-                            .overlay_strings = overlay_strings,
-                            .alpha = in_selected_zone ? 128 : 64,
-                            .draw_label = false
-                        } );
-                        selected_drawn = selected_drawn || in_selected_zone;
-                    }
-                }
-                if( in_selected_zone && !selected_drawn ) {
-                    draw_zone_overlay( {
-                        .renderer = renderer,
-                        .rect = tile_rect,
-                        .color = curses_color_to_SDL( c_light_green ),
-                        .overlay_strings = overlay_strings,
-                        .alpha = 128,
-                        .draw_label = false
-                    } );
-                }
-            }
-        }
-
-        for( int z = min_z; z <= center.z(); z++ ) {
-            for( tile_render_info &p : draw_points ) {
-                if( p.pos.z() > z ) {
-                    break;
-                }
-                if( p.pos.z() == z ) {
-                    for( decltype( &cata_tiles::draw_furniture ) f : base_drawing_layers ) {
-                        ( this->*f )( p.pos, p.ll, p.height_3d, p.invisible, center.z() - p.pos.z() );
                     }
                 }
                 const auto &ch = here.access_cache( z );
-                for( const zlevel_layer &f : zlevel_drawing_layers ) {
-                    if( here.inbounds( p.pos ) && z != p.pos.z() ) {
-                        const auto z_ll = ch.inbounds( { p.pos.x(), p.pos.y() } )
-                                          ? ch.visibility_cache[ch.idx( p.pos.x(), p.pos.y() )]
-                                          : lit_level::BLANK;
-                        if( !f.hide_unseen || z_ll != lit_level::BLANK ) {
-                            const bool ( invis )[5] = {false, false, false, false, false};
-                            ( this->*( f.function ) )( { p.pos.xy(), z}, z_ll, p.height_3d, invis, center.z() - z );
+                for( tile_render_info &p : row_points ) {
+                    if( p.pos.z() > z ) {
+                        continue;
+                    }
+                    for( const zlevel_layer &f : zlevel_drawing_layers ) {
+                        if( here.inbounds( p.pos ) && z != p.pos.z() ) {
+                            const auto z_ll = ch.inbounds( { p.pos.x(), p.pos.y() } )
+                                              ? ch.visibility_cache[ch.idx( p.pos.x(), p.pos.y() )]
+                                              : lit_level::BLANK;
+                            if( !f.hide_unseen || z_ll != lit_level::BLANK ) {
+                                const bool ( invis )[5] = {false, false, false, false, false};
+                                ( this->*( f.function ) )( { p.pos.xy(), z}, z_ll, p.height_3d, invis, center.z() - z );
+                            }
+                        } else {
+                            ( this->*( f.function ) )( { p.pos.xy(), z}, p.ll, p.height_3d, p.invisible, center.z() - z );
                         }
-                    } else {
-                        ( this->*( f.function ) )( { p.pos.xy(), z}, p.ll, p.height_3d, p.invisible, center.z() - z );
                     }
                 }
+                row_begin = row_end;
             }
         }
-        for( tile_render_info &p : draw_points ) {
-            for( decltype( &cata_tiles::draw_furniture ) f : final_drawing_layers ) {
-                ( this->*f )( p.pos, p.ll, p.height_3d, p.invisible, 0 );
-            }
+    }
+    for( tile_render_info &p : draw_points ) {
+        for( const auto f : final_drawing_layers ) {
+            ( this->*f )( p.pos, p.ll, p.height_3d, p.invisible, 0 );
         }
     }
 
@@ -5303,8 +5336,10 @@ bool cata_tiles::draw_vpart( const tripoint_bub_ms &p, lit_level ll, int &height
                 veh_part ) ) ) );
         const std::string vpname = "vp_" + vp_id.str();
         avatar &you = get_avatar();
-        if( here.check_seen_cache( p ) ) {
-            you.memorize_tile( here.bub_to_abs( p ), vpname, subtile, rotation );
+        const auto abs_pos = here.bub_to_abs( p );
+        // Projected rope segments are live draws, not persistent vehicle parts.
+        if( you.get_memorized_tile( abs_pos ).tile == vpname ) {
+            you.clear_memorized_overlay( abs_pos );
         }
         const tile_search_params tile = {vpname, C_VEHICLE_PART, empty_string, subtile, rotation};
         const bool ret = draw_from_id_string(
@@ -5319,7 +5354,7 @@ bool cata_tiles::draw_vpart( const tripoint_bub_ms &p, lit_level ll, int &height
 bool cata_tiles::draw_critter_at( const tripoint_bub_ms &p, lit_level ll, int &height_3d,
                                   const bool ( &invisible )[5], int z_drop )
 {
-    if( !fov_3d && z_drop > 0 ) {
+    if( ( !fov_3d && z_drop > 0 ) || fov_3d_z_range < z_drop ) {
         return false;
     }
     bool result;

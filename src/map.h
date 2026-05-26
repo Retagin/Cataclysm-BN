@@ -131,7 +131,9 @@ struct visibility_variables {
     // Cached values for map visibility calculations
     int g_light_level;
     int u_clairvoyance;
+    int u_unimpaired_range;
     float vision_threshold;
+    float visibility_scale_factor;
 };
 
 struct bash_params {
@@ -360,17 +362,17 @@ struct level_cache {
 
     // True when the tile has sky access via the 3×3 overhang rule (top-down floor cascade).
     // False means fully enclosed — protected from rain, wind, weather effects.
-    std::vector<bool>               outside_cache;
+    std::vector<char>               outside_cache;
 
     // True when at least one tile within 3×3 above has overhead coverage (floor or sheltered
     // tile at z+1).  Distinct from outside_cache: a tile can be outside yet sheltered (overhang).
-    std::vector<bool>               sheltered_cache;
+    std::vector<char>               sheltered_cache;
 
     // True when this tile has an unobstructed ray to the sun for the current in-game hour.
     // Rebuilt by map::build_angled_sunlight_cache() when the hour changes.
     // Consulted by build_sunlight_cache() to distinguish direct-sun tiles (full
     // outside_light_level) from scatter-lit outdoor tiles (reduced ambient level).
-    std::vector<bool>               angled_sunlight_cache;
+    std::vector<char>               angled_sunlight_cache;
 
     // true when vehicle below has "ROOF" or "OPAQUE" part, furniture below has "SUN_ROOF_ABOVE"
     //      or terrain doesn't have "NO_FLOOR" flag
@@ -899,7 +901,7 @@ class map : public submap_load_listener
         /** Helper function for light claculation; exposed here for map editor
          */
         static apparent_light_info apparent_light_helper( const level_cache &map_cache,
-                const tripoint_bub_ms &p );
+                const tripoint_bub_ms &p, float visibility_scale_factor );
         /** Determine the visible light level for a tile, based on light_at
          * for the tile, vision distance, etc
          *
@@ -907,6 +909,8 @@ class map : public submap_load_listener
          * @param cache Currently cached visibility parameters
          */
         lit_level apparent_light_at( const tripoint_bub_ms &p, const visibility_variables &cache ) const;
+        lit_level apparent_light_at( const tripoint_bub_ms &p, const visibility_variables &cache,
+                                     int dist ) const;
         visibility_type get_visibility( lit_level ll,
                                         const visibility_variables &cache ) const;
 
@@ -1239,9 +1243,11 @@ class map : public submap_load_listener
         * @param p Position within the map
         * @param new_furniture Id of new furniture
         * @param new_active Override default active tile of new furniture
+        * @param ignore_grabbed Ignore destruction of grabbed tile, useful when player is moved afterwards
         */
         void furn_set( const tripoint_bub_ms &p, const furn_id &new_furniture,
-                       const cata::poly_serialized<active_tile_data> &new_active = nullptr );
+                       const cata::poly_serialized<active_tile_data> &new_active = nullptr,
+                       const bool ignore_grabbed = false );
         void furn_set( const point_bub_ms &p, const furn_id &new_furniture ) {
             furn_set( tripoint_bub_ms( p, abs_sub.z() ), new_furniture );
         }
@@ -2396,6 +2402,21 @@ class map : public submap_load_listener
         int my_MAPSIZE;
         bool zlevels;
 
+        inline auto bubble_tiles() const -> point_range<point_bub_ms> {
+            return { point_bub_ms::zero(), point_bub_ms(
+                         coords::map_squares_per( coords::scale::submap ) * my_MAPSIZE - 1,
+                         coords::map_squares_per( coords::scale::submap ) * my_MAPSIZE - 1 ) };
+        }
+
+        inline auto bubble_submap_bounds() const -> inclusive_rectangle<point_bub_sm> {
+            return { point_bub_sm::zero(), point_bub_sm( my_MAPSIZE - 1, my_MAPSIZE - 1 ) };
+        }
+
+        inline auto bubble_submaps() const -> point_range<point_bub_sm> {
+            const auto bounds = bubble_submap_bounds();
+            return { bounds.p_min, bounds.p_max };
+        }
+
         // stores vision adjustment for the tiles immediately surrounding the player, the order is given by eight_adjacent_offsets in point.h
         // examples of adjustment: crouching
         vision_adjustment vision_transparency_cache[8] = { VISION_ADJUST_NONE };
@@ -2551,7 +2572,8 @@ class map : public submap_load_listener
         void process_items();
     private:
         // Iterates over every item on the map, passing each item to the provided function.
-        void process_items_in_submap( submap &current_submap, const tripoint_bub_sm &gridp );
+        auto process_items_in_submap( submap &current_submap, const tripoint_bub_sm &gridp,
+                                      std::vector<item *> &active_items ) -> void;
         void process_items_in_vehicles( submap &current_submap );
         void process_items_in_vehicle( vehicle &cur_veh, submap &current_submap );
 
@@ -2573,7 +2595,8 @@ class map : public submap_load_listener
         */
         /*@{*/
         template<typename Functor>
-        void function_over( const tripoint_bub_ms &start, const tripoint_bub_ms &end, Functor fun ) const;
+        auto function_over( const tripoint_bub_ms &start, const tripoint_bub_ms &end,
+                            Functor fun ) const -> void;
         /*@}*/
 
         /**
@@ -2812,4 +2835,3 @@ class fake_map : public tinymap
                   int fake_map_z );
         ~fake_map() override;
 };
-
