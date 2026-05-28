@@ -124,13 +124,13 @@ static constexpr short SOUND_ABSORPTION_FOREST = 20;
 // Per tile sound attenuation bonus in mdB spl provided by snow.
 static constexpr short SOUND_ABSORPTION_SNOW_BONUS = 128;
 // For use with the floodfill logic.
-static constexpr auto tile_structure_sound_absorption_tier = std::array<short,4>
+static constexpr auto tile_structure_sound_absorption_tier = std::array<short, 4>
 {
-    {SOUND_ABSORPTION_OPEN_FIELD,SOUND_ABSORPTION_BARRIER,SOUND_ABSORPTION_THICK_BARRIER,SOUND_ABSORPTION_WALL}
+    {SOUND_ABSORPTION_OPEN_FIELD, SOUND_ABSORPTION_BARRIER, SOUND_ABSORPTION_THICK_BARRIER, SOUND_ABSORPTION_WALL}
 };
-static constexpr auto tile_base_sound_absorption_tier = std::array<short,4>
+static constexpr auto tile_base_sound_absorption_tier = std::array<short, 4>
 {
-    {SOUND_ABSORPTION_OPEN_FIELD,SOUND_ABSORPTION_LIGHT_VEGITATION, SOUND_ABSORPTION_FOREST_FALL, SOUND_ABSORPTION_FOREST}
+    {SOUND_ABSORPTION_OPEN_FIELD, SOUND_ABSORPTION_LIGHT_VEGITATION, SOUND_ABSORPTION_FOREST_FALL, SOUND_ABSORPTION_FOREST}
 };
 // Maximum mdB spl value a sound can have in atmosphere.
 static constexpr short MAXIMUM_VOLUME_ATMOSPHERE = 19100;
@@ -149,44 +149,45 @@ static constexpr double mdBspl_to_dBspl_coeff = 0.01;
 // We do this often enough its worth it to have a constexpr even though its just *100
 static constexpr short dBspl_to_mdBspl( const short &dB )
 {
-    return (dBspl_to_mdBspl_coeff * dB);
+    return ( dBspl_to_mdBspl_coeff * dB );
 }
 // Converts milli-decibels sound pressure level to decibels sound pressure level.
 static constexpr short mdBspl_to_dBspl( const short &mdB )
 {
-    return static_cast<short>(std::round(mdBspl_to_dBspl_coeff * mdB));
+    return static_cast<short>( std::round( mdBspl_to_dBspl_coeff * mdB ) );
 }
 // We always take our base volume readings for sounds at 1m, even if we are in the same tile.
-// Calcing the volume very close to a sound source is the perview of sound stage technicians and physicists. 
+// Calcing the volume very close to a sound source is the perview of sound stage technicians and physicists.
 static constexpr uint8_t MINIMUM_DISTANCE_FOR_SOUND_PROPAGATION = 1;
 // We have entries for our dist_vol_loss[] array out to an index of 121
-// Stop one short of it for safeties sake. 
+// Stop one short of it for safeties sake.
 // The rate of change of volume past this distance is only significant at kilometer distances, so we dont care.
 static constexpr uint8_t MAXIMUM_DISTANCE_FOR_SOUND_PROPAGATION = 120;
 
-static constexpr auto tile_absorp_from_index(const uint8_t &index)
+static constexpr auto tile_absorp_from_index( const uint8_t &index )
 {
-    if (index > 3) {
+    if( index > 3 ) {
         return tile_structure_sound_absorption_tier[0];
     } else {
         return tile_structure_sound_absorption_tier[index];
     }
 }
 
-static constexpr uint8_t get_tile_absorp_index(const short &absorp){
-    if (absorp >= SOUND_ABSORPTION_WALL){
+static constexpr uint8_t get_tile_absorp_index( const short &absorp )
+{
+    if( absorp >= SOUND_ABSORPTION_WALL ) {
         return 3;
-    }else if (absorp >= SOUND_ABSORPTION_THICK_BARRIER) {
+    } else if( absorp >= SOUND_ABSORPTION_THICK_BARRIER ) {
         return 2;
-    }else if (absorp >= SOUND_ABSORPTION_BARRIER) {
+    } else if( absorp >= SOUND_ABSORPTION_BARRIER ) {
         return 1;
     } else {
         return 0;
     }
 }
-static constexpr auto base_absorp_from_index(const uint8_t &index)
+static constexpr auto base_absorp_from_index( const uint8_t &index )
 {
-    if (index > 3) {
+    if( index > 3 ) {
         return tile_base_sound_absorption_tier[0];
     } else {
         return tile_base_sound_absorption_tier[index];
@@ -195,23 +196,28 @@ static constexpr auto base_absorp_from_index(const uint8_t &index)
 
 static constexpr auto absorption_from_checkvar_bitset( const std::bitset<8> &checkvars ) -> short
 {
-    const uint8_t &base_absp_cnd = (checkvars[0] && checkvars[1]) ? 3 : (!checkvars[0] && checkvars[1]) ? 2 : checkvars[0] + checkvars[1];
-    const uint8_t &tile_absp_cnd = (checkvars[2] && checkvars[3]) ? 3 : (!checkvars[2] && checkvars[3]) ? 2 : checkvars[2] + checkvars[3];
-    return base_absorp_from_index(base_absp_cnd) + tile_absorp_from_index(tile_absp_cnd);
+    const uint8_t &base_absp_cnd = ( checkvars[0] && checkvars[1] ) ? 3 : ( !checkvars[0] &&
+                                   checkvars[1] ) ? 2 : checkvars[0] + checkvars[1];
+    const uint8_t &tile_absp_cnd = ( checkvars[2] && checkvars[3] ) ? 3 : ( !checkvars[2] &&
+                                   checkvars[3] ) ? 2 : checkvars[2] + checkvars[3];
+    return base_absorp_from_index( base_absp_cnd ) + tile_absorp_from_index( tile_absp_cnd );
 }
 
-static constexpr uint8_t get_base_absorp_index(const short &absorp){
-    if ( absorp == SOUND_ABSORPTION_OPEN_FIELD ) {
+static constexpr uint8_t get_base_absorp_index( const short &absorp )
+{
+    if( absorp == SOUND_ABSORPTION_OPEN_FIELD ) {
         return 0;
     }
-    // The absorption from walls or other structures comes in multiples of 500. 
+    // The absorption from walls or other structures comes in multiples of 500.
     // Deal with the potential for snow bonus as well while we are at it.
-    const short mod_result = ((absorp % SOUND_ABSORPTION_BARRIER) >= SOUND_ABSORPTION_SNOW_BONUS) ? (absorp % SOUND_ABSORPTION_BARRIER) - SOUND_ABSORPTION_SNOW_BONUS: absorp % SOUND_ABSORPTION_BARRIER ;
-    if ( mod_result >= SOUND_ABSORPTION_FOREST) {
+    const short mod_result = ( ( absorp % SOUND_ABSORPTION_BARRIER ) >= SOUND_ABSORPTION_SNOW_BONUS )
+                             ? ( absorp % SOUND_ABSORPTION_BARRIER ) - SOUND_ABSORPTION_SNOW_BONUS : absorp %
+                             SOUND_ABSORPTION_BARRIER ;
+    if( mod_result >= SOUND_ABSORPTION_FOREST ) {
         return 3;
-    } else if ( mod_result >= SOUND_ABSORPTION_FOREST_FALL ) {
+    } else if( mod_result >= SOUND_ABSORPTION_FOREST_FALL ) {
         return 2;
-    } else if ( mod_result >= SOUND_ABSORPTION_LIGHT_VEGITATION ) {
+    } else if( mod_result >= SOUND_ABSORPTION_LIGHT_VEGITATION ) {
         return 1;
     } else {
         return 0;
@@ -230,32 +236,32 @@ static constexpr uint8_t get_distance_for_volume_loss( const uint8_t &tile_dista
         return tile_distance + ( propagating_perpendicular ? -1 : 1 );
     }
 }
-// We have these to feed to skip_due_to_wall to speed up the floodfill logic by just a bit. 
-static constexpr std::pair<bool,bool> s_wall_false_false = { false, false };
-static constexpr std::pair<bool,bool> s_wall_true_false = { true, false };
-static constexpr std::pair<bool,bool> s_wall_false_true = { false, true };
-static constexpr std::pair<bool,bool> s_wall_true_true = { true, true };
-static constexpr auto s_wall_bool_pairs = std::array<std::pair<bool,bool>,4>
+// We have these to feed to skip_due_to_wall to speed up the floodfill logic by just a bit.
+static constexpr std::pair<bool, bool> s_wall_false_false = { false, false };
+static constexpr std::pair<bool, bool> s_wall_true_false = { true, false };
+static constexpr std::pair<bool, bool> s_wall_false_true = { false, true };
+static constexpr std::pair<bool, bool> s_wall_true_true = { true, true };
+static constexpr auto s_wall_bool_pairs = std::array<std::pair<bool, bool>, 4>
 {
     {
         s_wall_false_false, s_wall_true_false, s_wall_false_true, s_wall_true_true
     }
 };
-static constexpr auto get_s_wall_bool_pair( const bool &wall1, const bool &wall2)
+static constexpr auto get_s_wall_bool_pair( const bool &wall1, const bool &wall2 )
 {
-    if (!wall1 && !wall2){
-        // Using the sound direction indext constexpr since they are constexpr. 
+    if( !wall1 && !wall2 ) {
+        // Using the sound direction indext constexpr since they are constexpr.
         return s_wall_bool_pairs[SDI_NW];
-    }else if ( wall1 && !wall2) {
+    } else if( wall1 && !wall2 ) {
         return s_wall_bool_pairs[SDI_N];
-    }else if (!wall1 && wall2) {
+    } else if( !wall1 && wall2 ) {
         return s_wall_bool_pairs[SDI_NE];
-    }else {
+    } else {
         return s_wall_bool_pairs[SDI_E];
     }
 }
 
-static constexpr bool skip_due_to_wall( const std::pair<bool,bool> &wall,
+static constexpr bool skip_due_to_wall( const std::pair<bool, bool> &wall,
                                         const uint8_t &source_dir, const uint8_t &dir_index )
 {
     const auto &walls_to_check = wall_check_by_sdirection[source_dir];
@@ -345,8 +351,9 @@ static constexpr short vol_z_adjust( const tripoint_bub_ms &source, const tripoi
     } else if( lineofsight ) {
         // If we have direct line of sight, the horizontal volume loss over distance most likely wont be that far off from the amount that would have been lost straight line.
         // Just assign a 1dB penalty per zlevel difference.
-        return ( for_horde_signal) ? std::abs( source.z() - listener.z() ) : (dBspl_to_mdBspl(std::abs(source.z() - listener.z())));
-    }else if (map.inbounds(listener)) {
+        return ( for_horde_signal ) ? std::abs( source.z() - listener.z() ) : ( dBspl_to_mdBspl( std::abs(
+                    source.z() - listener.z() ) ) );
+    } else if( map.inbounds( listener ) ) {
         short vol_adjust = 0;
         // We want to work our way down from the top.
         const int c_index = map.get_cache_ref( 0 ).idx( listener.x(), listener.y() );
@@ -361,11 +368,13 @@ static constexpr short vol_z_adjust( const tripoint_bub_ms &source, const tripoi
                 vol_adjust += SOUND_ABSORPTION_BARRIER;
             }
         }
-        return std::min( ( for_horde_signal ) ? mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ) : MAXIMUM_VOLUME_ATMOSPHERE,
+        return std::min( ( for_horde_signal ) ? mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ) :
+                         MAXIMUM_VOLUME_ATMOSPHERE,
                          ( for_horde_signal ) ? mdBspl_to_dBspl( vol_adjust ) : vol_adjust );
     } else {
         //Well, the listener is out of bounds. Just assign a 1dB penalty per zlevel difference.
-        return ( for_horde_signal) ? std::abs( source.z() - listener.z() ) : (dBspl_to_mdBspl(std::abs(source.z() - listener.z())));
+        return ( for_horde_signal ) ? std::abs( source.z() - listener.z() ) : ( dBspl_to_mdBspl( std::abs(
+                    source.z() - listener.z() ) ) );
     }
 };
 
@@ -395,7 +404,7 @@ static constexpr short svol_at( const sound_instance_cache &sound_inst, const tr
     // Thankfully rl_dist does not account for z differences.
     const int distance = rl_dist( sound_inst.origin, tri );
     const uint8_t dir_index = dir_index_to_sound_source( sound_inst.origin, tri );
-    const auto &san_dir = get_sound_direction_index(dir_index);
+    const auto &san_dir = get_sound_direction_index( dir_index );
     // We know at this point that we are out of the envelope so our distance is greater than our flood radius.
     // We use a different escape volume depending upon a couple of factors.
     // Apologies for the messy ternary.
@@ -456,8 +465,9 @@ static short terrain_sound_attenuation( tripoint_abs_omt omtpos, season_type sea
     // This is the really heinous bit. We either use the integer id, or the string id. Integer id it is.
     if( landusecodenum == 3 || landusecodenum == 37 || landusecodenum == 35 )  {
         // Heavy vegitation or forest. Heaviest attenuation, except in the fall.
-        return snowbonus + ( ( season == AUTUMN ) ? ( ( horde_signal ) ? 20 : SOUND_ABSORPTION_FOREST_FALL ) : ( (
-                                 horde_signal ) ? 26 : SOUND_ABSORPTION_FOREST ) );
+        return snowbonus + ( ( season == AUTUMN ) ? ( ( horde_signal ) ? 20 : SOUND_ABSORPTION_FOREST_FALL )
+                             : ( (
+                                     horde_signal ) ? 26 : SOUND_ABSORPTION_FOREST ) );
 
     } else if( landusecodenum == 6 || landusecodenum == 9 || landusecodenum == 20 ||
                landusecodenum == 25 || landusecodenum == 26 )  {
@@ -507,7 +517,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
     // Make sure that there is a valid reference to A mapcache, even if we dont call it if we are too high up.
     const auto &up_map_cache = ( check_up_valid ) ? get_cache( zlev + 1 ) : map_cache;
     const bool is_winter =  season_of_year( calendar::turn ) == WINTER;
-    const auto &snowbonus = (is_winter) ? SOUND_ABSORPTION_SNOW_BONUS : SOUND_ABSORPTION_OPEN_FIELD;
+    const auto &snowbonus = ( is_winter ) ? SOUND_ABSORPTION_SNOW_BONUS : SOUND_ABSORPTION_OPEN_FIELD;
 
     //// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
     //// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
@@ -515,8 +525,8 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
     // 8 is the center, and should not normally be called. Kept incase of a sound looping back to its origin point.
     std::array<point_bub_ms, 8> adjacent_tiles;
 
-    auto get_san_dir = [&](const uint8_t &dir) -> uint8_t{
-        return get_sound_direction_index(dir);
+    auto get_san_dir = [&]( const uint8_t &dir ) -> uint8_t{
+        return get_sound_direction_index( dir );
     };
 
     auto cmp = []( const propagation_tile & a, const propagation_tile & b ) {
@@ -548,15 +558,15 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         //Initialize our checkvars array
         // We need to check the tiles 1 outside our actual envelope as well.
         // Little bit of shenanagins.
-        const auto vol_enum_index = get_san_dir(static_cast<uint8_t>(vol_enum));
-        const auto total_check_radius = get_total_check_radius_by_enum(vol_enum);
+        const auto vol_enum_index = get_san_dir( static_cast<uint8_t>( vol_enum ) );
+        const auto total_check_radius = get_total_check_radius_by_enum( vol_enum );
         const uint8_t env_length = total_check_envelop_by_index[vol_enum_index];
-        const auto checkvar_index_p = temp_sound_cache.origin + point{-total_check_radius,-total_check_radius};
+        const auto checkvar_index_p = temp_sound_cache.origin + point{-total_check_radius, -total_check_radius};
         // Our checkvar index point is located at 0,0 of our checkvar envelope.
-        const auto cv_env_rel_ms_adj = point{-checkvar_index_p.x(),-checkvar_index_p.y()};
+        const auto cv_env_rel_ms_adj = point{-checkvar_index_p.x(), -checkvar_index_p.y()};
         // Located at 0,0 of our flood envelope
         const auto &f_env_index_p = temp_sound_cache.envelope_index_point;
-        const auto f_env_rel_ms_adj = point{-f_env_index_p.x(),-f_env_index_p.y()};
+        const auto f_env_rel_ms_adj = point{-f_env_index_p.x(), -f_env_index_p.y()};
 
         /** If it explodes too bad, move to a vector of bitset vectors
         *    @param checkvars[][][0] = terrain base sound attenuation cases 1 & 3
@@ -569,14 +579,14 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         *    @param checkvars[][][7] = Does the tile count as a sound wall?
         */
         std::bitset<8> checkvars[env_length][env_length];
-        memset(checkvars, 0, sizeof(checkvars));
+        memset( checkvars, 0, sizeof( checkvars ) );
         // Our x/y zone is max +27
         // We now poll all of the relevant tiles in or adjacent to our envelope and encode the conditions in our bitset.
-        for ( uint8_t x = 0; x < env_length; x++ ) {
-            for ( uint8_t y = 0; y < env_length; y++ ) {
-                const auto env_tile = checkvar_index_p + point{x,y};
+        for( uint8_t x = 0; x < env_length; x++ ) {
+            for( uint8_t y = 0; y < env_length; y++ ) {
+                const auto env_tile = checkvar_index_p + point{x, y};
                 auto &env_tile_vars = checkvars[env_tile.x()][env_tile.y()];
-                if (!inbounds(env_tile)){
+                if( !inbounds( env_tile ) ) {
                     // If we are out of bounds, set all bits to true to indicate this.
                     env_tile_vars.set();
                     continue;
@@ -585,16 +595,20 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                     const auto et_midx = map_cache.idx( env_tile.x(), env_tile.y() );
                     const auto tile_absorp = absorption_cache[et_midx];
                     // First two bits set our base terrain absorption from landusecode
-                    const uint8_t base_absorp = get_base_absorp_index(tile_absorp);
-                    const uint8_t struc_absorp = get_tile_absorp_index(tile_absorp);
+                    const uint8_t base_absorp = get_base_absorp_index( tile_absorp );
+                    const uint8_t struc_absorp = get_tile_absorp_index( tile_absorp );
                     // Redo the encoding here to make more compact. 6 total cases for the various absorption, which can fit on 3 bits
                     // Which gives us space for floor chache on this level check
-                    env_tile_vars[0] = (base_absorp == 1 || base_absorp == 3); // terrain base sound attenuation cases 1 & 3
-                    env_tile_vars[1] = (base_absorp == 2 || base_absorp == 3); // terrain base sound attenuation cases 2 & 3
-                    env_tile_vars[2] = (struc_absorp == 1 || struc_absorp == 3); // tile sound attenuation cases 1 & 3
-                    env_tile_vars[3] = (struc_absorp == 2 || struc_absorp == 3); // tile sound attenuation cases 2 & 3
-                    env_tile_vars[4] = (check_up_valid) ? up_map_cache.floor_cache[et_midx] > 0 : false; // Is there a roof above us?
-                    env_tile_vars[5] = map_cache.floor_cache[et_midx] == 0; // If there is no floor in our tile, we can escape down.
+                    env_tile_vars[0] = ( base_absorp == 1 ||
+                                         base_absorp == 3 ); // terrain base sound attenuation cases 1 & 3
+                    env_tile_vars[1] = ( base_absorp == 2 ||
+                                         base_absorp == 3 ); // terrain base sound attenuation cases 2 & 3
+                    env_tile_vars[2] = ( struc_absorp == 1 || struc_absorp == 3 ); // tile sound attenuation cases 1 & 3
+                    env_tile_vars[3] = ( struc_absorp == 2 || struc_absorp == 3 ); // tile sound attenuation cases 2 & 3
+                    env_tile_vars[4] = ( check_up_valid ) ? up_map_cache.floor_cache[et_midx] > 0 :
+                                       false; // Is there a roof above us?
+                    env_tile_vars[5] = map_cache.floor_cache[et_midx] ==
+                                       0; // If there is no floor in our tile, we can escape down.
                     env_tile_vars[6] = outside_cache[et_midx]; // are we outside?
                     env_tile_vars[7] = wall_present[et_midx]; // Does the tile count as a sound wall?
                     // It is impossible for all of these bools to be true at once.
@@ -602,7 +616,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                     // If we have no roof, we are outdoors, no soundwall and it is winter, we can assume that there is snow cover.
                 }
             }
-        }       
+        }
         // Set our initial conditions. We want 100ths of a decibel for the volume
         // We dont apply directional sound propagation penalties at the very start.
         // the volume vector in the sound instance IS NOT aligned with normal game tripoints, and uses a limited local "area"
@@ -612,7 +626,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         // If we are not indoors and there is no floor on the tile above us, escape up.
         // We know by definition that our origin tile is located at f_radius, f_radius or check_radius,check_radius respectively.
         if( !temp_sound_cache.source_indoors && check_up_valid ) {
-            if( !checkvars[total_check_radius][total_check_radius][4]) {
+            if( !checkvars[total_check_radius][total_check_radius][4] ) {
                 up_escape_vector.push_back( {origin_volume, 1} );
             }
         }
@@ -629,7 +643,8 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
             return temp_sound_cache.p_to_env_index( p );
         };
 
-        auto check_escape = [&]( const int &cv_env_x, const int &cv_env_y, const short & tile_vol, const uint8_t &dist ) {
+        auto check_escape = [&]( const int &cv_env_x, const int &cv_env_y, const short & tile_vol,
+        const uint8_t &dist ) {
             if( checkvars[cv_env_x][cv_env_y][6] && check_up_valid ) {
                 if( !checkvars[cv_env_x][cv_env_y][4] ) {
                     up_escape_vector.push_back( {tile_vol, dist} );
@@ -649,7 +664,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
             // Lets make sure that we only propagate inbounds
             if( !tile_checkvars.all() ) {
                 // If our sound started inside, lets check if it got outside.
-                
+
                 const auto &tile_outdoors = tile_checkvars[6];
                 if( temp_sound_cache.source_indoors && tile_outdoors ) {
                     temp_sound_cache.escaped_indoors = true;
@@ -660,14 +675,15 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                 // And set our tile volume based on the distance. We know that the sound origin is atleast 1600mdB.
                 // Set our direction based upon the adjacent tile index.
                 tile_svol = std::max( 0,
-                                               ( tile_svol - dist_vol_loss[2] - (absorption_from_checkvar_bitset( tile_checkvars ) ) - snowbonus ) ) ;
-                if( tile_svol > (SOUND_ABSORPTION_OPEN_FIELD) ) {
+                                      ( tile_svol - dist_vol_loss[2] - ( absorption_from_checkvar_bitset( tile_checkvars ) ) -
+                                        snowbonus ) ) ;
+                if( tile_svol > ( SOUND_ABSORPTION_OPEN_FIELD ) ) {
 
                     // Check this if sound propagation is acting up.
                     if( tile_svol > origin_volume ) {
                         debugmsg( "Sound with description [ %1s ] attempted to propagate from %i:%i at %i mdB to %i:%i at %i mdB, a louder volume than the origin volume of %i mdB!"
                                   , soundevent.description, soundevent.origin.x(), soundevent.origin.y(),
-                                  svol[temp_sound_cache.p_to_env_index(soundevent.origin)], tile.x(), tile.y(), tile_svol,
+                                  svol[temp_sound_cache.p_to_env_index( soundevent.origin )], tile.x(), tile.y(), tile_svol,
                                   origin_volume );
                         // Dont break the laws of physics
                         continue;
@@ -675,24 +691,24 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                     // If there is no floor above or below with a few other conditions, escape.
                     check_escape( cv_trip.x(), cv_trip.y(), tile_svol, 2 );
 
-                    if( temp_sound_cache.in_envelope( tile ) && tile_svol >= SOUND_MINIMUM_VOLUME_FOR_PROPAGATION) {
+                    if( temp_sound_cache.in_envelope( tile ) && tile_svol >= SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) {
                         ptq.emplace( propagation_tile( tile, tile_svol, i, 2 ) );
                     }
                 }
             }
         }
 
-        std::pair<bool,bool> wall_bools;
+        std::pair<bool, bool> wall_bools;
 
-        auto check_walls = [&](const uint8_t &dir) -> void{
-            const auto &wall_dirs = wall_check_by_sdirection[get_san_dir(dir)];
+        auto check_walls = [&]( const uint8_t &dir ) -> void{
+            const auto &wall_dirs = wall_check_by_sdirection[get_san_dir( dir )];
             const auto &wall1_cv_p = adjacent_tiles[wall_dirs.first] + cv_env_rel_ms_adj;
             const auto &wall1_checkvars = checkvars[wall1_cv_p.x()][wall1_cv_p.y()];
             const auto &wall2_cv_p = adjacent_tiles[wall_dirs.second] + cv_env_rel_ms_adj;
             const auto &wall2_checkvars = checkvars[wall2_cv_p.x()][wall2_cv_p.y()];
             const auto &wall1 = wall1_checkvars[7];
             const auto &wall2 = wall2_checkvars[7];
-            wall_bools = get_s_wall_bool_pair(wall1,wall2);
+            wall_bools = get_s_wall_bool_pair( wall1, wall2 );
         };
 
         auto spropagate_from_tile = [&]( const propagation_tile & top_of_que ) {
@@ -705,9 +721,9 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
             // Grab our adjacent tiles, and the values for our center tile.
             adjacent_tiles = get_adjacent_tiles( ptile.pos );
 
-            const auto &san_pdir = get_san_dir(ptile.dir);
+            const auto &san_pdir = get_san_dir( ptile.dir );
             // We only have two walls to check for, use teh lamba.
-            check_walls(san_pdir);
+            check_walls( san_pdir );
             // Iterate through adjacent tiles.
             const auto &dirs_to_check = spropagation_tiles_by_sdirection[san_pdir];
             for( uint8_t i : dirs_to_check ) {
@@ -715,7 +731,8 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                 auto &adj_tile_dir = i;
                 // Only check if we know a wall is present.
                 if( wall_bools.first || wall_bools.second ) {
-                    if( skip_due_to_wall( get_s_wall_bool_pair(wall_bools.first,wall_bools.second), san_pdir, adj_tile_dir ) ) {
+                    if( skip_due_to_wall( get_s_wall_bool_pair( wall_bools.first, wall_bools.second ), san_pdir,
+                                          adj_tile_dir ) ) {
                         continue;
                     }
                 }
@@ -724,14 +741,17 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                 const auto &adj_tile_checkvars = checkvars[adj_tile_cv_env.x()][adj_tile_cv_env.y()];
 
                 // Dont check tiles that are not valid for propagation, i.e. behind the direction of sound, around a corner, out of bound
-                if( !adj_tile_checkvars.all() && temp_sound_cache.in_envelope(adj_tile) ) {
+                if( !adj_tile_checkvars.all() && temp_sound_cache.in_envelope( adj_tile ) ) {
 
                     auto &adj_tile_vol = svol[v_index_from_p( adj_tile )];
                     // Cap our tile distance between 1 and 121 to prevent overflow. We dont have or need distance loss values past dist_vol_loss[121]
                     // as the change in distance loss values past this point are negligible for gameplay scale.
-                    const uint8_t dist_for_vol_loss = get_distance_for_volume_loss( ptile.dist, ( adj_tile_dir == dirs_to_check.front() ||
-                                                      adj_tile_dir == dirs_to_check.back() ) );
-                    const short vol_to_check = std::max(0,(ptile.vol - ( absorption_from_checkvar_bitset(adj_tile_checkvars)) - ( dist_vol_loss[dist_for_vol_loss] ) - snowbonus));
+                    const uint8_t dist_for_vol_loss = get_distance_for_volume_loss( ptile.dist,
+                                                      ( adj_tile_dir == dirs_to_check.front() ||
+                                                        adj_tile_dir == dirs_to_check.back() ) );
+                    const short vol_to_check = std::max( 0,
+                                                         ( ptile.vol - ( absorption_from_checkvar_bitset( adj_tile_checkvars ) ) -
+                                                           ( dist_vol_loss[dist_for_vol_loss] ) - snowbonus ) );
                     // General priority goes loudest volume, then largest distance. Smaller distances loose volume more quickly.
                     // If volumes are equal and directions are one off from eachother, the cardinal direction wins.
                     // We dont want to track inaudible single dB values across the entire map for each sound.
@@ -776,8 +796,8 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         int vol_tally = 0;
         int non_zero = 0;
 
-        auto comp_cart_escape = [&](const uint8_t &cart_dir) -> void{
-            escape_direction_vol[cart_dir] = ( non_zero == 0 ) ? 0 : static_cast<short>(std::round(sqrt( static_cast<float>(vol_tally) / non_zero )));
+        auto comp_cart_escape = [&]( const uint8_t &cart_dir ) -> void{
+            escape_direction_vol[cart_dir] = ( non_zero == 0 ) ? 0 : static_cast<short>( std::round( sqrt( static_cast<float>( vol_tally ) / non_zero ) ) );
             vol_tally = 0;
             non_zero = 0;
         };
@@ -789,7 +809,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                 vol_tally += pow( svol[ i * envelope_width + envelope_width], 2 );
             }
         }
-        comp_cart_escape(SDI_N);
+        comp_cart_escape( SDI_N );
 
         for( int i = 0; i <= envelope_width; i++ ) {
             // For east escapes all all of our desired volumes will be at envelope_x = radius * 2.
@@ -798,7 +818,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                 vol_tally += pow( svol[( envelope_width * envelope_width ) + 1], 2 );
             }
         }
-        comp_cart_escape(SDI_E);
+        comp_cart_escape( SDI_E );
 
         for( int i = 0; i <= envelope_width; i++ ) {
             // For south escapes all all of our desired volumes will be at envelope_y = 0.
@@ -807,7 +827,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                 vol_tally += pow( svol[ i * envelope_width ], 2 );
             }
         }
-        comp_cart_escape(SDI_S);
+        comp_cart_escape( SDI_S );
 
         for( int i = 0; i <= envelope_width; i++ ) {
             // For west escapes all all of our desired volumes will be at envelope_x = 0.
@@ -816,15 +836,15 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                 vol_tally += pow( svol[ i ], 2 );
             }
         }
-        comp_cart_escape(SDI_W);
+        comp_cart_escape( SDI_W );
 
         // Now run through our diagonals.
-        for (uint8_t i : sanitized_sound_direction_indexes_diagonal){
+        for( uint8_t i : sanitized_sound_direction_indexes_diagonal ) {
             const auto &cclockwise = wall_check_by_sdirection[i].first;
             const auto &clockwise = wall_check_by_sdirection[i].second;
             escape_direction_vol[i] = ( escape_direction_vol[clockwise] != 0 ||
-                                    escape_direction_vol[cclockwise] != 0 ) ? sqrt( ( pow( escape_direction_vol[cclockwise],
-                                            2 ) + pow( escape_direction_vol[clockwise], 2 ) ) / 2 ) : 0;
+                                        escape_direction_vol[cclockwise] != 0 ) ? sqrt( ( pow( escape_direction_vol[cclockwise],
+                                                2 ) + pow( escape_direction_vol[clockwise], 2 ) ) / 2 ) : 0;
         }
         // Now lets sum up our up and down escapes. If our distance value is less than our flood radius, reduce volume by the appropriate amount.
 
@@ -843,7 +863,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
             }
         }
         // 8 is down, 9 is up.
-        comp_cart_escape(SDI_DOWN);
+        comp_cart_escape( SDI_DOWN );
 
         for( std::pair<short, uint8_t> listing : up_escape_vector ) {
             if( listing.first > 0 ) {
@@ -860,7 +880,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
             }
         }
         // 8 is down, 9 is up.
-        comp_cart_escape(SDI_UP);
+        comp_cart_escape( SDI_UP );
 
         // And from the maximum escape volume, approximate our minvol radius for easy distance filtering.
         vol_tally = 0;
@@ -890,7 +910,7 @@ void map::batch_flood_fill_sounds()
 
     add_msg( m_debug, _( "Attempting to batch flood fill %i sounds." ), batch_que.size() );
     const bool is_winter =  season_of_year( calendar::turn ) == WINTER;
-    const auto &snowbonus = (is_winter) ? SOUND_ABSORPTION_SNOW_BONUS : SOUND_ABSORPTION_OPEN_FIELD;
+    const auto &snowbonus = ( is_winter ) ? SOUND_ABSORPTION_SNOW_BONUS : SOUND_ABSORPTION_OPEN_FIELD;
 
     // How many sounds did we actually process?
     short num_processed_sounds = 0;
@@ -901,10 +921,10 @@ void map::batch_flood_fill_sounds()
     //// [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
     // 8 is the center, and should not normally be called. Kept incase of a sound looping back to its origin point.
     std::array<point_bub_ms, 8> adjacent_tiles;
-    std::pair<bool,bool> wall_bools;
+    std::pair<bool, bool> wall_bools;
     // Grab a constexpr version of our sound direction
-    auto get_san_dir = [&](const uint8_t &dir) -> uint8_t{
-        return get_sound_direction_index(dir);
+    auto get_san_dir = [&]( const uint8_t &dir ) -> uint8_t{
+        return get_sound_direction_index( dir );
     };
 
     auto cmp = []( const propagation_tile & a, const propagation_tile & b ) {
@@ -912,7 +932,7 @@ void map::batch_flood_fill_sounds()
     };
     // max-heap: highest volume processed first. We clear this after each sound processed. pqt = priority tile que
     std::priority_queue<propagation_tile, std::vector<propagation_tile>, decltype( cmp )> ptq( cmp );
-    
+
     // Now we step through our zlevels
     for( int z = -OVERMAP_DEPTH; z <= OVERMAP_HEIGHT; z++ ) {
 
@@ -948,15 +968,17 @@ void map::batch_flood_fill_sounds()
                 // Set this for use with the slightly cheaper direct line propagation.
                 temp_sound_cache.terrain_sound_absorbtion_at_source = absorption_cache[map_cache.idx(
                             temp_sound_cache.origin.x(), temp_sound_cache.origin.y() )];
-                const auto vol_enum_index = get_san_dir(static_cast<uint8_t>(get_flood_dist_enum( flooded_sound.volume )));
-                const auto total_check_radius = get_total_check_radius_by_enum(get_flood_dist_enum( flooded_sound.volume ));
+                const auto vol_enum_index = get_san_dir( static_cast<uint8_t>( get_flood_dist_enum(
+                                                flooded_sound.volume ) ) );
+                const auto total_check_radius = get_total_check_radius_by_enum( get_flood_dist_enum(
+                                                    flooded_sound.volume ) );
                 const uint8_t env_length = total_check_envelop_by_index[vol_enum_index];
-                const auto checkvar_index_p = temp_sound_cache.origin + point{-total_check_radius,-total_check_radius};
+                const auto checkvar_index_p = temp_sound_cache.origin + point{-total_check_radius, -total_check_radius};
                 // Our checkvar index point is located at 0,0 of our checkvar envelope.
-                const auto cv_env_rel_ms_adj = point{-checkvar_index_p.x(),-checkvar_index_p.y()};
+                const auto cv_env_rel_ms_adj = point{-checkvar_index_p.x(), -checkvar_index_p.y()};
                 // Located at 0,0 of our flood envelope
                 const auto &f_env_index_p = temp_sound_cache.envelope_index_point;
-                const auto f_env_rel_ms_adj = point{-f_env_index_p.x(),-f_env_index_p.y()};
+                const auto f_env_rel_ms_adj = point{-f_env_index_p.x(), -f_env_index_p.y()};
                 /** If it explodes too bad, move to a vector of bitset vectors
                 *    @param checkvars[][][0] = terrain base sound attenuation cases 1 & 3
                 *    @param checkvars[][][1] = terrain base sound attenuation cases 2 & 3
@@ -968,18 +990,18 @@ void map::batch_flood_fill_sounds()
                 *    @param checkvars[][][7] = Does the tile count as a sound wall?
                 */
                 std::bitset<8> checkvars[env_length][env_length];
-                memset(checkvars, 0, sizeof(checkvars));
+                memset( checkvars, 0, sizeof( checkvars ) );
 
                 // We run through this often enough that we might as well make a lambda of it.
-                auto check_walls = [&](const uint8_t &dir) -> void{
-                    const auto &wall_dirs = wall_check_by_sdirection[get_san_dir(dir)];
+                auto check_walls = [&]( const uint8_t &dir ) -> void{
+                    const auto &wall_dirs = wall_check_by_sdirection[get_san_dir( dir )];
                     const auto &wall1_cv_p = adjacent_tiles[wall_dirs.first] + cv_env_rel_ms_adj;
                     const auto &wall1_checkvars = checkvars[wall1_cv_p.x()][wall1_cv_p.y()];
                     const auto &wall2_cv_p = adjacent_tiles[wall_dirs.second] + cv_env_rel_ms_adj;
                     const auto &wall2_checkvars = checkvars[wall2_cv_p.x()][wall2_cv_p.y()];
                     const auto &wall1 = wall1_checkvars[7];
                     const auto &wall2 = wall2_checkvars[7];
-                    wall_bools = get_s_wall_bool_pair(wall1,wall2);
+                    wall_bools = get_s_wall_bool_pair( wall1, wall2 );
                 };
 
                 // Given some point, return the corresponding volume vector index.
@@ -988,11 +1010,11 @@ void map::batch_flood_fill_sounds()
                     return temp_sound_cache.p_to_env_index( p );
                 };
 
-                for ( uint8_t x = 0; x < env_length; x++ ) {
-                    for ( uint8_t y = 0; y < env_length; y++ ) {
-                        const auto env_tile = checkvar_index_p + point{x,y};
+                for( uint8_t x = 0; x < env_length; x++ ) {
+                    for( uint8_t y = 0; y < env_length; y++ ) {
+                        const auto env_tile = checkvar_index_p + point{x, y};
                         auto &env_tile_vars = checkvars[env_tile.x()][env_tile.y()];
-                        if (!inbounds(env_tile)){
+                        if( !inbounds( env_tile ) ) {
                             // If we are out of bounds, set all bits to true to indicate this.
                             env_tile_vars.set();
                             continue;
@@ -1001,16 +1023,20 @@ void map::batch_flood_fill_sounds()
                             const auto et_midx = map_cache.idx( env_tile.x(), env_tile.y() );
                             const auto tile_absorp = absorption_cache[et_midx];
                             // First two bits set our base terrain absorption from landusecode
-                            const uint8_t base_absorp = get_base_absorp_index(tile_absorp);
-                            const uint8_t struc_absorp = get_tile_absorp_index(tile_absorp);
+                            const uint8_t base_absorp = get_base_absorp_index( tile_absorp );
+                            const uint8_t struc_absorp = get_tile_absorp_index( tile_absorp );
                             // Redo the encoding here to make more compact. 6 total cases for the various absorption, which can fit on 3 bits
                             // Which gives us space for floor chache on this level check
-                            env_tile_vars[0] = (base_absorp == 1 || base_absorp == 3); // terrain base sound attenuation cases 1 & 3
-                            env_tile_vars[1] = (base_absorp == 2 || base_absorp == 3); // terrain base sound attenuation cases 2 & 3
-                            env_tile_vars[2] = (struc_absorp == 1 || struc_absorp == 3); // tile sound attenuation cases 1 & 3
-                            env_tile_vars[3] = (struc_absorp == 2 || struc_absorp == 3); // tile sound attenuation cases 2 & 3
-                            env_tile_vars[4] = (check_up_valid) ? up_map_cache.floor_cache[et_midx] > 0 : false; // Is there a roof above us?
-                            env_tile_vars[5] = map_cache.floor_cache[et_midx] == 0; // If there is no floor in our tile, we can escape down.
+                            env_tile_vars[0] = ( base_absorp == 1 ||
+                                                 base_absorp == 3 ); // terrain base sound attenuation cases 1 & 3
+                            env_tile_vars[1] = ( base_absorp == 2 ||
+                                                 base_absorp == 3 ); // terrain base sound attenuation cases 2 & 3
+                            env_tile_vars[2] = ( struc_absorp == 1 || struc_absorp == 3 ); // tile sound attenuation cases 1 & 3
+                            env_tile_vars[3] = ( struc_absorp == 2 || struc_absorp == 3 ); // tile sound attenuation cases 2 & 3
+                            env_tile_vars[4] = ( check_up_valid ) ? up_map_cache.floor_cache[et_midx] > 0 :
+                                               false; // Is there a roof above us?
+                            env_tile_vars[5] = map_cache.floor_cache[et_midx] ==
+                                               0; // If there is no floor in our tile, we can escape down.
                             env_tile_vars[6] = outside_cache[et_midx]; // are we outside?
                             env_tile_vars[7] = map_cache.sound_wall_cache[et_midx]; // Does the tile count as a sound wall?
                             // It is impossible for all of these bools to be true at once.
@@ -1018,9 +1044,10 @@ void map::batch_flood_fill_sounds()
                             // If we have no roof, we are outdoors, no soundwall and it is winter, we can assume that there is snow cover.
                         }
                     }
-                }       
+                }
 
-                auto check_escape = [&]( const int &cv_env_x, const int &cv_env_y, const short & tile_vol, const uint8_t &dist ) {
+                auto check_escape = [&]( const int &cv_env_x, const int &cv_env_y, const short & tile_vol,
+                const uint8_t &dist ) {
                     const auto &tilevars = checkvars[cv_env_x][cv_env_y];
                     if( tilevars[6] && check_up_valid ) {
                         if( !tilevars[4] && tile_vol > escape_vol[SDI_UP] ) {
@@ -1049,7 +1076,7 @@ void map::batch_flood_fill_sounds()
                 adjacent_tiles = get_adjacent_tiles( temp_sound_cache.sound.origin.xy() );
 
                 const auto &orig_to_cv = temp_sound_cache.origin + cv_env_rel_ms_adj;
-                check_escape( orig_to_cv.x(),orig_to_cv.y(),
+                check_escape( orig_to_cv.x(), orig_to_cv.y(),
                               dBspl_to_mdBspl( temp_sound_cache.sound.volume ) - dist_vol_loss[2], 2 );
 
                 // This propagates the sounds from the source tile to the 8 adjacent tiles, setting initial directions, distances and volumes.
@@ -1066,12 +1093,13 @@ void map::batch_flood_fill_sounds()
                         // And set our tile volume based on the distance. We know that the sound origin is atleast 1600mdB.
                         // Set our direction based upon the adjacent tile index.
                         svol[vol_index] = std::max( 0,
-                                                       ( svol[vol_index] -  dist_vol_loss[2] - absorption_from_checkvar_bitset(t_checkvars) - snowbonus));
-                                                               
+                                                    ( svol[vol_index] -  dist_vol_loss[2] - absorption_from_checkvar_bitset(
+                                                          t_checkvars ) - snowbonus ) );
+
 
                         if( temp_sound_cache.in_envelope( tile ) && svol[vol_index] > 0 ) {
 
-                            check_escape( cv_env_tile.x(),cv_env_tile.y(), svol[vol_index], 2 );
+                            check_escape( cv_env_tile.x(), cv_env_tile.y(), svol[vol_index], 2 );
 
                             ptq.emplace( propagation_tile( tile, svol[vol_index], i, 2 ) );
                         }
@@ -1088,14 +1116,15 @@ void map::batch_flood_fill_sounds()
                     // Grab our adjacent tiles, and the values for our center tile.
                     adjacent_tiles = get_adjacent_tiles( ptile.pos );
                     // Set our wall1 and wall2 bools
-                    const auto &san_pdir = get_san_dir(ptile.dir);
-                    check_walls(ptile.dir);
+                    const auto &san_pdir = get_san_dir( ptile.dir );
+                    check_walls( ptile.dir );
 
                     // Iterate through adjacent tiles.
                     const auto &dirs_to_check = spropagation_tiles_by_sdirection[san_pdir];
                     for( uint8_t adj_tile_dir : dirs_to_check ) {
-                        // Check should be being fed only constexpr inputs by this point. 
-                        if( skip_due_to_wall( get_s_wall_bool_pair(wall_bools.first, wall_bools.second), san_pdir, adj_tile_dir ) ) {
+                        // Check should be being fed only constexpr inputs by this point.
+                        if( skip_due_to_wall( get_s_wall_bool_pair( wall_bools.first, wall_bools.second ), san_pdir,
+                                              adj_tile_dir ) ) {
                             continue;
                         }
 
@@ -1107,9 +1136,12 @@ void map::batch_flood_fill_sounds()
                             auto &adj_tile_vol = svol[v_index_from_p( adj_tile )];
                             // Cap our tile distance between 1 and 121 to prevent overflow. We dont have or need distance loss values past dist_vol_loss[121]
                             // as the change in distance loss values past this point are negligible for gameplay scale.
-                            const uint8_t dist_for_vol_loss = get_distance_for_volume_loss( ptile.dist, ( adj_tile_dir = dirs_to_check.front() ||
-                                                              adj_tile_dir == dirs_to_check.back()) );
-                            const short vol_to_check = std::max(0, ( ptile.vol - absorption_from_checkvar_bitset(adjt_checkvars) - ( dist_vol_loss[dist_for_vol_loss] ) - snowbonus ));
+                            const uint8_t dist_for_vol_loss = get_distance_for_volume_loss( ptile.dist,
+                                                              ( adj_tile_dir = dirs_to_check.front() ||
+                                                                      adj_tile_dir == dirs_to_check.back() ) );
+                            const short vol_to_check = std::max( 0,
+                                                                 ( ptile.vol - absorption_from_checkvar_bitset( adjt_checkvars ) -
+                                                                   ( dist_vol_loss[dist_for_vol_loss] ) - snowbonus ) );
                             // General priority goes loudest volume, then largest distance. Smaller distances loose volume more quickly.
                             // If volumes are equal and directions are one off from eachother, the cardinal direction wins.
                             // We dont want to track inaudible single dB values across the entire map for each sound.
@@ -1126,7 +1158,7 @@ void map::batch_flood_fill_sounds()
                                 }
                                 adj_tile_vol = vol_to_check;
 
-                                check_escape( adj_tile_cve.x(),adj_tile_cve.y(), vol_to_check, dist_for_vol_loss );
+                                check_escape( adj_tile_cve.x(), adj_tile_cve.y(), vol_to_check, dist_for_vol_loss );
 
                                 if( adj_tile_vol > SOUND_ABSORPTION_OPEN_FIELD ) {
                                     // If the tiles new volume is greater than our old one and is inside the envelope, mark it for update.
@@ -1154,8 +1186,8 @@ void map::batch_flood_fill_sounds()
                 int vol_tally = 0;
                 int non_zero = 0;
 
-                auto comp_cart_escape = [&](const uint8_t &cart_dir) -> void{
-                    escape_vol[cart_dir] = ( non_zero == 0 ) ? 0 : static_cast<short>(std::round(sqrt( static_cast<float>(vol_tally) / non_zero )));
+                auto comp_cart_escape = [&]( const uint8_t &cart_dir ) -> void{
+                    escape_vol[cart_dir] = ( non_zero == 0 ) ? 0 : static_cast<short>( std::round( sqrt( static_cast<float>( vol_tally ) / non_zero ) ) );
                     vol_tally = 0;
                     non_zero = 0;
                 };
@@ -1166,7 +1198,7 @@ void map::batch_flood_fill_sounds()
                         vol_tally += pow( svol[ i * envelope_width + envelope_width], 2 );
                     }
                 }
-                comp_cart_escape(SDI_N);
+                comp_cart_escape( SDI_N );
 
                 for( int i = 0; i <= envelope_width; i++ ) {
                     // For east escapes all all of our desired volumes will be at envelope_x = radius * 2.
@@ -1175,7 +1207,7 @@ void map::batch_flood_fill_sounds()
                         vol_tally += pow( svol[( envelope_width * envelope_width ) + i], 2 );
                     }
                 }
-                comp_cart_escape(SDI_E);
+                comp_cart_escape( SDI_E );
 
                 for( int i = 0; i <= envelope_width; i++ ) {
                     // For south escapes all all of our desired volumes will be at envelope_y = 0.
@@ -1184,7 +1216,7 @@ void map::batch_flood_fill_sounds()
                         vol_tally += pow( svol[ i * envelope_width ], 2 );
                     }
                 }
-                comp_cart_escape(SDI_S);
+                comp_cart_escape( SDI_S );
 
                 for( int i = 0; i <= envelope_width; i++ ) {
                     // For west escapes all all of our desired volumes will be at envelope_x = 0.
@@ -1194,16 +1226,16 @@ void map::batch_flood_fill_sounds()
                         vol_tally += pow( svol[ i ], 2 );
                     }
                 }
-                comp_cart_escape(SDI_W);
+                comp_cart_escape( SDI_W );
 
                 // Now run through our diagonals.
                 // Now run through our diagonals.
-                for (uint8_t i : sanitized_sound_direction_indexes_diagonal){
+                for( uint8_t i : sanitized_sound_direction_indexes_diagonal ) {
                     const auto &cclockwise = wall_check_by_sdirection[i].first;
                     const auto &clockwise = wall_check_by_sdirection[i].second;
                     escape_vol[i] = ( escape_vol[clockwise] != 0 ||
-                                            escape_vol[cclockwise] != 0 ) ? sqrt( ( pow( escape_vol[cclockwise],
-                                                    2 ) + pow( escape_vol[clockwise], 2 ) ) / 2 ) : 0;
+                                      escape_vol[cclockwise] != 0 ) ? sqrt( ( pow( escape_vol[cclockwise],
+                                              2 ) + pow( escape_vol[clockwise], 2 ) ) / 2 ) : 0;
                 }
 
                 if( temp_sound_cache.source_indoors && escape_vol[SDI_UP] > 0 ) {
@@ -1272,7 +1304,7 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
     std::ranges::fill( std::span( &absorption_cache[0][0], SEEX * SEEY ), default_terrain_absorption );
     // We are by neccesity rebuilding the sound wall cache as well, so lets zero that out.
     std::ranges::fill( std::span( &sound_wall_cache[0][0], SEEX * SEEY ), false );
-    
+
     const point_bub_ms abs_p = project_to<coords::ms>( grid_pos ).xy();
     // For use when checking the vehicle cache.
     const tripoint_bub_ms abs_trip = project_to<coords::ms>( grid_pos );
@@ -1383,11 +1415,11 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
         {
             // We are on the border of the submap. Lets first figure out which tiles are in our submap or are out of bounds.
             tris_to_check = get_adjacent_tripoints( abs_trip + sp.raw() );
-            check_out_of_bounds(tris_to_check, out_of_bounds);
-            check_if_in_submap(points_to_check, in_submap);
-            for (uint8_t i : san_sdir ) {
-                if ( !out_of_bounds[i] ) {
-                    if ( in_submap[i] ) {
+            check_out_of_bounds( tris_to_check, out_of_bounds );
+            check_if_in_submap( points_to_check, in_submap );
+            for( uint8_t i : san_sdir ) {
+                if( !out_of_bounds[i] ) {
+                    if( in_submap[i] ) {
                         const auto &adj_tile = points_to_check[i];
                         const auto &checkvars = check_vars[adj_tile.x()][adj_tile.y()];
                         if( checkvars == 0 ) {
@@ -1456,7 +1488,7 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
         // Now lets take our easy outs
         if( !roof_above_center_tile || outside_cache[sp.x()][sp.y()] ) {
             // If we are outside or have no roof, assign values and continue.
-            if (center_checkvar >= 10){
+            if( center_checkvar >= 10 ) {
                 absorption_cache[sp.x()][sp.y()] += SOUND_ABSORPTION_BARRIER;
             }
             continue;

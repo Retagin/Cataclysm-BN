@@ -453,7 +453,7 @@ struct sound_instance_cache {
     // The flood envelope is 1 + (radius * 2) on a side.
     // Set based on the dist_enum above, and the distance setting for each enum in sound_cache.
     // radius 7 equates to a 15x15 area, radius 3 is a 7x7 area.
-    // However as our index point starts at local x/y = 0, 
+    // However as our index point starts at local x/y = 0,
     // our bounds are actually radius * 2, radius * 2
     int flood_radius = 3;
 
@@ -623,11 +623,11 @@ struct sound_cache {
 
     // Return the radius to flood a sound out to from the provided enum.
     int flood_radius_by_enum( const enum sound_vol_for_flood_dist &dist_enum ) const {
-        return get_flood_radius_by_enum(dist_enum);
+        return get_flood_radius_by_enum( dist_enum );
     }
     // Return a sorting enum provided a dB volume short.
     sound_vol_for_flood_dist flood_dist_enum_by_volume( const short &dB_vol ) const {
-        return get_flood_dist_enum(dB_vol);
+        return get_flood_dist_enum( dB_vol );
     }
     // Generated and checked against while informing monster AI of sounds.
     // MUST be cleared after all monsters are informed of sounds, or if the sound cache gets culled.
