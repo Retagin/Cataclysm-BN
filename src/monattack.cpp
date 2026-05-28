@@ -3822,13 +3822,20 @@ void mattack::atgm( monster *z, Creature *target )
     if( dist > 50 ) {
         return;
     }
-
+    sound_event se;
+    se.origin = z->bub_pos();
+    se.from_monster = true;
+    se.monfaction = z->faction->id;
+    se.category = sounds::sound_t::combat;
     if( !z->has_effect( effect_targeted ) ) {
         //~ There will be a ATGM HEAT sent at high speed to your location next turn.
         target->add_msg_if_player( m_warning, _( "You're not sure why you've got a laser dot on you…" ) );
         //~ Sound of a atgm tube uncovering swiveling into place
-        sounds::sound( z->bub_pos(), 10, sounds::sound_t::combat, _( "whirrrrrclick." ), false, "misc",
-                       "servomotor" );
+        se.description = _( "whirrrrrclick." );
+        se.id = "misc";
+        se.variant = "servomotor";
+        se.volume = 75;
+        sounds::sound( se );
         z->add_effect( effect_targeted, 1_minutes );
         target->add_effect( effect_laserlocked, 1_minutes );
         z->moves -= 200;
@@ -3845,12 +3852,17 @@ void mattack::atgm( monster *z, Creature *target )
     z->moves -= 150;
 
     if( z->ammo[ammo_type] <= 0 ) {
+        se.id = "fire_gun";
+        se.variant = "empty";
         if( one_in( 3 ) ) {
-            sounds::sound( z->bub_pos(), 2, sounds::sound_t::combat, _( "a chk!" ), false, "fire_gun",
-                           "empty" );
+            se.description = _( "a chk!" );
+            se.volume = 50;
+            sounds::sound( se );
+
         } else if( one_in( 4 ) ) {
-            sounds::sound( z->bub_pos(), 6, sounds::sound_t::combat, _( "clank!" ), false, "fire_gun",
-                           "empty" );
+            se.description = _( "clank!" );
+            se.volume = 60;
+            sounds::sound( se );
         }
         return;
     }
