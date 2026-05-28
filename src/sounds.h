@@ -1,7 +1,9 @@
 #pragma once
 
 #include <array>
+#include <bitset>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <string>
@@ -88,15 +90,226 @@ struct enum_traits<sounds::sound_t> {
     static constexpr auto last = sounds::sound_t::_LAST;
 };
 
-enum class sound_vol_for_flood_dist : int {
+// Use these to tweak sound floodfilling.
+// Only here for completeness and characters with super hearing or bionic ears in an anechoic chamber.
+static constexpr uint8_t flood_radius_SILENT = 1; // 3x3 flood.
+static constexpr uint8_t flood_radius_NEARLY_SILENT = 3;
+static constexpr uint8_t flood_radius_QUIET = 4;
+static constexpr uint8_t flood_radius_NORMAL = 6;
+static constexpr uint8_t flood_radius_LOUD = 8;
+static constexpr uint8_t flood_radius_VERY_LOUD = 10;
+static constexpr uint8_t flood_radius_DEAFENING = 12; // radius 12 equates to a 25x25 flooded zone.
+// in dB spl
+static constexpr short vol_threshold_SILENT = 1;
+// in dB spl
+static constexpr short vol_threshold_NEARLY_SILENT = 20;
+// in dB spl
+static constexpr short vol_threshold_QUIET = 45;
+// in dB spl
+static constexpr short vol_threshold_NORMAL = 75;
+// in dB spl
+static constexpr short vol_threshold_LOUD = 95;
+// in dB spl
+static constexpr short vol_threshold_VERY_LOUD = 125;
+// in dB spl
+static constexpr short vol_threshold_DEAFENING = 191;
+
+// The total checked radius is + 1 of its equivalent flood radius.
+// We need to check all tiles adjacent to the ones we flood to, hence the widened area. 
+// We declare these so that we can actually generate a 2d array of the correct size.
+
+static constexpr uint8_t total_check_radius_SILENT = flood_radius_SILENT + 1;
+static constexpr uint8_t total_check_radius_NEARLY_SILENT = flood_radius_NEARLY_SILENT + 1;
+static constexpr uint8_t total_check_radius_QUIET = flood_radius_QUIET + 1;
+static constexpr uint8_t total_check_radius_NORMAL = flood_radius_NORMAL + 1;
+static constexpr uint8_t total_check_radius_LOUD = flood_radius_LOUD + 1;
+static constexpr uint8_t total_check_radius_VERY_LOUD = flood_radius_VERY_LOUD + 1;
+static constexpr uint8_t total_check_radius_DEAFENING = flood_radius_DEAFENING + 1;
+
+static constexpr uint8_t total_check_envelope_SILENT = (1 + (2 * total_check_radius_SILENT));
+static constexpr uint8_t total_check_envelope_NEARLY_SILENT = (1 + (2 * total_check_radius_NEARLY_SILENT));
+static constexpr uint8_t total_check_envelope_QUIET = (1 + (2 * total_check_radius_QUIET));
+static constexpr uint8_t total_check_envelope_NORMAL = (1 + (2 * total_check_radius_NORMAL));
+static constexpr uint8_t total_check_envelope_LOUD = (1 + (2 * total_check_radius_LOUD));
+static constexpr uint8_t total_check_envelope_VERY_LOUD = (1 + (2 * total_check_radius_VERY_LOUD));
+static constexpr uint8_t total_check_envelope_DEAFENING = (1 + (2 * total_check_radius_DEAFENING));
+
+enum class sound_vol_for_flood_dist : int 
+{
     SILENT,
     NEARLY_SILENT,
     QUIET,
     NORMAL,
     LOUD,
     VERY_LOUD,
-    DEAFENING
+    DEAFENING,
+    _LAST
 };
+
+template<>
+struct enum_traits<sound_vol_for_flood_dist> {
+    static constexpr auto last = sound_vol_for_flood_dist::_LAST;
+};
+
+enum class floodfill_checkvar_envelope_size : uint8_t 
+{
+    SILENT = total_check_envelope_SILENT,
+    NEARLY_SILENT = total_check_envelope_NEARLY_SILENT,
+    QUIET = total_check_envelope_QUIET,
+    NORMAL = total_check_envelope_NORMAL,
+    LOUD = total_check_envelope_LOUD,
+    VERY_LOUD = total_check_envelope_VERY_LOUD,
+    DEAFENING = total_check_envelope_DEAFENING,
+    _LAST = 28,
+};
+
+template<>
+struct enum_traits<floodfill_checkvar_envelope_size> {
+    static constexpr auto last = floodfill_checkvar_envelope_size::_LAST;
+};
+
+// static constexpr auto flood_dist_enum_by_index = std::array<sound_vol_for_flood_dist, 7> {
+//     {sound_vol_for_flood_dist::SILENT, 
+//     sound_vol_for_flood_dist::NEARLY_SILENT,
+//     sound_vol_for_flood_dist::QUIET,
+//     sound_vol_for_flood_dist::NORMAL,
+//     sound_vol_for_flood_dist::LOUD,
+//     sound_vol_for_flood_dist::VERY_LOUD,
+//     sound_vol_for_flood_dist::DEAFENING}
+// };
+
+static constexpr auto get_flood_dist_enum( const short &dB_vol )  
+{
+    if( dB_vol > vol_threshold_VERY_LOUD ) {
+        return sound_vol_for_flood_dist::DEAFENING;
+    } else if( dB_vol > vol_threshold_LOUD ) {
+        return sound_vol_for_flood_dist::VERY_LOUD;
+    } else if( dB_vol > vol_threshold_NORMAL ) {
+        return sound_vol_for_flood_dist::LOUD;
+    } else if( dB_vol > vol_threshold_QUIET ) {
+        return sound_vol_for_flood_dist::NORMAL;
+    } else if( dB_vol > vol_threshold_NEARLY_SILENT ) {
+        return sound_vol_for_flood_dist::QUIET;
+    } else if( dB_vol > vol_threshold_SILENT ) {
+        return sound_vol_for_flood_dist::NEARLY_SILENT;
+    } else {
+        return sound_vol_for_flood_dist::SILENT;
+    }
+}
+
+static constexpr auto get_flood_radius_by_enum( const enum sound_vol_for_flood_dist &dist_enum )  
+{
+    switch( dist_enum ) {
+        case sound_vol_for_flood_dist::SILENT:
+            return flood_radius_SILENT;
+        case sound_vol_for_flood_dist::NEARLY_SILENT:
+            return flood_radius_NEARLY_SILENT;
+        case sound_vol_for_flood_dist::QUIET:
+            return flood_radius_QUIET;
+        case sound_vol_for_flood_dist::NORMAL:
+            return flood_radius_NORMAL;
+        case sound_vol_for_flood_dist::LOUD:
+            return flood_radius_LOUD;
+        case sound_vol_for_flood_dist::VERY_LOUD:
+            return flood_radius_VERY_LOUD;
+        case sound_vol_for_flood_dist::DEAFENING:
+            return flood_radius_DEAFENING;
+        case sound_vol_for_flood_dist::_LAST:
+            return flood_radius_SILENT;
+    }
+}
+
+// static constexpr auto flood_dist_by_index = std::array<uint8_t, 7> 
+// {
+//     {flood_radius_SILENT, flood_radius_NEARLY_SILENT, flood_radius_QUIET, flood_radius_NORMAL, flood_radius_LOUD, flood_radius_VERY_LOUD, flood_radius_DEAFENING}
+// };
+
+// static constexpr auto total_check_dist_by_index = std::array<uint8_t, 7> 
+// {
+//     {total_check_radius_SILENT, total_check_radius_NEARLY_SILENT, total_check_radius_QUIET, total_check_radius_NORMAL, total_check_radius_LOUD, total_check_radius_VERY_LOUD, total_check_radius_DEAFENING}
+// };
+
+static constexpr auto total_check_envelop_by_index = std::array<uint8_t, 7> 
+{
+    {total_check_envelope_SILENT, total_check_envelope_NEARLY_SILENT, total_check_envelope_QUIET, total_check_envelope_NORMAL, total_check_envelope_LOUD, total_check_envelope_VERY_LOUD, total_check_envelope_DEAFENING}
+};
+
+static constexpr auto get_total_check_radius_by_enum( const enum sound_vol_for_flood_dist &dist_enum )  
+{
+    switch( dist_enum ) {
+        case sound_vol_for_flood_dist::SILENT:
+            return total_check_radius_SILENT;
+        case sound_vol_for_flood_dist::NEARLY_SILENT:
+            return total_check_radius_NEARLY_SILENT;
+        case sound_vol_for_flood_dist::QUIET:
+            return total_check_radius_QUIET;
+        case sound_vol_for_flood_dist::NORMAL:
+            return total_check_radius_NORMAL;
+        case sound_vol_for_flood_dist::LOUD:
+            return total_check_radius_LOUD;
+        case sound_vol_for_flood_dist::VERY_LOUD:
+            return total_check_radius_VERY_LOUD;
+        case sound_vol_for_flood_dist::DEAFENING:
+            return total_check_radius_DEAFENING;
+        case sound_vol_for_flood_dist::_LAST:
+            return total_check_radius_SILENT;
+    }
+}
+
+// static constexpr auto get_total_checkvar_length(const enum sound_vol_for_flood_dist &dist_enum) {
+//     switch( dist_enum ) {
+//         case sound_vol_for_flood_dist::SILENT:
+//             return total_check_envelope_SILENT;
+//         case sound_vol_for_flood_dist::NEARLY_SILENT:
+//             return total_check_envelope_NEARLY_SILENT;
+//         case sound_vol_for_flood_dist::QUIET:
+//             return total_check_envelope_QUIET;
+//         case sound_vol_for_flood_dist::NORMAL:
+//             return total_check_envelope_NORMAL;
+//         case sound_vol_for_flood_dist::LOUD:
+//             return total_check_envelope_LOUD;
+//         case sound_vol_for_flood_dist::VERY_LOUD:
+//             return total_check_envelope_VERY_LOUD;
+//         case sound_vol_for_flood_dist::DEAFENING:
+//             return total_check_envelope_DEAFENING;
+//         case sound_vol_for_flood_dist::_LAST:
+//             return total_check_envelope_SILENT;
+//     }
+// }
+
+// static constexpr auto get_total_checkvar_length( const enum floodfill_checkvar_envelope_size &checkvar_enum )  
+// {
+//     switch( checkvar_enum ) {
+//         case floodfill_checkvar_envelope_size::SILENT:
+//             return total_check_radius_SILENT;
+//         case floodfill_checkvar_envelope_size::NEARLY_SILENT:
+//             return total_check_radius_NEARLY_SILENT;
+//         case floodfill_checkvar_envelope_size::QUIET:
+//             return total_check_radius_QUIET;
+//         case floodfill_checkvar_envelope_size::NORMAL:
+//             return total_check_radius_NORMAL;
+//         case floodfill_checkvar_envelope_size::LOUD:
+//             return total_check_radius_LOUD;
+//         case floodfill_checkvar_envelope_size::VERY_LOUD:
+//             return total_check_radius_VERY_LOUD;
+//         case floodfill_checkvar_envelope_size::DEAFENING:
+//             return total_check_radius_DEAFENING;
+//         case floodfill_checkvar_envelope_size::_LAST:
+//             return total_check_radius_SILENT;
+//     }
+// }
+
+//static constexpr auto dummy_floodfill_checkvars_SILENT = std::array<std::array<std::bitset<8>, total_check_envelope_SILENT>, total_check_envelope_SILENT>{{{0}}};
+//static constexpr auto dummy_floodfill_checkvars_NEARLY_SILENT = std::array<std::array<std::bitset<8>, total_check_envelope_NEARLY_SILENT>, total_check_envelope_NEARLY_SILENT>{{{0}}};
+//static constexpr auto dummy_floodfill_checkvars_QUIET = std::array<std::array<std::bitset<8>, total_check_envelope_QUIET>, total_check_envelope_QUIET>{{{0}}};
+//static constexpr auto dummy_floodfill_checkvars_NORMAL = std::array<std::array<std::bitset<8>, total_check_envelope_NORMAL>, total_check_envelope_NORMAL>{{{0}}};
+//static constexpr auto dummy_floodfill_checkvars_LOUD = std::array<std::array<std::bitset<8>, total_check_envelope_LOUD>, total_check_envelope_LOUD>{{{0}}};
+//static constexpr auto dummy_floodfill_checkvars_VERY_LOUD = std::array<std::array<std::bitset<8>, total_check_envelope_VERY_LOUD>, total_check_envelope_VERY_LOUD>{{{0}}};
+//static constexpr auto dummy_floodfill_checkvars_DEAFENING = std::array<std::array<std::bitset<8>, total_check_envelope_DEAFENING>, total_check_envelope_DEAFENING>{{{0}}};
+//template <typename T, std::size_t Row, std::size_t Col>
+//using tot_checkvar_env = std::array<std::array<T,Col>, Row>;
+
+
 namespace sfx
 {
 //Channel assignments:
@@ -185,7 +398,7 @@ struct enum_traits<sfx::channel> {
 /**
 * sound_event to pass to the sounds::sound() to flood fill out the sound or pass ambient noise to the player.
 * How loud a sound is at the source tile (or how loud an ambient sound is), in Decibels Sound Pressure Level (dB spl, or dB) at a reference distance of 1 meter from the sound source.
-* Valid input is 0-191. volume must be atleast 20dB to propagate, volumes louder than 191dB will be reduced to 191dB.
+* Valid input is 0-191. Volumes louder than 191dB will be reduced to 191dB.
 * See the wall of text below for more context, physics and proper usage if desired.
 * @param volume
 * What is the tripoint position of the sound source?
@@ -303,7 +516,8 @@ struct sound_event {
     mfaction_str_id monfaction = mfaction_str_id( "" );
 };
 
-// Sounds are not valid to be flood filled if they are below this threshold.
+// Sounds are not valid to be properly flood filled below this threshold.
+// The sound will be only flooded to the adjacent tiles if below this threshold. 
 // We also take this as our average minimum audible volume for filtering purposes.
 static constexpr short SOUND_MINIMUM_VOLUME_FOR_PROPAGATION = 2000;
 
@@ -327,66 +541,57 @@ static constexpr auto dist_vol_loss = std::array<short, 122>
     9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7, 7
 };
 
-// Provides an array of the bubble points adjacent to a point.
+// Provides an array of the bubble points adjacent to a point. 
 // The index of an adjacent tile is used as the direction index to that tile.
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
 static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_bub_ms &p )
-{
-    return std::array<point_bub_ms, 8> { {
-            p + point_rel_ms::north_west(), // Direction 0
-            p + point_rel_ms::north(),      // Direction 1
-            p + point_rel_ms::north_east(), // Direction 2
-            p + point_rel_ms::east(),       // Direction 3
-            p + point_rel_ms::south_east(), // Direction 4
-            p + point_rel_ms::south(),      // Direction 5
-            p + point_rel_ms::south_west(), // Direction 6
-            p + point_rel_ms::west()
-        }
-    };   // Direction 7
+{    
+    return std::array<point_bub_ms, 8>{ { p + point_rel_ms::north_west(), // Direction 0
+        p + point_rel_ms::north(),      // Direction 1
+        p + point_rel_ms::north_east(), // Direction 2
+        p + point_rel_ms::east(),       // Direction 3
+        p + point_rel_ms::south_east(), // Direction 4
+        p + point_rel_ms::south(),      // Direction 5
+        p + point_rel_ms::south_west(), // Direction 6
+        p + point_rel_ms::west() } };   // Direction 7
 }
 
+// Use this overload sparingly, it is preferable to 
 // Provides an array of the bubble points adjacent to some submap point.
 // The index of an adjacent tile is used as the direction index to that tile.
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
-static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_sm_ms &sp,
-        const point_bub_sm &grid_pos )
-{
-    const point_bub_ms bp = project_combine( grid_pos, sp );
-    return std::array<point_bub_ms, 8> { {
-            bp + point_rel_ms::north_west(), // Direction 0
-            bp + point_rel_ms::north(),      // Direction 1
-            bp + point_rel_ms::north_east(), // Direction 2
-            bp + point_rel_ms::east(),       // Direction 3
-            bp + point_rel_ms::south_east(), // Direction 4
-            bp + point_rel_ms::south(),      // Direction 5
-            bp + point_rel_ms::south_west(), // Direction 6
-            bp + point_rel_ms::west()
-        }
-    };   // Direction 7
+static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_sm_ms &sp, const point_bub_sm &grid_pos )
+{    
+    const point_bub_ms bp = project_combine(grid_pos, sp);
+    return std::array<point_bub_ms, 8>{ { bp + point_rel_ms::north_west(), // Direction 0
+        bp + point_rel_ms::north(),      // Direction 1
+        bp + point_rel_ms::north_east(), // Direction 2
+        bp + point_rel_ms::east(),       // Direction 3
+        bp + point_rel_ms::south_east(), // Direction 4
+        bp + point_rel_ms::south(),      // Direction 5
+        bp + point_rel_ms::south_west(), // Direction 6
+        bp + point_rel_ms::west() } };   // Direction 7
 }
 
-// Provides an array of the tripoints adjacent to some bubble tripoint.
+// Provides an array of the tripoints adjacent to some bubble tripoint. 
 // The index of an adjacent tile is used as the direction index to that tile.
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
 static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const tripoint_bub_ms &p )
-{
-    return std::array<tripoint_bub_ms, 8> { {
-            p + tripoint_rel_ms::north_west(), // Direction 0
-            p + tripoint_rel_ms::north(),      // Direction 1
-            p + tripoint_rel_ms::north_east(), // Direction 2
-            p + tripoint_rel_ms::east(),       // Direction 3
-            p + tripoint_rel_ms::south_east(), // Direction 4
-            p + tripoint_rel_ms::south(),      // Direction 5
-            p + tripoint_rel_ms::south_west(), // Direction 6
-            p + tripoint_rel_ms::west()
-        }
-    };   // Direction 7
+{    
+    return std::array<tripoint_bub_ms, 8>{ { p + tripoint_rel_ms::north_west(), // Direction 0
+        p + tripoint_rel_ms::north(),      // Direction 1
+        p + tripoint_rel_ms::north_east(), // Direction 2
+        p + tripoint_rel_ms::east(),       // Direction 3
+        p + tripoint_rel_ms::south_east(), // Direction 4
+        p + tripoint_rel_ms::south(),      // Direction 5
+        p + tripoint_rel_ms::south_west(), // Direction 6
+        p + tripoint_rel_ms::west() } };   // Direction 7
 }
 
 // Provides an array of the bubble tripoints adjacent to some submap point.
@@ -394,21 +599,17 @@ static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const tr
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
-static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const point_sm_ms &sp,
-        const tripoint_bub_sm &grid_pos )
-{
-    const tripoint_bub_ms btri = project_combine( grid_pos, sp );
-    return std::array<tripoint_bub_ms, 8> { {
-            btri + tripoint_rel_ms::north_west(), // Direction 0
-            btri + tripoint_rel_ms::north(),      // Direction 1
-            btri + tripoint_rel_ms::north_east(), // Direction 2
-            btri + tripoint_rel_ms::east(),       // Direction 3
-            btri + tripoint_rel_ms::south_east(), // Direction 4
-            btri + tripoint_rel_ms::south(),      // Direction 5
-            btri + tripoint_rel_ms::south_west(), // Direction 6
-            btri + tripoint_rel_ms::west()
-        }
-    };   // Direction 7
+static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const point_sm_ms &sp, const tripoint_bub_sm &grid_pos )
+{    
+    const tripoint_bub_ms btri = project_combine(grid_pos, sp);
+    return std::array<tripoint_bub_ms, 8>{ { btri + tripoint_rel_ms::north_west(), // Direction 0
+        btri + tripoint_rel_ms::north(),      // Direction 1
+        btri + tripoint_rel_ms::north_east(), // Direction 2
+        btri + tripoint_rel_ms::east(),       // Direction 3
+        btri + tripoint_rel_ms::south_east(), // Direction 4
+        btri + tripoint_rel_ms::south(),      // Direction 5
+        btri + tripoint_rel_ms::south_west(), // Direction 6
+        btri + tripoint_rel_ms::west() } };   // Direction 7
 }
 
 // Provides an array of the bubble tripoints adjacent to some submap point.
@@ -417,21 +618,20 @@ static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const po
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
 // Sorry (not sorry at all) for making this abomination of out of bounds memory access requests.
+// This is the preferd array getter to use when working through a submap for the absorption cache.
 // Sanitize your inputs.
-static constexpr std::array<point_sm_ms, 8> get_adjacent_submap_points( const point_sm_ms &sp )
-{
+static constexpr std::array<point_sm_ms, 8> get_adjacent_submap_points( const point_sm_ms &sp)
+{    
 
-    return std::array<point_sm_ms, 8> { {
-            sp + point_rel_ms::north_west(), // Direction 0
-            sp + point_rel_ms::north(),      // Direction 1
-            sp + point_rel_ms::north_east(), // Direction 2
-            sp + point_rel_ms::east(),       // Direction 3
-            sp + point_rel_ms::south_east(), // Direction 4
-            sp + point_rel_ms::south(),      // Direction 5
-            sp + point_rel_ms::south_west(), // Direction 6
-            sp + point_rel_ms::west()
-        }
-    };   // Direction 7
+    return std::array<point_sm_ms, 8>{ { 
+        sp + point_rel_ms::north_west(), // Direction 0
+        sp + point_rel_ms::north(),      // Direction 1
+        sp + point_rel_ms::north_east(), // Direction 2
+        sp + point_rel_ms::east(),       // Direction 3
+        sp + point_rel_ms::south_east(), // Direction 4
+        sp + point_rel_ms::south(),      // Direction 5
+        sp + point_rel_ms::south_west(), // Direction 6
+        sp + point_rel_ms::west() } };   // Direction 7
 }
 
 // All of these values are kept as static constexprs
@@ -461,29 +661,34 @@ static constexpr uint8_t SDI_DOWN   = 8;
 // Sound Direction Index, Up +Z
 static constexpr uint8_t SDI_UP     = 9;
 
-static constexpr auto sanitized_sound_direction_indexes_full = std::array<uint8_t, 10>
+static constexpr auto sanitized_sound_direction_indexes_full = std::array<uint8_t,10> 
 {
-    {SDI_NW, SDI_N, SDI_NE, SDI_E, SDI_SE, SDI_S, SDI_SW, SDI_W, SDI_DOWN, SDI_UP}
+    {SDI_NW,SDI_N,SDI_NE,SDI_E,SDI_SE,SDI_S,SDI_SW,SDI_W,SDI_DOWN,SDI_UP}
 };
 
-static constexpr auto sanitized_sound_direction_indexes = std::array<uint8_t, 8>
+static constexpr auto sanitized_sound_direction_indexes = std::array<uint8_t,8> 
 {
-    {SDI_NW, SDI_N, SDI_NE, SDI_E, SDI_SE, SDI_S, SDI_SW, SDI_W}
+    {SDI_NW,SDI_N,SDI_NE,SDI_E,SDI_SE,SDI_S,SDI_SW,SDI_W}
 };
 // Provides the cartesion sound direction indexes in clockwise order starting from zero.
-static constexpr auto sanitized_sound_direction_indexes_cartesian = std::array<uint8_t, 4>
+static constexpr auto sanitized_sound_direction_indexes_cartesian = std::array<uint8_t,4> 
 {
     { SDI_N, SDI_E, SDI_S, SDI_W }
 };
-
-// Return the static constexpr version of given direction index.
-// Useful for sanitizing index inputs to use faster logic.
-static constexpr auto get_sound_direction_index( const uint8_t &dir )
+// Provides the diagonal sound direction indexes in clockwise order starting from zero.
+static constexpr auto sanitized_sound_direction_indexes_diagonal = std::array<uint8_t,4> 
 {
-    if( dir > SDI_UP ) {
+    { SDI_NW, SDI_NE, SDI_SE, SDI_SW }
+};
+
+// Return the static constexpr version of given direction index. 
+// Useful for sanitizing index inputs to use faster logic.
+static constexpr auto get_sound_direction_index( const uint8_t &dir)
+{
+    if ( dir > SDI_UP ){
         return SDI_UP;
     } else {
-        return sanitized_sound_direction_indexes_full[dir];
+    return sanitized_sound_direction_indexes_full[dir];
     }
 }
 
@@ -553,8 +758,7 @@ static constexpr auto wall_sdir_invalidation = std::array<std::pair<uint8_t, uin
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
 static constexpr auto opposite_tile_by_sdir = std::array<uint8_t, 8>
 {
-    {
-        SDI_SE, //Direction "0"
+    {   SDI_SE, //Direction "0"
         SDI_S,  //Direction "1"
         SDI_SW, //Direction "2"
         SDI_W,  //Direction "3"
