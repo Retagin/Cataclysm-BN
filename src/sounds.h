@@ -569,23 +569,23 @@ static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_bub
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
-static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_sm_ms &sp,
-        const point_bub_sm &grid_pos )
-{
-    point_bub_ms bp = project_combine( grid_pos, sp );
-    const auto array = std::array<point_bub_ms, 8> { {
-            bp + point_rel_ms::north_west(), // Direction 0
-            bp + point_rel_ms::north(),      // Direction 1
-            bp + point_rel_ms::north_east(), // Direction 2
-            bp + point_rel_ms::east(),       // Direction 3
-            bp + point_rel_ms::south_east(), // Direction 4
-            bp + point_rel_ms::south(),      // Direction 5
-            bp + point_rel_ms::south_west(), // Direction 6
-            bp + point_rel_ms::west()        // Direction 7
-        }
-    };
-    return array;
-}
+// static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_sm_ms &sp,
+//         const point_bub_sm &grid_pos )
+// {
+//     point_bub_ms bp = project_combine( grid_pos, sp );
+//     const auto array = std::array<point_bub_ms, 8> { {
+//             bp + point_rel_ms::north_west(), // Direction 0
+//             bp + point_rel_ms::north(),      // Direction 1
+//             bp + point_rel_ms::north_east(), // Direction 2
+//             bp + point_rel_ms::east(),       // Direction 3
+//             bp + point_rel_ms::south_east(), // Direction 4
+//             bp + point_rel_ms::south(),      // Direction 5
+//             bp + point_rel_ms::south_west(), // Direction 6
+//             bp + point_rel_ms::west()        // Direction 7
+//         }
+//     };
+//     return array;
+// }
 
 // Provides an array of the tripoints adjacent to some bubble tripoint.
 // The index of an adjacent tile is used as the direction index to that tile.
@@ -612,23 +612,23 @@ static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const tr
 // [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
 // [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ @ ] [ 3 ]
 // [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
-static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const point_sm_ms &sp,
-        const tripoint_bub_sm &grid_pos )
-{
-    tripoint_bub_ms btri = project_combine( grid_pos, sp );
-    const auto array = std::array<tripoint_bub_ms, 8> { {
-            btri + tripoint_rel_ms::north_west(), // Direction 0
-            btri + tripoint_rel_ms::north(),      // Direction 1
-            btri + tripoint_rel_ms::north_east(), // Direction 2
-            btri + tripoint_rel_ms::east(),       // Direction 3
-            btri + tripoint_rel_ms::south_east(), // Direction 4
-            btri + tripoint_rel_ms::south(),      // Direction 5
-            btri + tripoint_rel_ms::south_west(), // Direction 6
-            btri + tripoint_rel_ms::west()        // Direction 7
-        }
-    };
-    return array;
-}
+// static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const point_sm_ms &sp,
+//         const tripoint_bub_sm &grid_pos )
+// {
+//     tripoint_bub_ms btri = project_combine( grid_pos, sp );
+//     const auto array = std::array<tripoint_bub_ms, 8> { {
+//             btri + tripoint_rel_ms::north_west(), // Direction 0
+//             btri + tripoint_rel_ms::north(),      // Direction 1
+//             btri + tripoint_rel_ms::north_east(), // Direction 2
+//             btri + tripoint_rel_ms::east(),       // Direction 3
+//             btri + tripoint_rel_ms::south_east(), // Direction 4
+//             btri + tripoint_rel_ms::south(),      // Direction 5
+//             btri + tripoint_rel_ms::south_west(), // Direction 6
+//             btri + tripoint_rel_ms::west()        // Direction 7
+//         }
+//     };
+//     return array;
+// }
 
 // Provides an array of the bubble tripoints adjacent to some submap point.
 // The index of an adjacent tile is used as the direction index to that tile.
