@@ -2103,7 +2103,7 @@ void activity_handlers::reload_finish( player_activity *act, player *p )
                     reload_volume = 70;
                 }
             }
-            
+
             sound_event se;
             se.origin = p->bub_pos();
             se.volume = reload_volume;

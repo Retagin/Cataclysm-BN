@@ -2441,37 +2441,37 @@ void ranged::make_gun_sound_effect( const Character &who, bool burst, const item
             // If it was none of the above but is shooting a gun anyways, its almost certainly a monster
             // of some kind with wierd shenanagins done to make it fire a gun without a fake gun or something.
             // Had to pass a character, which may or may not include a tripoint.
-            
-            Creature *const critter = g->critter_at<Creature>( who.bub_pos() , true);
-            if ( critter ){
-                if ( !critter->is_hallucination() ) {
-                    if ( critter->is_avatar() ){
+
+            Creature *const critter = g->critter_at<Creature>( who.bub_pos(), true );
+            if( critter ) {
+                if( !critter->is_hallucination() ) {
+                    if( critter->is_avatar() ) {
                         se.from_player = true;
                         se.faction = critter->as_avatar()->get_faction()->id;
                         se.monfaction = critter->as_avatar()->get_faction()->mon_faction;
-                    } else if ( critter->is_monster() ){
-                        se.from_monster = true;  
-                        se.monfaction = critter->as_monster()->faction.id();  
-                    } else if (critter ->is_npc() ){
+                    } else if( critter->is_monster() ) {
+                        se.from_monster = true;
+                        se.monfaction = critter->as_monster()->faction.id();
+                    } else if( critter ->is_npc() ) {
                         se.from_npc = true;
                         se.faction = critter->as_npc()->get_faction()->id;
                         se.monfaction = critter->as_npc()->get_faction()->mon_faction;
                     } else {
                         // Gunshots dont get to be ambient noise.
                         se.from_monster = true;
-                    }  
-                }    
-                
+                    }
+                }
+
             }
-            
+
         }
         // We want to make our gun sound, and then check to see if our shooter is a hallucination.
         // Hallucinations dont get to deafen the character.
         sfx::generate_gun_sound( who.bub_pos(), gun, se.volume );
-        if (!who.is_hallucination()){
+        if( !who.is_hallucination() ) {
             sounds::sound( se );
         }
-        
+
         return;
     }
     // If a perfectly silent gun shoots, does it make a sound?

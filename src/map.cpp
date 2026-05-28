@@ -2216,7 +2216,8 @@ void map::furn_set( const tripoint_bub_ms &p, const furn_id &new_furniture,
         set_floor_cache_dirty( tripoint_bub_ms( p.xy(), p.z() + 1 ) );
     }
 
-    if( old_t.has_flag( TFLAG_BLOCK_WIND ) != new_t.has_flag( TFLAG_BLOCK_WIND ) || old_t.has_flag( TFLAG_CONNECT_TO_WALL ) != new_t.has_flag( TFLAG_CONNECT_TO_WALL ) ) {
+    if( old_t.has_flag( TFLAG_BLOCK_WIND ) != new_t.has_flag( TFLAG_BLOCK_WIND ) ||
+        old_t.has_flag( TFLAG_CONNECT_TO_WALL ) != new_t.has_flag( TFLAG_CONNECT_TO_WALL ) ) {
         set_absorption_cache_dirty( tripoint_bub_ms( p.xy(), p.z() ) );
     }
 
