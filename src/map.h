@@ -453,6 +453,8 @@ struct sound_instance_cache {
     // The flood envelope is 1 + (radius * 2) on a side.
     // Set based on the dist_enum above, and the distance setting for each enum in sound_cache.
     // radius 7 equates to a 15x15 area, radius 3 is a 7x7 area.
+    // However as our index point starts at local x/y = 0, 
+    // our bounds are actually radius * 2, radius * 2
     int flood_radius = 3;
 
     // Normal tripoint origin of the sound instance.
@@ -468,7 +470,6 @@ struct sound_instance_cache {
     int offset_x;
     // the numerical offset between index_point.y and 0. Must be calced on sound instance creation.
     int offset_y;
-    // T
 
     // Volume in 100ths of a dB (mdB) of the sound in question
     // Indexed as: vec[x * (flood_radius * 2) + y]
@@ -479,7 +480,7 @@ struct sound_instance_cache {
     // The base volume level in mdB to use for long distance sound, by direction defaulting to 0.
     // Determined by the highest volume on a tile along the envelope boundary in that respective direction.
     //              0 1 2
-    // Indexed as   7 S 3 where S is the source, indexes 8 and 9 are Down and Up escapes, respectively.
+    // Indexed as   7 @ 3 where @ is the source, indexes 8 and 9 are Down and Up escapes, respectively.
     //              6 5 4
     // Index to use is determined by general direction from source to requester.
     std::array<short, 10> base_distance_vol_by_dir = {{0}};
@@ -620,66 +621,13 @@ struct sound_cache {
 
     std::vector<sound_instance_cache> sound_instances;
 
-    // Use these to tweak sound floodfilling.
-    // Only here for completeness and characters with super hearing or bionic ears in an anechoic chamber.
-    int flood_radius_SILENT = 1; // 3x3 flood.
-    int flood_radius_NEARLY_SILENT = 3;
-    int flood_radius_QUIET = 4;
-    int flood_radius_NORMAL = 6;
-    int flood_radius_LOUD = 8;
-    int flood_radius_VERY_LOUD = 10;
-    int flood_radius_DEAFENING = 12; // radius 12 equates to a 25x25 flooded zone.
-    // in dB spl
-    short vol_threshold_SILENT = 1;
-    // in dB spl
-    short vol_threshold_NEARLY_SILENT = 20;
-    // in dB spl
-    short vol_threshold_QUIET = 45;
-    // in dB spl
-    short vol_threshold_NORMAL = 75;
-    // in dB spl
-    short vol_threshold_LOUD = 95;
-    // in dB spl
-    short vol_threshold_VERY_LOUD = 125;
-    // in dB spl
-    short vol_threshold_DEAFENING = 191;
-
     // Return the radius to flood a sound out to from the provided enum.
     int flood_radius_by_enum( const enum sound_vol_for_flood_dist &dist_enum ) const {
-        switch( dist_enum ) {
-            case sound_vol_for_flood_dist::SILENT:
-                return flood_radius_SILENT;
-            case sound_vol_for_flood_dist::NEARLY_SILENT:
-                return flood_radius_NEARLY_SILENT;
-            case sound_vol_for_flood_dist::QUIET:
-                return flood_radius_QUIET;
-            case sound_vol_for_flood_dist::NORMAL:
-                return flood_radius_NORMAL;
-            case sound_vol_for_flood_dist::LOUD:
-                return flood_radius_LOUD;
-            case sound_vol_for_flood_dist::VERY_LOUD:
-                return flood_radius_VERY_LOUD;
-            case sound_vol_for_flood_dist::DEAFENING:
-                return flood_radius_DEAFENING;
-        }
+        return get_flood_radius_by_enum(dist_enum);
     }
     // Return a sorting enum provided a dB volume short.
     sound_vol_for_flood_dist flood_dist_enum_by_volume( const short &dB_vol ) const {
-        if( dB_vol > vol_threshold_VERY_LOUD ) {
-            return sound_vol_for_flood_dist::DEAFENING;
-        } else if( dB_vol > vol_threshold_LOUD ) {
-            return sound_vol_for_flood_dist::VERY_LOUD;
-        } else if( dB_vol > vol_threshold_NORMAL ) {
-            return sound_vol_for_flood_dist::LOUD;
-        } else if( dB_vol > vol_threshold_QUIET ) {
-            return sound_vol_for_flood_dist::NORMAL;
-        } else if( dB_vol > vol_threshold_NEARLY_SILENT ) {
-            return sound_vol_for_flood_dist::QUIET;
-        } else if( dB_vol > vol_threshold_SILENT ) {
-            return sound_vol_for_flood_dist::NEARLY_SILENT;
-        } else {
-            return sound_vol_for_flood_dist::SILENT;
-        }
+        return get_flood_dist_enum(dB_vol);
     }
     // Generated and checked against while informing monster AI of sounds.
     // MUST be cleared after all monsters are informed of sounds, or if the sound cache gets culled.
