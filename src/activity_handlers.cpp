@@ -399,7 +399,7 @@ bool activity_handlers::resume_for_multi_activities( player &p )
 void activity_handlers::burrow_do_turn( player_activity *act, player *p )
 {
     sfx::play_activity_sound( "activity", "burrow",
-                              sfx::get_heard_volume( abs_to_bub( act->placement ) ) );
+                              sfx::get_heard_volume( abs_to_bub( act->placement ), 70 ) );
     if( calendar::once_every( 1_minutes ) ) {
         sound_event se;
         se.origin = here.abs_to_bub( act->placement );
@@ -1877,7 +1877,7 @@ void activity_handlers::make_zlave_finish( player_activity *act, player *p )
 void activity_handlers::pickaxe_do_turn( player_activity *act, player *p )
 {
     const auto &pos = get_map().abs_to_bub( act->placement );
-    sfx::play_activity_sound( "tool", "pickaxe", sfx::get_heard_volume( pos ) );
+    sfx::play_activity_sound( "tool", "pickaxe", sfx::get_heard_volume( pos, 80 ) );
     // each turn is too much
     if( calendar::once_every( 1_minutes ) ) {
         //~ Sound of a Pickaxe at work!
@@ -2102,8 +2102,7 @@ void activity_handlers::reload_finish( player_activity *act, player *p )
                     reload_volume = 70;
                 }
             }
-            sfx::play_variant_sound( "reload", reloadable.typeId().str(),
-                                     sfx::get_heard_volume( p->bub_pos() ) );
+            
             sound_event se;
             se.origin = p->bub_pos();
             se.volume = reload_volume;
@@ -2113,6 +2112,8 @@ void activity_handlers::reload_finish( player_activity *act, player *p )
             se.variant = reloadable.typeId().str();
 
             sounds::sound( se );
+            sfx::play_variant_sound( "reload", reloadable.typeId().str(),
+                                     sfx::get_heard_volume( p->bub_pos(), se.volume ) );
         }
     } else if( reloadable.is_container() ) {
         msg = _( "You refill the %s." );
@@ -4014,7 +4015,7 @@ void activity_handlers::pry_nails_do_turn( player_activity *act, player * )
 {
     map &here = get_map();
     const auto bub_loc = here.abs_to_bub( act->placement );
-    sfx::play_activity_sound( "tool", "hammer", sfx::get_heard_volume( bub_loc ) );
+    sfx::play_activity_sound( "tool", "hammer", sfx::get_heard_volume( bub_loc, 70 ) );
 }
 
 void activity_handlers::pry_nails_finish( player_activity *act, player *p )
@@ -4036,7 +4037,7 @@ void activity_handlers::chop_tree_do_turn( player_activity *act, player *p )
 {
     map &here = get_map();
     sfx::play_activity_sound( "tool", "axe",
-                              sfx::get_heard_volume( here.abs_to_bub( act->placement ) ) );
+                              sfx::get_heard_volume( here.abs_to_bub( act->placement ), 85 ) );
     if( calendar::once_every( 1_minutes ) ) {
         //~ Sound of a wood chopping tool at work!
         sound_event se;
@@ -4121,7 +4122,7 @@ void activity_handlers::chop_tree_finish( player_activity *act, player *p )
     here.collapse_at( pos, false, true, false );
     // sound of falling tree
     sfx::play_variant_sound( "misc", "timber",
-                             sfx::get_heard_volume( here.abs_to_bub( act->placement ) ) );
+                             sfx::get_heard_volume( here.abs_to_bub( act->placement ), 95 ) );
     act->set_to_null();
 
     // Quality of tool used and assistants can together both reduce intensity of work.
@@ -4241,7 +4242,7 @@ void activity_handlers::jackhammer_do_turn( player_activity *act, player *p )
 {
     map &here = get_map();
     sfx::play_activity_sound( "tool", "jackhammer",
-                              sfx::get_heard_volume( here.abs_to_bub( act->placement ) ) );
+                              sfx::get_heard_volume( here.abs_to_bub( act->placement ), 130 ) );
     if( calendar::once_every( 1_minutes ) ) {
         sound_event se;
         se.origin = here.abs_to_bub( act->placement );

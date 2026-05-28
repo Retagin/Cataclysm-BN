@@ -1374,7 +1374,7 @@ void iexamine::chainfence( player &p, const tripoint_bub_ms &examp )
             return;
         }
         p.moves += climb * 10;
-        sfx::play_variant_sound( "plmove", "clear_obstacle", sfx::get_heard_volume( g->u.bub_pos() ) );
+        sfx::play_variant_sound( "plmove", "clear_obstacle", sfx::get_heard_volume( g->u.bub_pos(), 60 ) );
     }
     if( p.in_vehicle ) {
         here.unboard_vehicle( p.bub_pos() );

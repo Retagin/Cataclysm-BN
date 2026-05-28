@@ -2085,7 +2085,7 @@ void monster::melee_attack( Creature &target, float accuracy )
         if( u_see_me ) {
             if( target.is_player() ) {
                 sfx::play_variant_sound( "melee_attack", "monster_melee_hit",
-                                         sfx::get_heard_volume( target.bub_pos() ) );
+                                         sfx::get_heard_volume( target.bub_pos(), 65 ) );
                 sfx::do_player_death_hurt( dynamic_cast<player &>( target ), false );
                 //~ 1$s is attacker name, 2$s is bodypart name in accusative.
                 add_msg( m_bad, _( "%1$s hits your %2$s." ), disp_name( false, true ),

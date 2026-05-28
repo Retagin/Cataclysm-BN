@@ -99,7 +99,7 @@ void mdeath::normal( monster &z )
     }
 
     if( z.type->in_species( ZOMBIE ) ) {
-        sfx::play_variant_sound( "mon_death", "zombie_death", sfx::get_heard_volume( z.bub_pos() ) );
+        sfx::play_variant_sound( "mon_death", "zombie_death", sfx::get_heard_volume( z.bub_pos(), 75 ) );
     }
 
     if( g->u.sees( z ) ) {
@@ -215,7 +215,7 @@ void mdeath::splatter( monster &z )
 
         if( pulverized && z.type->size >= creature_size::medium ) {
             number_of_gibs += rng( 1, 6 );
-            sfx::play_variant_sound( "mon_death", "zombie_gibbed", sfx::get_heard_volume( z.bub_pos() ) );
+            sfx::play_variant_sound( "mon_death", "zombie_gibbed", sfx::get_heard_volume( z.bub_pos(), 90 ) );
         }
 
         for( int i = 0; i < number_of_gibs; ++i ) {
