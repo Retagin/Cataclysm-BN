@@ -558,9 +558,9 @@ static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_bub
             p + point_rel_ms::south_east(), // Direction 4
             p + point_rel_ms::south(),      // Direction 5
             p + point_rel_ms::south_west(), // Direction 6
-            p + point_rel_ms::west()
+            p + point_rel_ms::west()        // Direction 7
         }
-    };   // Direction 7
+    };   
 }
 
 // Use this overload sparingly, it is preferable to
@@ -572,8 +572,8 @@ static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_bub
 static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_sm_ms &sp,
         const point_bub_sm &grid_pos )
 {
-    const point_bub_ms bp = project_combine( grid_pos, sp );
-    return std::array<point_bub_ms, 8> { {
+    point_bub_ms bp = project_combine( grid_pos, sp );
+    const auto array = std::array<point_bub_ms, 8> { {
             bp + point_rel_ms::north_west(), // Direction 0
             bp + point_rel_ms::north(),      // Direction 1
             bp + point_rel_ms::north_east(), // Direction 2
@@ -581,9 +581,10 @@ static constexpr std::array<point_bub_ms, 8> get_adjacent_tiles( const point_sm_
             bp + point_rel_ms::south_east(), // Direction 4
             bp + point_rel_ms::south(),      // Direction 5
             bp + point_rel_ms::south_west(), // Direction 6
-            bp + point_rel_ms::west()
+            bp + point_rel_ms::west()        // Direction 7
         }
-    };   // Direction 7
+    };   
+    return array;
 }
 
 // Provides an array of the tripoints adjacent to some bubble tripoint.
@@ -601,9 +602,9 @@ static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const tr
             p + tripoint_rel_ms::south_east(), // Direction 4
             p + tripoint_rel_ms::south(),      // Direction 5
             p + tripoint_rel_ms::south_west(), // Direction 6
-            p + tripoint_rel_ms::west()
+            p + tripoint_rel_ms::west()        // Direction 7
         }
-    };   // Direction 7
+    };   
 }
 
 // Provides an array of the bubble tripoints adjacent to some submap point.
@@ -614,8 +615,8 @@ static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const tr
 static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const point_sm_ms &sp,
         const tripoint_bub_sm &grid_pos )
 {
-    const tripoint_bub_ms btri = project_combine( grid_pos, sp );
-    return std::array<tripoint_bub_ms, 8> { {
+    tripoint_bub_ms btri = project_combine( grid_pos, sp );
+    const auto array = std::array<tripoint_bub_ms, 8> { {
             btri + tripoint_rel_ms::north_west(), // Direction 0
             btri + tripoint_rel_ms::north(),      // Direction 1
             btri + tripoint_rel_ms::north_east(), // Direction 2
@@ -623,9 +624,10 @@ static constexpr std::array<tripoint_bub_ms, 8> get_adjacent_tripoints( const po
             btri + tripoint_rel_ms::south_east(), // Direction 4
             btri + tripoint_rel_ms::south(),      // Direction 5
             btri + tripoint_rel_ms::south_west(), // Direction 6
-            btri + tripoint_rel_ms::west()
+            btri + tripoint_rel_ms::west()        // Direction 7
         }
-    };   // Direction 7
+    };   
+    return array;
 }
 
 // Provides an array of the bubble tripoints adjacent to some submap point.
