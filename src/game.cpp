@@ -14069,6 +14069,7 @@ auto game::vertical_shift( const int z_after, const bool keep_grab ) -> void
         m.access_cache( z_before ).map_memory_seen_cache.reset();
         m.set_transparency_cache_dirty( z_before );
         m.set_outside_cache_dirty( z_before );
+        m.set_absorption_cache_dirty( z_before );
         m.load( tripoint_abs_sm( get_levx(), get_levy(), z_after ), true );
         shift_monsters( tripoint_rel_sm( 0, 0, z_after - z_before ) );
         reload_npcs();

@@ -3117,7 +3117,7 @@ int iuse::geiger( player *p, item *it, bool t, const tripoint_bub_ms &pos )
         se.id = "tool";
         se.variant = sound_var;
         sounds::sound( se );
-        if( !p->can_hear( pos, 6 ) ) {
+        if( !p->can_hear( pos, se.volume ) ) {
             // can not hear it, but may have alarmed other creatures
             return it->type->charges_to_use();
         }
@@ -4952,7 +4952,7 @@ int iuse::artifact( player *p, item *it, bool, const tripoint_bub_ms & )
                 se.id = "misc";
                 se.variant = "earthquake";
                 sounds::sound( se );
-                for( const tripoint &pt : g->m.points_in_radius( p->bub_pos(), 2 ) ) {
+                for( const tripoint_bub_ms &pt : g->m.points_in_radius( p->bub_pos(), 2 ) ) {
                     g->m.bash( pt, 40 );
                     g->m.bash( pt, 40 );  // Multibash effect, so that doors &c will fall
                     g->m.bash( pt, 40 );
@@ -7638,7 +7638,7 @@ int iuse::ehandcuffs( player *p, item *it, bool t, const tripoint_bub_ms &pos )
         if( it->charges == 0 ) {
 
             sound_event se;
-            se.origin = p->pos();
+            se.origin = p->bub_pos();
             se.volume = 40;
             se.category = sounds::sound_t::combat;
             se.description = "Click.";
@@ -7672,7 +7672,7 @@ int iuse::ehandcuffs( player *p, item *it, bool t, const tripoint_bub_ms &pos )
 
         if( calendar::once_every( 1_minutes ) ) {
             sound_event se;
-            se.origin = p->pos();
+            se.origin = p->bub_pos();
             se.volume = 70;
             se.category = sounds::sound_t::alarm;
             se.description = _( "a police siren, whoop WHOOP." );

@@ -19,6 +19,7 @@
 #include "calendar.h"
 #include "character.h"
 #include "color.h"
+#include "coordinates.h"
 #include "creature.h"
 #include "cursesdef.h"
 #include "enums.h"
@@ -477,7 +478,7 @@ struct sound_to_warn_about {
     time_duration duration = 10_minutes;
     std::string name;
     int range = -1;
-    tripoint danger_pos = tripoint_zero;
+    tripoint_bub_ms danger_pos = tripoint_bub_ms::zero();
 };
 
 const direction npc_threat_dir[8] = { direction::NORTHWEST, direction::NORTH, direction::NORTHEAST, direction::EAST,

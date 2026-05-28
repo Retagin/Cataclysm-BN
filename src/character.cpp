@@ -11588,12 +11588,14 @@ bool Character::can_hear( const tripoint_bub_ms &source, const int volume ) cons
     }
 
     // source is in-ear and at our square, we can hear it
-    if( source == bub_pos() && volume == 0 ) {
+    if( source == bub_pos() ) {
         return true;
     }
+    const auto cache = get_map().get_cache_ref( bub_pos().z() );
     const int dist = rl_dist( source, bub_pos() );
     const float volume_multiplier = hearing_ability();
-    return ( volume - get_weather().weather_id->sound_attn ) * volume_multiplier >= dist;
+    const auto tabsp = ( get_map().inbounds( bub_pos() ) ) ? cache.absorption_cache[cache.idx(bub_pos().x(), bub_pos().y())] : 0;
+    return  ( (100 * volume) - get_cumulative_vol_dist_loss(3, dist, tabsp) ) >= (SOUND_MINIMUM_VOLUME_FOR_PROPAGATION - ( (volume_multiplier * 100) - 100 ) );
 }
 
 float Character::hearing_ability() const

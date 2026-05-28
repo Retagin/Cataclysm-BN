@@ -117,7 +117,7 @@ void drop_or_embed_projectile( dealt_projectile_attack &attack )
         // TODO: Wine glass breaking vs. entire sheet of glass breaking
         sound_event se;
         se.origin = pt;
-        se.volume = 65;
+        se.volume = 75;
         se.category = sounds::sound_t::combat;
         se.description = _( "glass breaking!" );
         se.id = "bullet_hit";
@@ -199,7 +199,7 @@ void drop_or_embed_projectile( dealt_projectile_attack &attack )
                 sounds::sound( se );
             } else {
                 se.description = _( "thud." );
-                se.volume = 60;
+                se.volume = 70;
                 sounds::sound( se );
             }
             const trap &tr = here.tr_at( pt );

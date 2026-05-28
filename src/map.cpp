@@ -1,6 +1,7 @@
 #include "map.h"
 
 #include "faction.h"
+#include "mapdata.h"
 #include "mapgen_async.h"
 
 #include <algorithm>
@@ -644,7 +645,7 @@ void map::set_absorption_cache_dirty( const int zlev )
     }
 }
 
-static submap null_submap( tripoint_bub_ms::zero() );
+static submap null_submap( tripoint_abs_sm::zero() );
 
 maptile map::maptile_at( const tripoint_bub_ms &p ) const
 {
@@ -2213,6 +2214,10 @@ void map::furn_set( const tripoint_bub_ms &p, const furn_id &new_furniture,
 
     if( old_t.has_flag( TFLAG_SUN_ROOF_ABOVE ) != new_t.has_flag( TFLAG_SUN_ROOF_ABOVE ) ) {
         set_floor_cache_dirty( tripoint_bub_ms( p.xy(), p.z() + 1 ) );
+    }
+
+    if( old_t.has_flag( TFLAG_BLOCK_WIND ) != new_t.has_flag( TFLAG_BLOCK_WIND ) || old_t.has_flag( TFLAG_CONNECT_TO_WALL ) != new_t.has_flag( TFLAG_CONNECT_TO_WALL ) ) {
+        set_absorption_cache_dirty( tripoint_bub_ms( p.xy(), p.z() ) );
     }
 
     invalidate_max_populated_zlev( p.z() );
@@ -8367,6 +8372,7 @@ void map::shift( const point_rel_sm &sp )
             set_seen_cache_dirty( gridz );
             set_pathfinding_cache_dirty( gridz );
             set_suspension_cache_dirty( gridz );
+            set_absorption_cache_dirty( gridz );
         }
     } // shift_grid_copy_load
     // New edge submaps have stale solar cache data. Force a rebuild before the next draw.
@@ -8578,11 +8584,13 @@ void map::loadn( const tripoint_bub_sm &grid, const bool update_vehicles,
             tmpsub->transparency_dirty = true;
             tmpsub->floor_dirty = true;
             tmpsub->outside_dirty = true;
+            tmpsub->absorption_dirty = true;
             tmpsub->pf_dirty = true;
         } else {
             set_transparency_cache_dirty( grid.z() );
             set_floor_cache_dirty( grid.z() );
             set_outside_cache_dirty( grid.z() );
+            set_absorption_cache_dirty( grid.z() );
             set_seen_cache_dirty( grid.z() );
             set_pathfinding_cache_dirty( grid.z() );
             set_suspension_cache_dirty( grid.z() );

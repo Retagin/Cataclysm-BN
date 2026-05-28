@@ -15,6 +15,7 @@
 #include "avatar.h"
 #include "bodypart.h"
 #include "calendar.h"
+#include "coordinates.h"
 #include "creature.h"
 #include "enums.h"
 #include "explosion_queue.h"
@@ -288,7 +289,7 @@ void mdeath::boomer( monster &z )
     se.variant = "small";
     se.monfaction = z.faction.id();
     sounds::sound( se );
-    for( const tripoint &dest : g->m.points_in_radius( z.pos(), 1 ) ) { // *NOPAD*
+    for( const tripoint_bub_ms &dest : g->m.points_in_radius( z.bub_pos(), 1 ) ) { // *NOPAD*
         g->m.bash( dest, 10 );
         if( monster *const target = g->critter_at<monster>( dest ) ) {
             target->stumble();
@@ -784,7 +785,7 @@ void mdeath::gas( monster &z )
     se.variant = "small";
     se.monfaction = z.faction.id();
     sounds::sound( se );
-    g->m.emit_field( z.pos(), emit_id( "emit_toxic_blast" ) );
+    g->m.emit_field( z.bub_pos(), emit_id( "emit_toxic_blast" ) );
 }
 
 void mdeath::smokeburst( monster &z )
@@ -800,7 +801,7 @@ void mdeath::smokeburst( monster &z )
     se.variant = "small";
     se.monfaction = z.faction.id();
     sounds::sound( se );
-    g->m.emit_field( z.pos(), emit_id( "emit_smoke_blast" ) );
+    g->m.emit_field( z.bub_pos(), emit_id( "emit_smoke_blast" ) );
 }
 
 void mdeath::fungalburst( monster &z )
@@ -824,7 +825,7 @@ void mdeath::fungalburst( monster &z )
     se.variant = "small";
     se.monfaction = z.faction.id();
     sounds::sound( se );
-    g->m.emit_field( z.pos(), emit_id( "emit_fungal_blast" ) );
+    g->m.emit_field( z.bub_pos(), emit_id( "emit_fungal_blast" ) );
 }
 
 void mdeath::jabberwock( monster &z )

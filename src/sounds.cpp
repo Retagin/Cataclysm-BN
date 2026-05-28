@@ -1334,11 +1334,11 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
             }
         }
         const auto &tile_furn = get_furn( sp ).obj();
-        if( tile_furn.has_flag( "BLOCK_WIND" ) ) {
+        if( tile_furn.has_flag( TFLAG_BLOCK_WIND ) ) {
             vars_tile += 10;
         }
         const auto &tile_ter = get_ter( sp ).obj();
-        if( tile_ter.has_flag( "BLOCK_WIND" ) || tile_ter.has_flag( "CONNECT_TO_WALL" ) ) {
+        if( tile_ter.has_flag( TFLAG_BLOCK_WIND ) || tile_ter.has_flag( TFLAG_CONNECT_TO_WALL ) ) {
             vars_tile += 100;
         }
         // If we are indoors, we dont get the default terrain sound attenuation.
@@ -1438,9 +1438,9 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
                         const auto &adj_terrain = m.ter( adj_tile ).obj();
                         const auto &idx = above->idx( adj_tile.x(), adj_tile.y() );
                         roof_cover[i] = ( ( above->floor_cache[idx] ) > 0 );
-                        point_valid[i] = ( roof_cover[i] && ( adj_furn.has_flag( "BLOCK_WIND" ) ||
-                                                              adj_terrain.has_flag( "BLOCK_WIND" ) ||
-                                                              adj_terrain.has_flag( "CONNECT_TO_WALL" ) ) );
+                        point_valid[i] = ( roof_cover[i] && ( adj_furn.has_flag( TFLAG_BLOCK_WIND ) ||
+                                                              adj_terrain.has_flag( TFLAG_BLOCK_WIND ) ||
+                                                              adj_terrain.has_flag( TFLAG_CONNECT_TO_WALL ) ) );
                     }
                 }
             }
@@ -1495,7 +1495,7 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
         }
         // Do this last as it involves the most calcs.
         // Store which type of sound block we are using. If true we have a windblocker, if false we have a barrier
-        const bool blockswind = tile_ter.has_flag( "BLOCK_WIND" );
+        const bool blockswind = tile_ter.has_flag( TFLAG_BLOCK_WIND );
         // Alrighty, here we go. Queary the adjacent terrain to see if it blocks sound or connects to a wall.
         // Lets build out the bool indexes.
         pol_adjacent( sp );
@@ -2654,7 +2654,7 @@ void sounds::process_sound_markers( Character *who )
                 }
             }
             // TODO: Fix the sfx volumes in here to simply take a ratio of the sounds original volume to its volume at the player
-            // so that we aboid double calcing and properly account for walls.
+            // so that we avoid double calcing and properly account for walls.
             const std::string &sfx_id = element.sound.id;
             const std::string &sfx_variant = element.sound.variant;
             if( !sfx_id.empty() ) {

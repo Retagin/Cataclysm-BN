@@ -4830,7 +4830,7 @@ void npc::do_reload( item &it )
 
     if( get_player_character().sees( *this ) ) {
         add_msg( _( "%1$s reloads their %2$s." ), name, it.tname() );
-        sfx::play_variant_sound( "reload", it.typeId().str(), sfx::get_heard_volume( bub_pos() ),
+        sfx::play_variant_sound( "reload", it.typeId().str(), sfx::get_heard_volume( bub_pos(), 60 ),
                                  sfx::get_heard_angle( bub_pos() ) );
     }
 

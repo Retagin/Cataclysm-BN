@@ -1126,10 +1126,10 @@ void spell::make_sound( const tripoint_bub_ms &target, Creature &caster ) const
     }
 }
 
-void spell::make_sound( const tripoint_bub_ms &target, Creature &caster, int loudness ) const
+void spell::make_sound( const tripoint_bub_ms & /*target*/, Creature &caster, int loudness ) const
 {
     sound_event se;
-    se.origin = target;
+    se.origin = caster.bub_pos();
     se.volume = loudness;
     se.category = type->sound_type;
     se.description = type->sound_description.translated();

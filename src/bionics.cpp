@@ -26,6 +26,7 @@
 #include "character_stat.h"
 #include "color.h"
 #include "consistency_report.h"
+#include "coordinates.h"
 #include "cursesdef.h"
 #include "damage.h"
 #include "debug.h"
@@ -771,7 +772,7 @@ bool Character::activate_bionic( bionic &bio, bool eff_only, bool *close_bionics
         se.id = "bionic";
         se.variant = static_cast<std::string>( bio_resonator );
         sounds::sound( se );
-        for( const tripoint &bashpoint : here.points_in_radius( bub_pos(), 1 ) ) {
+        for( const tripoint_bub_ms &bashpoint : here.points_in_radius( bub_pos(), 1 ) ) {
             here.bash( bashpoint, 110 );
             // Multibash effect, so that doors &c will fall
             here.bash( bashpoint, 110 );

@@ -1106,7 +1106,7 @@ void spell_effect::transform_blast( const spell &sp, Creature &caster,
     }
 }
 
-void spell_effect::noise( const spell &sp, Creature &, const tripoint_bub_ms &target )
+void spell_effect::noise( const spell &sp, Creature &caster, const tripoint_bub_ms &target )
 {
     sp.make_sound( target, caster, sp.damage() );
 }

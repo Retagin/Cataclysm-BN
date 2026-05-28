@@ -398,11 +398,12 @@ bool activity_handlers::resume_for_multi_activities( player &p )
 
 void activity_handlers::burrow_do_turn( player_activity *act, player *p )
 {
+    const auto &pos = get_map().abs_to_bub( act->placement );
     sfx::play_activity_sound( "activity", "burrow",
                               sfx::get_heard_volume( abs_to_bub( act->placement ), 70 ) );
     if( calendar::once_every( 1_minutes ) ) {
         sound_event se;
-        se.origin = here.abs_to_bub( act->placement );
+        se.origin = pos;
         se.volume = 65;
         se.category = sounds::sound_t::movement;
         se.description = _( "ScratchCrunchScrabbleScurry." ); //~ Sound of a Rat mutant burrowing!

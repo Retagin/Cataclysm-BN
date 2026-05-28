@@ -722,7 +722,6 @@ void game::chat()
             const auto &to = p.value();
             if( npcselect == follower_count ) {
                 for( npc *them : followers ) {
-                    tripoint_abs_ms( here.bub_to_abs( to ) );
                     them->goto_to_this_pos = here.bub_to_abs( to );
                 }
                 yell_msg = _( "Everyone move there!" );
@@ -898,19 +897,19 @@ void npc::handle_sound( const short heard_vol, sound_event sound )
              disp_name(), description, static_cast<int>( sound.category ), heard_vol,
              s_abs_pos.x(), s_abs_pos.y(), abs_pos().x(), abs_pos().y() );
 
-    bool player_ally = get_player_character().bub_pos() == spos && is_player_ally();
+    // bool player_ally = get_player_character().bub_pos() == spos && is_player_ally();
     player *const sound_source = g->critter_at<player>( spos );
     bool npc_ally = sound_source && sound_source->is_npc() && is_ally( *sound_source );
 
     // Is the player the source of the sound, and is the NPC an ally of the player?
-    const bool player_ally = ( ( source_player || ( get_player_character().pos() == sound.origin ) ) &&
+    const bool player_ally = ( ( source_player || ( get_player_character().bub_pos() == sound.origin ) ) &&
                                is_player_ally() ) ;
 
     // ONLY reference this in cases where we know the sound source is an NPC
     //Character const *npc_critter = dynamic_cast<Character>( *critter );
 
     // Is the sound source an NPC, and is the source NPC an ally of the hearing NPC?
-    const bool npc_ally = ( source_npc ) ? ( critter->as_npc()->is_ally( *this ) ) : false;
+    //const bool npc_ally = ( source_npc ) ? ( critter->as_npc()->is_ally( *this ) ) : false;
 
     // Is the sound source a monster, and is said monster an ally of the hearing NPC?
 
@@ -979,7 +978,7 @@ void npc::handle_sound( const short heard_vol, sound_event sound )
         investigate_dist = 0;
     }
     if( ai_cache.total_danger < 1.0f ) {
-        if( spriority == sounds::sound_t::movement && !in_vehicle ) {
+        if( sound.category == sounds::sound_t::movement && !in_vehicle ) {
             bool should_check = rl_dist( bub_pos(), sound.origin ) < investigate_dist;
             if( should_check ) {
                 const zone_manager &mgr = zone_manager::get_manager();
@@ -1008,7 +1007,7 @@ void npc::handle_sound( const short heard_vol, sound_event sound )
                     temp_warning.type = "combat_noise";
                     temp_warning.duration = rng( 1, 10 ) * 1_minutes;
                     ai_cache.warn_about_queue.push_back( temp_warning );
-                    add_msg( m_debug, "%s added noise at pos %d:%d", name, s_abs_pos.x, s_abs_pos.y );
+                    add_msg( m_debug, "%s added noise at pos %d:%d", name, s_abs_pos.x(), s_abs_pos.y() );
                     dangerous_sound temp_sound;
                     temp_sound.abs_pos = s_abs_pos;
                     // Convert out of mdB spl to dB spl
@@ -1059,9 +1058,9 @@ void npc::handle_sound( const short heard_vol, sound_event sound )
                     }
 
                     if( should_check ) {
-                        add_msg( m_debug, "%s added noise at pos %d:%d", name, s_abs_pos.x, s_abs_pos.y );
+                        add_msg( m_debug, "%s added noise at pos %d:%d", name, s_abs_pos.x(), s_abs_pos.y() );
                         dangerous_sound temp_sound;
-                        dangerous_sound temp_sound;
+
                         temp_sound.abs_pos = s_abs_pos;
                         // Convert out of mdB spl to dB spl
                         temp_sound.volume = std::floor( 0.01 * heard_vol );
@@ -1081,6 +1080,8 @@ void npc::handle_sound( const short heard_vol, sound_event sound )
                 }
             }
         }
+    }
+}
 
         void npc_chatbin::check_missions() {
             // TODO: or simply fail them? Some missions might only need to be reported.

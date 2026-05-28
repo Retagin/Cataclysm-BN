@@ -3306,7 +3306,7 @@ bool mattack::nurse_operate( monster *z )
                 monster *mon = dynamic_cast<monster *>( critter );
                 if( mon != nullptr && mon != z ) {
                     sound_event se;
-                    se.origin = z->pos();
+                    se.origin = z->bub_pos();
                     se.volume = 60;
                     se.category = sounds::sound_t::electronic_speech;
                     se.from_monster = true;
@@ -3344,7 +3344,7 @@ bool mattack::nurse_operate( monster *z )
 bool mattack::check_money_left( monster *z )
 {
     sound_event se;
-    se.origin = z->pos();
+    se.origin = z->bub_pos();
     se.category = sounds::sound_t::electronic_speech;
     se.from_monster = true;
     se.monfaction = z->faction.id();
@@ -3746,7 +3746,7 @@ void mattack::tankgun( monster *z, Creature *target )
         return;
     }
     sound_event se;
-    se.origin = z->pos();
+    se.origin = z->bub_pos();
 
     se.from_monster = true;
     se.monfaction = z->faction.id();
@@ -4129,7 +4129,7 @@ bool mattack::copbot( monster *z )
         return true;
     }
 
-    if( rl_dist( z->pos(), target->pos() ) > 2 || foe == nullptr || !z->sees( *target ) ) {
+    if( rl_dist( z->bub_pos(), target->bub_pos() ) > 2 || foe == nullptr || !z->sees( *target ) ) {
         sound_event se;
         se.origin = z->bub_pos();
         se.category = sounds::sound_t::alert;
@@ -5556,7 +5556,7 @@ bool mattack::flesh_tendril( monster *z )
 {
     Creature *target = z->attack_target();
     sound_event se;
-    se.origin = z->pos();
+    se.origin = z->bub_pos();
     se.category = sounds::sound_t::alert;
     se.from_monster = true;
     se.monfaction = z->faction.id();

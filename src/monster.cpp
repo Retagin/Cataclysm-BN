@@ -13,6 +13,7 @@
 #include "catalua_hooks.h"
 #include "catalua_sol.h"
 #include "character.h"
+#include "coordinates.h"
 #include "creature_tracker.h"
 #include "cursesdef.h"
 #include "debug.h"
@@ -3968,11 +3969,11 @@ void monster::hear_sound( const sound_event &source, const short heard_vol, cons
     process_trigger( mon_trigger::SOUND, ( heard_vol * 0.001 ) );
     if( morale >= 0 && anger >= 10  && !afraid_of_source ) {
 
-        wander_to( tripoint( target_x, target_y, source.origin.z() ), wander_turns );
+        wander_to( tripoint_bub_ms( target_x, target_y, source.origin.z() ), wander_turns );
     } else if( morale < 0 || afraid_of_source ) {
         // Monsters afraid of sound should not go towards sound
         wander_to( tripoint_bub_ms( 2 * bub_pos().x() - target_x, 2 * bub_pos().y() - target_y,
-                                    2 * bub_pos().z() - source.z() ), wander_turns );
+                                    2 * bub_pos().z() - source.origin.z() ), wander_turns );
     }
 }
 
