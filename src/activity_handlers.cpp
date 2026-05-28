@@ -394,7 +394,7 @@ bool activity_handlers::resume_for_multi_activities( player &p )
     return false;
 }
 
-void activity_handlers::burrow_do_turn( player_activity *act, player * )
+void activity_handlers::burrow_do_turn( player_activity *act, player *p )
 {
     const auto &pos = get_map().abs_to_bub( act->placement );
     sfx::play_activity_sound( "activity", "burrow",
