@@ -5156,7 +5156,7 @@ std::string item::tname( unsigned int quantity, bool with_prefix, unsigned int t
         if( is_loaded() ) {
             const auto temp = rot::temperature_flag_for_location( get_map(), *this );
             if( temp == temperature_flag::TEMP_FREEZER ) {
-                tagtext += _( " (very cold)" );
+                tagtext += _( " (frozen)" );
             } else if( temp == temperature_flag::TEMP_FRIDGE || temp == temperature_flag::TEMP_ROOT_CELLAR ) {
                 tagtext += _( " (cold)" );
             }
@@ -6276,7 +6276,7 @@ int item::get_comestible_fun() const
     if( !is_comestible() ) {
         return 0;
     }
-    int fun = get_comestible()->fun;
+    auto fun = get_comestible()->fun;
     for( const flag_id &flag : item_tags ) {
         fun += flag->taste_mod();
     }
@@ -6284,7 +6284,7 @@ int item::get_comestible_fun() const
         fun += flag->taste_mod();
     }
 
-    return fun;
+    return static_cast<int>( get_var( "comestible_fun", static_cast<double>( fun ) ) );
 }
 
 bool item::goes_bad() const
