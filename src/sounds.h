@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <bitset>
 #include <cmath>
@@ -170,15 +171,15 @@ struct enum_traits<floodfill_checkvar_envelope_size> {
     static constexpr auto last = floodfill_checkvar_envelope_size::_LAST;
 };
 
-// static constexpr auto flood_dist_enum_by_index = std::array<sound_vol_for_flood_dist, 7> {
-//     {sound_vol_for_flood_dist::SILENT,
-//     sound_vol_for_flood_dist::NEARLY_SILENT,
-//     sound_vol_for_flood_dist::QUIET,
-//     sound_vol_for_flood_dist::NORMAL,
-//     sound_vol_for_flood_dist::LOUD,
-//     sound_vol_for_flood_dist::VERY_LOUD,
-//     sound_vol_for_flood_dist::DEAFENING}
-// };
+static constexpr auto flood_dist_enum_by_index = std::array<sound_vol_for_flood_dist, 7> {
+    {sound_vol_for_flood_dist::SILENT,
+    sound_vol_for_flood_dist::NEARLY_SILENT,
+    sound_vol_for_flood_dist::QUIET,
+    sound_vol_for_flood_dist::NORMAL,
+    sound_vol_for_flood_dist::LOUD,
+    sound_vol_for_flood_dist::VERY_LOUD,
+    sound_vol_for_flood_dist::DEAFENING}
+};
 
 static constexpr uint8_t get_flood_envelope_by_enum( const sound_vol_for_flood_dist &dist_enum )
 {
@@ -541,6 +542,8 @@ struct sound_event {
     mfaction_str_id monfaction = mfaction_str_id( "" );
 };
 
+// Maximum mdB spl value a sound can have in atmosphere.
+static constexpr short MAXIMUM_VOLUME_ATMOSPHERE = 19100;
 // Sounds are not valid to be properly flood filled below this threshold.
 // The sound will be only flooded to the adjacent tiles if below this threshold.
 // We also take this as our average minimum audible volume for filtering purposes.
@@ -828,6 +831,27 @@ static constexpr auto roof_to_check_by_sdir = std::array<std::array<uint8_t, 3>,
     }
 };
 
+// We always take our base volume readings for sounds at 1m, even if we are in the same tile.
+// Calcing the volume very close to a sound source is the perview of sound stage technicians and physicists.
+static constexpr uint8_t MINIMUM_DISTANCE_FOR_SOUND_PROPAGATION = 1;
+// We have entries for our dist_vol_loss[] array out to an index of 121
+// Stop one short of it for safeties sake.
+// The rate of change of volume past this distance is only significant at kilometer distances, so we dont care.
+static constexpr uint8_t MAXIMUM_DISTANCE_FOR_SOUND_PROPAGATION = 120;
+
+// used to sanitize dist_for_vol_loss[] requests so we dont get out of bound memorry access segfaults.
+static constexpr uint8_t get_distance_for_volume_loss( const uint8_t &tile_distance,
+        const bool &propagating_perpendicular )
+{
+    if( tile_distance < MINIMUM_DISTANCE_FOR_SOUND_PROPAGATION ) {
+        return MINIMUM_DISTANCE_FOR_SOUND_PROPAGATION;
+    } else if( tile_distance > MAXIMUM_DISTANCE_FOR_SOUND_PROPAGATION ) {
+        return MAXIMUM_DISTANCE_FOR_SOUND_PROPAGATION;
+    } else {
+        return tile_distance + ( propagating_perpendicular ? -1 : 1 );
+    }
+}
+
 /** Returns cumulative volume lost over some distance in mdB SPL.  For use getting the heard volume of a sound outside of its floodfill radius.
     For dB, dL = 20 * Log(R1/R2). For use with mdB we just multiply by 2000 instead which is conveniently our minvol for sound propagation constant.
     Tiles are taken at 1 meter. Will give gibberish answers if a non-tile distance is provided.
@@ -842,9 +866,8 @@ static constexpr short get_cumulative_vol_dist_loss( const int &dist1, const int
     if( dist1 == dist2 ) {
         return 0;
     }
-    return ( std::floor( SOUND_MINIMUM_VOLUME_FOR_PROPAGATION * log10( static_cast<float>
-                         ( dist2 ) / static_cast<float>( dist1 ) ) ) + ( ( dist2 > dist1 ) ? ( (
-                                     dist2 - dist1 ) * t_absorp ) : 0 ) );
+    const int result = ( std::floor( SOUND_MINIMUM_VOLUME_FOR_PROPAGATION * log10( static_cast<float>( dist2 ) / static_cast<float>( dist1 ) ) ) + ( ( dist2 > dist1 ) ? ( ( dist2 - dist1 ) * t_absorp ) : 0 ) );
+    return std::min(static_cast<int>(MAXIMUM_VOLUME_ATMOSPHERE), result);
 
 }
 
@@ -856,50 +879,22 @@ static constexpr short get_cumulative_vol_dist_loss( const int &dist1, const int
 
     If we ever get a dist2 that is less than dist1, we just return dist1.
 */
-static constexpr int average_minvol_distance( const int &dist1, const short &vol1,
-        const short &t_asbsorp = 0, const short &vol2 = SOUND_MINIMUM_VOLUME_FOR_PROPAGATION )
+static constexpr int average_minvol_distance( const int &dist1, const short &vol1, const short t_absorp = 0, const short &vol2 = SOUND_MINIMUM_VOLUME_FOR_PROPAGATION )
 {
     // Deal with our undefined behavior.
     // if vol2 is greater than vol1, that is a very good indication that our sound failed to propagate to the boundary of its envelope.
     // Just return the envelope radius.
     if( vol2 >= vol1 ) {
-        return dist1;
+        return dist1 + 3;
     }
-    // How much volume change do we need to get to our minvol.
-    // Because we are effectively pre-converting our volume and multiplying by 100, we need to do the same to the other half of our equations down the line.
-    const auto &delta_vol_req = static_cast<double>( vol1 - vol2 );
-
-    // If t_absorp == 0, we take the blue pill, the function ends, we wake up in our bed and believe that all our math is nice and has closed form analytical solutions that dont require differential equations.
-
-    if( t_asbsorp == 0 ) {
-
-        // 10^this = R2, our desired distance. Broken out for readability.
-        // As 20*100 is equal to our minvol, just use that. Easy peasy static constexpr squeezy.
-        const auto &coefficient = ( ( delta_vol_req / SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) + log10(
-                                        dist1 ) );
-
-        return pow( 10, coefficient );
-
-    } else {
-        // If t_absorp != 0, we take the red pill, we stay in wonderland and I show you how deep the rabit hole goes.
-
-        // Which is not actually particularly deep. Many "unsolved problems" are solveable for each particular case using a numerical method.
-        // Which is not super ideal when you want to do alot of unique ones in sequence, by hand.
-        // But computers are practically speaking the best counters in the world.
-        // Taking into consideration our actual required precision which as we are dealing in whole tiles is not much
-        // We can make some very simple assumptions and adjustments that lets us turn unsolvable problems into solveable ones.
-
-        // In this particular case we have two factors that reduce volume, one that is linear and one that exponentially decays with distance.
-        // We effectively get out some big equation C = dist2 + log10(dist2).
-        // Log10(10) = 1, Log10(100) = 2, Log10(1000) = 3, etc. If we would have had a dist2 of 42, our total result is 43.623.
-        // Discarding the log10(dist2) portion of the equation only results in a relative error of 3.7%
-        // A true distance of 10 should output 10 + log10(10) = 11, so discarding the log10 portion only results in an error of 10%.
-        // If we just add 1 and discard the log10(dist2) portion, we wont ever accrue enough error to care about it.
-
-        // If we somehow get an dist2 less than dist1, just return dist1. log10(20) + 1 = ~2.30103
-        const int equation = ( delta_vol_req / SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) + ( (
-                                 t_asbsorp * dist1 ) / 20.0 ) + log10( dist1 ) - log10( t_asbsorp ) + 2.30103;
-        return ( dist1 > equation ) ? dist1 : equation;
+    
+    int delta_vol_req = vol1 - vol2;
+    int approx_dist = dist1;
+    uint8_t check_dist = std::min(120,dist1);
+    while ( delta_vol_req > 0 && approx_dist < 250){
+        approx_dist++;
+        check_dist = get_distance_for_volume_loss(check_dist,false);
+        delta_vol_req -= (dist_vol_loss[check_dist] + t_absorp );
     }
-
+    return approx_dist;
 }
