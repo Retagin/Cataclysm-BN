@@ -501,10 +501,10 @@ void map::cull_heard_sounds()
         return sound.heard_by_monsters && sound.heard_by_player && sound.heard_by_npcs;
     } );
     const int soundnumafter = m_sound_cache.sound_instances.size();
-        add_msg( m_debug,
-                     _( " Culled %i sounds from the sounds vector and cleared %i sound filter lists." ),
-                     soundnumbefore - soundnumafter, soundlistnum);
-    
+    add_msg( m_debug,
+             _( " Culled %i sounds from the sounds vector and cleared %i sound filter lists." ),
+             soundnumbefore - soundnumafter, soundlistnum );
+
 }
 // TODO: method for getting the escaped sounds per fascing side
 // Creates a sound_instance_cache by "flood filling" a given sound event through the absorption map of the given z-level.
