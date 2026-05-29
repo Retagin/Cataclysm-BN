@@ -598,7 +598,7 @@ void map::set_transparency_cache_dirty( const tripoint_bub_ms &p )
 void map::set_absorption_cache_dirty( const tripoint_bub_ms &p )
 {
     // Logic lifted shamelessly from set_outside_cache_dirty
-    if ( !inbounds( p ) ){
+    if( !inbounds( p ) ) {
         return;
     }
     level_cache &ch = get_cache( p.z() );
@@ -638,7 +638,7 @@ void map::set_absorption_cache_dirty( const tripoint_bub_ms &p )
     if( on_right && on_top )    { mark( smp + point_rel_sm::north_east() ); }
     if( on_left  && on_bottom ) { mark( smp + point_rel_sm::south_west() ); }
     if( on_right && on_bottom ) { mark( smp + point_rel_sm::south_east() ); }
-    
+
 }
 
 void map::set_absorption_cache_dirty( const int zlev )

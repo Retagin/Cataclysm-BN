@@ -876,8 +876,8 @@ static constexpr int average_minvol_distance( const int &dist1, const short &vol
 
         // If we somehow get an dist2 less than dist1, just return dist1. log10(20) + 1 = ~2.30103
         const int equation = ( delta_vol_req / SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) + ( (
-                                   t_asbsorp * dist1 ) / 20.0 ) + log10( dist1 ) - log10( t_asbsorp ) + 2.30103;
-        return (dist1 > equation) ? dist1 : equation;
+                                 t_asbsorp * dist1 ) / 20.0 ) + log10( dist1 ) - log10( t_asbsorp ) + 2.30103;
+        return ( dist1 > equation ) ? dist1 : equation;
     }
 
 }
