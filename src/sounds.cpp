@@ -493,11 +493,18 @@ static short terrain_sound_attenuation( tripoint_abs_omt omtpos, season_type sea
 void map::cull_heard_sounds()
 {
     //If we dont clear our filtered sounds list map, there *will* be errors.
+    const int soundnumbefore = m_sound_cache.sound_instances.size();
+    const int soundlistnum = m_sound_cache.sound_list_filtered.size();
     m_sound_cache.sound_list_filtered.clear();
     //Now we can safely cull sounds.
     std::erase_if( m_sound_cache.sound_instances, []( const auto & sound ) {
         return sound.heard_by_monsters && sound.heard_by_player && sound.heard_by_npcs;
     } );
+    const int soundnumafter = m_sound_cache.sound_instances.size();
+        add_msg( m_debug,
+                     _( " Culled %i sounds from the sounds vector and cleared %i sound filter lists." ),
+                     soundnumbefore - soundnumafter, soundlistnum);
+    
 }
 // TODO: method for getting the escaped sounds per fascing side
 // Creates a sound_instance_cache by "flood filling" a given sound event through the absorption map of the given z-level.
