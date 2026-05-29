@@ -500,12 +500,12 @@ struct sound_instance_cache {
 
     // Returns corresponding flood envelope volume index provided a relative point.
     // Use carefully.
-    auto env_index( const point_rel_ms &p ) const -> int { return ( ( p.x() ) * ( 2 * flood_radius ) + ( p.y() ) ); }
+    auto env_index( const point_rel_ms &p ) const -> int { return ( ( p.x() ) * ( (2 * flood_radius ) + 1 ) + ( p.y() ) ); }
 
     // Returns the corresponding flood envelope volume index provided a bubble point.
-    auto p_to_env_index( const point_bub_ms &p ) const -> int { return ( ( p.x() - offset_x ) * ( 2 * flood_radius ) + ( p.y() - offset_y ) ); }
+    auto p_to_env_index( const point_bub_ms &p ) const -> int { return ( ( p.x() - offset_x ) * ( (2 * flood_radius ) + 1 ) + ( p.y() - offset_y ) ); }
     // Returns the corresponding flood envelope volume index provided a bubble tripoint.
-    auto p_to_env_index( const tripoint_bub_ms &p ) const -> int { return ( ( p.x() - offset_x ) * ( 2 * flood_radius ) + ( p.y() - offset_y ) ); }
+    auto p_to_env_index( const tripoint_bub_ms &p ) const -> int { return ( ( p.x() - offset_x ) * ( (2 * flood_radius ) + 1 ) + ( p.y() - offset_y ) ); }
 
     // Returns true if a given bubble tripoint is inside our envelope.
     // X and Y offsets taken from our index point, the bottom left corner of our envelope.

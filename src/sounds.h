@@ -117,6 +117,7 @@ static constexpr short vol_threshold_DEAFENING = 191;
 // The total checked radius is + 1 of its equivalent flood radius.
 // We need to check all tiles adjacent to the ones we flood to, hence the widened area.
 // We declare these so that we can actually generate a 2d array of the correct size.
+// Use checkvar radius when navigating a checkvar envelope, and total checkvar envelope when declaring the size of one.
 
 static constexpr uint8_t total_check_radius_SILENT = flood_radius_SILENT + 1;
 static constexpr uint8_t total_check_radius_NEARLY_SILENT = flood_radius_NEARLY_SILENT + 1;
@@ -125,7 +126,7 @@ static constexpr uint8_t total_check_radius_NORMAL = flood_radius_NORMAL + 1;
 static constexpr uint8_t total_check_radius_LOUD = flood_radius_LOUD + 1;
 static constexpr uint8_t total_check_radius_VERY_LOUD = flood_radius_VERY_LOUD + 1;
 static constexpr uint8_t total_check_radius_DEAFENING = flood_radius_DEAFENING + 1;
-
+// The total check envelopes should only be used when defining the size of a checkvars array.
 static constexpr uint8_t total_check_envelope_SILENT = ( 1 + ( 2 * total_check_radius_SILENT ) );
 static constexpr uint8_t total_check_envelope_NEARLY_SILENT = ( 1 + ( 2 *
         total_check_radius_NEARLY_SILENT ) );
@@ -225,15 +226,15 @@ static constexpr auto get_flood_radius_by_enum( const enum sound_vol_for_flood_d
 //     {flood_radius_SILENT, flood_radius_NEARLY_SILENT, flood_radius_QUIET, flood_radius_NORMAL, flood_radius_LOUD, flood_radius_VERY_LOUD, flood_radius_DEAFENING}
 // };
 
-// static constexpr auto total_check_dist_by_index = std::array<uint8_t, 7>
-// {
-//     {total_check_radius_SILENT, total_check_radius_NEARLY_SILENT, total_check_radius_QUIET, total_check_radius_NORMAL, total_check_radius_LOUD, total_check_radius_VERY_LOUD, total_check_radius_DEAFENING}
-// };
-
-static constexpr auto total_check_envelop_by_index = std::array<uint8_t, 7>
+static constexpr auto total_check_radius_by_index = std::array<uint8_t, 7>
 {
-    {total_check_envelope_SILENT, total_check_envelope_NEARLY_SILENT, total_check_envelope_QUIET, total_check_envelope_NORMAL, total_check_envelope_LOUD, total_check_envelope_VERY_LOUD, total_check_envelope_DEAFENING}
+    {total_check_radius_SILENT, total_check_radius_NEARLY_SILENT, total_check_radius_QUIET, total_check_radius_NORMAL, total_check_radius_LOUD, total_check_radius_VERY_LOUD, total_check_radius_DEAFENING}
 };
+
+// static constexpr auto total_check_envelop_by_index = std::array<uint8_t, 7>
+// {
+//     {total_check_envelope_SILENT, total_check_envelope_NEARLY_SILENT, total_check_envelope_QUIET, total_check_envelope_NORMAL, total_check_envelope_LOUD, total_check_envelope_VERY_LOUD, total_check_envelope_DEAFENING}
+// };
 
 static constexpr auto get_total_check_radius_by_enum( const enum sound_vol_for_flood_dist
         &dist_enum )
@@ -855,7 +856,7 @@ static constexpr int average_minvol_distance( const int &dist1, const short &vol
         const auto &coefficient = ( ( delta_vol_req / SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) + log10(
                                         dist1 ) );
 
-        return static_cast<int>( std::round( pow( 10, coefficient ) ) );
+        return pow( 10, coefficient );
 
     } else {
         // If t_absorp != 0, we take the red pill, we stay in wonderland and I show you how deep the rabit hole goes.
@@ -874,9 +875,9 @@ static constexpr int average_minvol_distance( const int &dist1, const short &vol
         // If we just add 1 and discard the log10(dist2) portion, we wont ever accrue enough error to care about it.
 
         // If we somehow get an dist2 less than dist1, just return dist1. log10(20) + 1 = ~2.30103
-        const auto &equation = ( delta_vol_req / SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) + ( (
+        const int equation = ( delta_vol_req / SOUND_MINIMUM_VOLUME_FOR_PROPAGATION ) + ( (
                                    t_asbsorp * dist1 ) / 20.0 ) + log10( dist1 ) - log10( t_asbsorp ) + 2.30103;
-        return std::max( dist1, static_cast<int>( std::round( equation ) ) );
+        return (dist1 > equation) ? dist1 : equation;
     }
 
 }

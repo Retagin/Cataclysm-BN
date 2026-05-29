@@ -154,7 +154,7 @@ static constexpr short dBspl_to_mdBspl( const short &dB )
 // Converts milli-decibels sound pressure level to decibels sound pressure level.
 static constexpr short mdBspl_to_dBspl( const short &mdB )
 {
-    return static_cast<short>( std::round( mdBspl_to_dBspl_coeff * mdB ) );
+    return ( mdBspl_to_dBspl_coeff * mdB );
 }
 // We always take our base volume readings for sounds at 1m, even if we are in the same tile.
 // Calcing the volume very close to a sound source is the perview of sound stage technicians and physicists.
@@ -559,16 +559,24 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         // We need to check the tiles 1 outside our actual envelope as well.
         // Little bit of shenanagins.
         const auto vol_enum_index = get_san_dir( static_cast<uint8_t>( vol_enum ) );
-        const auto total_check_radius = get_total_check_radius_by_enum( vol_enum );
-        const uint8_t env_length = total_check_envelop_by_index[vol_enum_index];
-        const auto checkvar_index_p = temp_sound_cache.origin + point{-total_check_radius, -total_check_radius};
+        const auto &actual_check_radius = total_check_radius_by_index[vol_enum_index];
+        // const auto &actual_env_length = total_check_envelop_by_index[vol_enum_index];
+        // As our checkvar envelope is of a set size, we need to mark our absolute index position and our "relative" index position.
+        const auto checkvar_index_p = temp_sound_cache.origin + point{-total_check_radius_DEAFENING, -total_check_radius_DEAFENING};
+        // const auto checkvar_rel_index_p = temp_sound_cache.origin + point{-total_check_radius, -total_check_radius};
+        // const auto checkvar_rel_index_opp_p = temp_sound_cache.origin + point{total_check_radius, total_check_radius};
         // Our checkvar index point is located at 0,0 of our checkvar envelope.
+        // We only actually check from our rel_index_p to our rell_index_opp_p
         const auto cv_env_rel_ms_adj = point{-checkvar_index_p.x(), -checkvar_index_p.y()};
         // Located at 0,0 of our flood envelope
-        const auto &f_env_index_p = temp_sound_cache.envelope_index_point;
-        const auto f_env_rel_ms_adj = point{-f_env_index_p.x(), -f_env_index_p.y()};
+        // const auto &f_env_index_p = temp_sound_cache.envelope_index_point;
+        // const auto f_env_rel_ms_adj = point{-f_env_index_p.x(), -f_env_index_p.y()};
 
-        /** If it explodes too bad, move to a vector of bitset vectors
+        // The start x/y adjustment to where we actually want to check. 
+        const uint8_t startxy = total_check_radius_DEAFENING - actual_check_radius;
+        const uint8_t endxy = total_check_envelope_DEAFENING - startxy;
+
+        /** Windows MSVS fails compile with variable length arrays while everything else works. Max size it is.
         *    @param checkvars[][][0] = terrain base sound attenuation cases 1 & 3
         *    @param checkvars[][][1] = terrain base sound attenuation cases 2 & 3
         *    @param checkvars[][][2] = tile sound attenuation cases 1 & 3
@@ -577,13 +585,15 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         *    @param checkvars[][][5] = True if no floor in this tile. If there is no floor in our tile, we can escape down.
         *    @param checkvars[][][6] = Are we outside?
         *    @param checkvars[][][7] = Does the tile count as a sound wall?
+        *   It is possible for all bits to be false, but not for all bits to be true.
         */
-        std::bitset<8> checkvars[env_length][env_length];
+        std::bitset<8> checkvars[total_check_envelope_DEAFENING][total_check_envelope_DEAFENING];
         memset( checkvars, 0, sizeof( checkvars ) );
         // Our x/y zone is max +27
         // We now poll all of the relevant tiles in or adjacent to our envelope and encode the conditions in our bitset.
-        for( uint8_t x = 0; x < env_length; x++ ) {
-            for( uint8_t y = 0; y < env_length; y++ ) {
+        // We are likely not filling out our entire checkvar array, just the entries that correlate to the relevant tiles. 
+        for( uint8_t x = startxy; x < endxy; x++ ) {
+            for( uint8_t y = startxy; y < endxy; y++ ) {
                 const auto env_tile = checkvar_index_p + point{x, y};
                 auto &env_tile_vars = checkvars[env_tile.x()][env_tile.y()];
                 if( !inbounds( env_tile ) ) {
@@ -622,16 +632,17 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         // the volume vector in the sound instance IS NOT aligned with normal game tripoints, and uses a limited local "area"
         // The origin will always be located at (radius, radius), equivalent to and index position of (radius * (2 * radius) + radius) = r^2 + 3r
         svol[( f_radius * f_radius ) + ( 3 * f_radius )] =  origin_volume;
+        auto &checkvars_origin = checkvars[total_check_radius_DEAFENING][total_check_radius_DEAFENING];
 
         // If we are not indoors and there is no floor on the tile above us, escape up.
         // We know by definition that our origin tile is located at f_radius, f_radius or check_radius,check_radius respectively.
         if( !temp_sound_cache.source_indoors && check_up_valid ) {
-            if( !checkvars[total_check_radius][total_check_radius][4] ) {
+            if( !checkvars_origin[4] ) {
                 up_escape_vector.push_back( {origin_volume, 1} );
             }
         }
         // If there is no floor where we are, escape down.
-        if( checkvars[total_check_radius][total_check_radius][5] ) {
+        if( checkvars_origin[5] ) {
             down_escape_vector.push_back( {origin_volume, 1} );
         }
         adjacent_tiles = get_adjacent_tiles( temp_sound_cache.origin.xy() );
@@ -921,7 +932,9 @@ void map::batch_flood_fill_sounds()
     //// [-1 , -1] [ 0 , -1] [ 1 , -1]   [ 6 ] [ 5 ] [ 4 ]
     // 8 is the center, and should not normally be called. Kept incase of a sound looping back to its origin point.
     std::array<point_bub_ms, 8> adjacent_tiles;
+
     std::pair<bool, bool> wall_bools;
+
     // Grab a constexpr version of our sound direction
     auto get_san_dir = [&]( const uint8_t &dir ) -> uint8_t{
         return get_sound_direction_index( dir );
@@ -930,9 +943,25 @@ void map::batch_flood_fill_sounds()
     auto cmp = []( const propagation_tile & a, const propagation_tile & b ) {
         return a.vol < b.vol;
     };
+
     // max-heap: highest volume processed first. We clear this after each sound processed. pqt = priority tile que
     std::priority_queue<propagation_tile, std::vector<propagation_tile>, decltype( cmp )> ptq( cmp );
 
+    // We will just use one checkvars envelope for all the sounds, and set it to zero when we begin to floodfill a sound. 
+
+    /** Windows MSVS wont compile with variable sized multidimension arrays but everything else will. So we just use the max size.
+    *    @param checkvars[][][0] = terrain base sound attenuation cases 1 & 3
+    *    @param checkvars[][][1] = terrain base sound attenuation cases 2 & 3
+    *    @param checkvars[][][2] = tile sound attenuation cases 1 & 3
+    *    @param checkvars[][][3] = tile sound attenuation cases 2 & 3
+    *    @param checkvars[][][4] = True if there is a roof above us. If there is no roof and we are not indoors, we can escape up.
+    *    @param checkvars[][][5] = True if no floor in this tile. If there is no floor in our tile, we can escape down.
+    *    @param checkvars[][][6] = Are we outside?
+    *    @param checkvars[][][7] = Does the tile count as a sound wall?
+    */
+    std::bitset<8> checkvars[total_check_envelope_DEAFENING][total_check_envelope_DEAFENING];
+    memset( checkvars, 0, sizeof( checkvars ) );
+    
     // Now we step through our zlevels
     for( int z = -OVERMAP_DEPTH; z <= OVERMAP_HEIGHT; z++ ) {
 
@@ -956,6 +985,8 @@ void map::batch_flood_fill_sounds()
                 continue;
             } else {
 
+                // Set our checkvars to zero before we get too much farther and break stuff.
+                memset( checkvars, 0, sizeof( checkvars ) );
                 sound_instance_cache temp_sound_cache( flooded_sound,
                                                        get_flood_dist_enum( flooded_sound.volume ),
                                                        get_flood_radius_by_enum( get_flood_dist_enum(
@@ -970,27 +1001,17 @@ void map::batch_flood_fill_sounds()
                             temp_sound_cache.origin.x(), temp_sound_cache.origin.y() )];
                 const auto vol_enum_index = get_san_dir( static_cast<uint8_t>( get_flood_dist_enum(
                                                 flooded_sound.volume ) ) );
-                const auto total_check_radius = get_total_check_radius_by_enum( get_flood_dist_enum(
-                                                    flooded_sound.volume ) );
-                const uint8_t env_length = total_check_envelop_by_index[vol_enum_index];
-                const auto checkvar_index_p = temp_sound_cache.origin + point{-total_check_radius, -total_check_radius};
+                const auto &actual_check_radius = total_check_radius_by_index[vol_enum_index];
+                // const auto &actual_env_length = total_check_envelop_by_index[vol_enum_index];
+                const auto checkvar_index_p = temp_sound_cache.origin + point{-total_check_radius_DEAFENING, -total_check_radius_DEAFENING};
                 // Our checkvar index point is located at 0,0 of our checkvar envelope.
                 const auto cv_env_rel_ms_adj = point{-checkvar_index_p.x(), -checkvar_index_p.y()};
                 // Located at 0,0 of our flood envelope
-                const auto &f_env_index_p = temp_sound_cache.envelope_index_point;
-                const auto f_env_rel_ms_adj = point{-f_env_index_p.x(), -f_env_index_p.y()};
-                /** If it explodes too bad, move to a vector of bitset vectors
-                *    @param checkvars[][][0] = terrain base sound attenuation cases 1 & 3
-                *    @param checkvars[][][1] = terrain base sound attenuation cases 2 & 3
-                *    @param checkvars[][][2] = tile sound attenuation cases 1 & 3
-                *    @param checkvars[][][3] = tile sound attenuation cases 2 & 3
-                *    @param checkvars[][][4] = True if there is a roof above us. If there is no roof and we are not indoors, we can escape up.
-                *    @param checkvars[][][5] = True if no floor in this tile. If there is no floor in our tile, we can escape down.
-                *    @param checkvars[][][6] = Are we outside?
-                *    @param checkvars[][][7] = Does the tile count as a sound wall?
-                */
-                std::bitset<8> checkvars[env_length][env_length];
-                memset( checkvars, 0, sizeof( checkvars ) );
+                // const auto &f_env_index_p = temp_sound_cache.envelope_index_point;
+                // const auto f_env_rel_ms_adj = point{-f_env_index_p.x(), -f_env_index_p.y()};
+                const uint8_t startxy = total_check_radius_DEAFENING - actual_check_radius;
+                const uint8_t endxy = total_check_envelope_DEAFENING - startxy;
+                
 
                 // We run through this often enough that we might as well make a lambda of it.
                 auto check_walls = [&]( const uint8_t &dir ) -> void{
@@ -1010,8 +1031,8 @@ void map::batch_flood_fill_sounds()
                     return temp_sound_cache.p_to_env_index( p );
                 };
 
-                for( uint8_t x = 0; x < env_length; x++ ) {
-                    for( uint8_t y = 0; y < env_length; y++ ) {
+                for( uint8_t x = startxy; x < endxy; x++ ) {
+                    for( uint8_t y = startxy; y < endxy; y++ ) {
                         const auto env_tile = checkvar_index_p + point{x, y};
                         auto &env_tile_vars = checkvars[env_tile.x()][env_tile.y()];
                         if( !inbounds( env_tile ) ) {
@@ -1070,8 +1091,8 @@ void map::batch_flood_fill_sounds()
                 };
                 // Set our initial conditions. We want 100ths of a decibel for the volume
                 // We dont apply directional sound propagation penalties at the very start.
-                // The center of our flood envelope is always (flood radius, flood radius). Index location math is (radius * (2 * radius) + radius) = (radius * radius) + (3 * radius)
-                svol[( f_radius * f_radius ) + ( 3 * f_radius )] =  dBspl_to_mdBspl( temp_sound_cache.sound.volume )
+                // The center of our flood envelope is always (flood radius, flood radius). Index location math is (radius * ( ( 2 * radius ) + 1 ) + radius) = 2 * ( radius * radius ) + ( 2 * radius )
+                svol[temp_sound_cache.p_to_env_index(temp_sound_cache.origin)] =  dBspl_to_mdBspl( temp_sound_cache.sound.volume )
                         ;
                 adjacent_tiles = get_adjacent_tiles( temp_sound_cache.sound.origin.xy() );
 

@@ -597,45 +597,48 @@ void map::set_transparency_cache_dirty( const tripoint_bub_ms &p )
 
 void map::set_absorption_cache_dirty( const tripoint_bub_ms &p )
 {
-    if( inbounds( p ) ) {
-        const auto smp = project_to<coords::sm>( p );
-        level_cache &ch = get_cache( smp.z() );
-        ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x(), smp.y() ) ) );
-        // Check if the point is on the submap border.
-        const auto abs_p = project_to<coords::ms>( smp ).xy();
-        if( p.x() == abs_p.x() || p.x() == ( abs_p.x() + SEEX - 1 ) || p.y() == abs_p.y() ||
-            p.y() == ( abs_p.y() + SEEY - 1 ) ) {
-            // Now figure out which border we are on.
-            if( p.x() == abs_p.x() && p.y() == abs_p.y() ) {
-                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x() - 1, smp.y() ) ) );
-                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x() - 1, smp.y() - 1 ) ) );
-                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x(), smp.y() - 1 ) ) );
-            } else if( p.x() == abs_p.x() && p.y() == ( abs_p.y() + SEEY - 1 ) ) {
-                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x() - 1, smp.y() ) ) );
-                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x() - 1, smp.y() + 1 ) ) );
-                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x(), smp.y() + 1 ) ) );
-            } else if( p.x() == ( abs_p.x() + SEEX - 1 ) && p.y() == abs_p.y() ) {
-                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x(), smp.y() - 1 ) ) );
-                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x() + 1, smp.y() - 1 ) ) );
-                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x() + 1, smp.y() ) ) );
-            } else if( p.x() == ( abs_p.x() + SEEX - 1 ) && p.y() == ( abs_p.y() + SEEY - 1 ) ) {
-                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x() + 1, smp.y() ) ) );
-                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x() + 1, smp.y() + 1 ) ) );
-                ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x(), smp.y() + 1 ) ) );
-            } else {
-                if( p.x() == abs_p.x() ) {
-                    ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x() - 1, smp.y() ) ) );
-                } else if( p.x() == ( abs_p.x() + SEEX - 1 ) ) {
-                    ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x() + 1, smp.y() ) ) );
-                } else if( p.y() == abs_p.y() ) {
-                    ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x(), smp.y() - 1 ) ) );
-                } else if( p.y() == ( abs_p.y() + SEEY - 1 ) ) {
-                    ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( smp.x(), smp.y() + 1 ) ) );
-                }
-            }
-        }
-
+    // Logic lifted shamelessly from set_outside_cache_dirty
+    if ( !inbounds( p ) ){
+        return;
     }
+    level_cache &ch = get_cache( p.z() );
+    const auto proj = project_remain<coords::sm>( p );
+    const auto smp = proj.quotient_tripoint;
+    const auto l = proj.remainder;
+
+    // Helper: mark one submap grid cell dirty in both the bitset and the submap flag.
+    auto mark = [&]( const tripoint_bub_sm & p ) {
+        if( p.x() < 0 || p.y() < 0 || p.x() >= my_MAPSIZE || p.y() >= my_MAPSIZE ) {
+            return;
+        }
+        ch.absorption_cache_dirty.set( static_cast<size_t>( ch.bidx( p.x(), p.y() ) ) );
+        auto *sm = get_submap_at_grid( tripoint_bub_sm{ p.x(), p.y(), p.z() } );
+        if( sm ) {
+            sm->absorption_dirty = true;
+        }
+    };
+
+    // Always mark the tile's own submap.
+    mark( smp );
+
+    // rebuild_absorption_cache checks a 3×3 tile neighbourhood, so a tile on a
+    // submap boundary can affect tiles in the adjacent submap.
+    const bool on_left   = ( l.x() == 0 );
+    const bool on_right  = ( l.x() == SEEX - 1 );
+    const bool on_top    = ( l.y() == 0 );
+    const bool on_bottom = ( l.y() == SEEY - 1 );
+
+    if( on_left )   { mark( smp + point_rel_sm::west() ); }
+    if( on_right )  { mark( smp + point_rel_sm::east() ); }
+    if( on_top )    { mark( smp + point_rel_sm::north() ); }
+    if( on_bottom ) { mark( smp + point_rel_sm::south() ); }
+
+    // Corner neighbours when on both x and y boundaries.
+    if( on_left  && on_top )    { mark( smp + point_rel_sm::north_west() ); }
+    if( on_right && on_top )    { mark( smp + point_rel_sm::north_east() ); }
+    if( on_left  && on_bottom ) { mark( smp + point_rel_sm::south_west() ); }
+    if( on_right && on_bottom ) { mark( smp + point_rel_sm::south_east() ); }
+    
 }
 
 void map::set_absorption_cache_dirty( const int zlev )
