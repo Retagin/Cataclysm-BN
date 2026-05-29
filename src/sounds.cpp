@@ -342,7 +342,7 @@ static constexpr uint8_t dir_index_to_sound_source( const tripoint_bub_ms &sourc
 
 // Returns the volume adjustment due to altitude in mdB spl. While better than assessing a direct penalty per zlevel, this still has has many assumptions worked into it.
 static short vol_z_adjust( const tripoint_bub_ms &source, const tripoint_bub_ms &listener,
-                                     const bool &lineofsight = false, const bool &for_horde_signal = false )
+                           const bool &lineofsight = false, const bool &for_horde_signal = false )
 {
     // Take our easy out if we have it for whatever reason.
     const auto &map = get_map();
@@ -381,8 +381,8 @@ static short vol_z_adjust( const tripoint_bub_ms &source, const tripoint_bub_ms 
 // Returns a the mdB volume of a given sound cache at some tripoint.
 // If you feed this an invalid tripoint, there is a very good chance it explodes or gives you 0.
 static short svol_at( const sound_instance_cache &sound_inst, const tripoint_bub_ms &tri,
-                                const short &t_absorp = SOUND_ABSORPTION_OPEN_FIELD, const bool &listener_indoors = false,
-                                const bool &lineofsight = false )
+                      const short &t_absorp = SOUND_ABSORPTION_OPEN_FIELD, const bool &listener_indoors = false,
+                      const bool &lineofsight = false )
 {
     const auto &map = get_map();
     // Oddly enough everything should still work if we get asked for a noise outside of the bubble, with a simple check.

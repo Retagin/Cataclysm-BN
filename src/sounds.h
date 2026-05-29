@@ -180,17 +180,17 @@ struct enum_traits<floodfill_checkvar_envelope_size> {
 //     sound_vol_for_flood_dist::DEAFENING}
 // };
 
-static constexpr uint8_t get_flood_envelope_by_enum(const sound_vol_for_flood_dist &dist_enum)
+static constexpr uint8_t get_flood_envelope_by_enum( const sound_vol_for_flood_dist &dist_enum )
 {
     switch( dist_enum ) {
         case sound_vol_for_flood_dist::SILENT:
-            return ( flood_radius_SILENT * 2) + 1;
+            return ( flood_radius_SILENT * 2 ) + 1;
         case sound_vol_for_flood_dist::NEARLY_SILENT:
-            return ( flood_radius_NEARLY_SILENT * 2) + 1;
+            return ( flood_radius_NEARLY_SILENT * 2 ) + 1;
         case sound_vol_for_flood_dist::QUIET:
             return ( flood_radius_QUIET * 2 ) + 1;
         case sound_vol_for_flood_dist::NORMAL:
-            return ( flood_radius_NORMAL * 2) + 1;
+            return ( flood_radius_NORMAL * 2 ) + 1;
         case sound_vol_for_flood_dist::LOUD:
             return ( flood_radius_LOUD * 2 ) + 1;
         case sound_vol_for_flood_dist::VERY_LOUD:

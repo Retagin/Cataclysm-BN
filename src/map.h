@@ -511,13 +511,15 @@ struct sound_instance_cache {
     // X and Y offsets taken from our index point, the bottom left corner of our envelope.
     bool in_envelope( const tripoint_bub_ms &tp ) const {
         return ( tp.x() - offset_x ) >= 0 && ( tp.y() - offset_y ) >= 0 &&
-               ( tp.x() - offset_x ) <= get_flood_envelope_by_enum(dist_enum) && ( tp.y() - offset_y ) <= get_flood_envelope_by_enum(dist_enum);
+               ( tp.x() - offset_x ) <= get_flood_envelope_by_enum( dist_enum ) &&
+               ( tp.y() - offset_y ) <= get_flood_envelope_by_enum( dist_enum );
     }
     // Returns true if a given bubble point is inside our envelope.
     // X and Y offsets taken from our index point, the bottom left corner of our envelope.
     bool in_envelope( const point_bub_ms &tp ) const {
         return ( tp.x() - offset_x ) >= 0 && ( tp.y() - offset_y ) >= 0 &&
-               ( tp.x() - offset_x ) < get_flood_envelope_by_enum(dist_enum) && ( tp.y() - offset_y ) < get_flood_envelope_by_enum(dist_enum);
+               ( tp.x() - offset_x ) < get_flood_envelope_by_enum( dist_enum ) &&
+               ( tp.y() - offset_y ) < get_flood_envelope_by_enum( dist_enum );
     }
 
     // Returns true if a given point is on the border of the flood envelope.
