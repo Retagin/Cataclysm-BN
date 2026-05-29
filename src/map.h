@@ -455,7 +455,7 @@ struct sound_instance_cache {
     // etc.
     sound_event sound;
 
-    enum sound_vol_for_flood_dist dist_enum;
+    sound_vol_for_flood_dist dist_enum;
 
     // "radius" around the origin to flood a sound through.
     // The flood envelope is 1 + (radius * 2) on a side.
@@ -511,13 +511,13 @@ struct sound_instance_cache {
     // X and Y offsets taken from our index point, the bottom left corner of our envelope.
     bool in_envelope( const tripoint_bub_ms &tp ) const {
         return ( tp.x() - offset_x ) >= 0 && ( tp.y() - offset_y ) >= 0 &&
-               ( tp.x() - offset_x ) <= ( flood_radius * 2 ) && ( tp.y() - offset_y ) <= ( flood_radius * 2 );
+               ( tp.x() - offset_x ) <= get_flood_envelope_by_enum(dist_enum) && ( tp.y() - offset_y ) <= get_flood_envelope_by_enum(dist_enum);
     }
     // Returns true if a given bubble point is inside our envelope.
     // X and Y offsets taken from our index point, the bottom left corner of our envelope.
     bool in_envelope( const point_bub_ms &tp ) const {
         return ( tp.x() - offset_x ) >= 0 && ( tp.y() - offset_y ) >= 0 &&
-               ( tp.x() - offset_x ) <= ( flood_radius * 2 ) && ( tp.y() - offset_y ) <= ( flood_radius * 2 );
+               ( tp.x() - offset_x ) < get_flood_envelope_by_enum(dist_enum) && ( tp.y() - offset_y ) < get_flood_envelope_by_enum(dist_enum);
     }
 
     // Returns true if a given point is on the border of the flood envelope.
@@ -2125,9 +2125,6 @@ class map : public submap_load_listener
         point_bub_ms abs_to_bub( const point_abs_ms &abs ) const { return point_bub_ms( ( abs - project_to<coords::ms>( abs_sub ).xy() ).raw() ); }
         point_abs_sm bub_to_abs( const point_bub_sm &bub ) const { return abs_sub.xy() + point_rel_sm( bub.raw() ); }
         point_bub_sm abs_to_bub( const point_abs_sm &abs ) const { return ( abs - abs_sub.raw().xy() ).reinterpret_as<point_bub_sm>(); }
-        /** Returns true if bubble point p resides along the border of the reality bubble.
-        */
-        bool on_bubble_border( const point_bub_ms &p ) const;
 
         bool inbounds_z( const int z ) const {
             return z >= -OVERMAP_DEPTH && z <= OVERMAP_HEIGHT;

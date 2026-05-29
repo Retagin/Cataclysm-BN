@@ -9421,13 +9421,6 @@ bool map::inbounds( const tripoint_abs_sm &p ) const
     return inbounds( abs_to_bub( p ) );
 }
 
-bool map::on_bubble_border( const point_bub_ms &p ) const
-{
-    const auto max_x = SEEX * my_MAPSIZE - 1;
-    const auto max_y = SEEY * my_MAPSIZE - 1;
-    return p.x() <= 0 || p.x() >= max_x || p.y() <= 0 || p.y() >= max_y;
-}
-
 bool map::inbounds( const point_bub_sm &p ) const
 {
     const auto max_xy = my_MAPSIZE;

@@ -341,7 +341,7 @@ static constexpr uint8_t dir_index_to_sound_source( const tripoint_bub_ms &sourc
 }
 
 // Returns the volume adjustment due to altitude in mdB spl. While better than assessing a direct penalty per zlevel, this still has has many assumptions worked into it.
-static constexpr short vol_z_adjust( const tripoint_bub_ms &source, const tripoint_bub_ms &listener,
+static short vol_z_adjust( const tripoint_bub_ms &source, const tripoint_bub_ms &listener,
                                      const bool &lineofsight = false, const bool &for_horde_signal = false )
 {
     // Take our easy out if we have it for whatever reason.
@@ -380,7 +380,7 @@ static constexpr short vol_z_adjust( const tripoint_bub_ms &source, const tripoi
 
 // Returns a the mdB volume of a given sound cache at some tripoint.
 // If you feed this an invalid tripoint, there is a very good chance it explodes or gives you 0.
-static constexpr short svol_at( const sound_instance_cache &sound_inst, const tripoint_bub_ms &tri,
+static short svol_at( const sound_instance_cache &sound_inst, const tripoint_bub_ms &tri,
                                 const short &t_absorp = SOUND_ABSORPTION_OPEN_FIELD, const bool &listener_indoors = false,
                                 const bool &lineofsight = false )
 {
@@ -1809,12 +1809,14 @@ static std::unordered_map<tripoint_bub_ms, sound_event> sound_markers;
 
 void sounds::sound( const sound_event &soundevent )
 {
+    // Make a copy so that when our referenced sound event inevitably goes out of scope things dont explode.
+    auto temp_se = soundevent;
     // Make sure our sound came from a valid inbounds location.
     auto &map = get_map();
-    if( map.inbounds( soundevent.origin ) ) {
+    if( map.inbounds( temp_se.origin ) ) {
         debugmsg( "Sound with description [ %1s ] attempted to propagate from out of bounds location %i:%i!",
-                  soundevent.description, soundevent.origin.x(),
-                  soundevent.origin.y() );
+                  temp_se.description, temp_se.origin.x(),
+                  temp_se.origin.y() );
         return;
     }
 
@@ -1824,12 +1826,12 @@ void sounds::sound( const sound_event &soundevent )
     // Most sounds intended to be quiet but still audible to the player, and maybe to creatures very close, is 35-45dB.
     // Ambient volume minimum is usually between 35 and 55dB in game. A player with normal hearing can notice sounds 20dB below ambient.
 
-    if( soundevent.volume < 16 ) {
+    if( temp_se.volume < 16 ) {
 
         add_msg( m_debug,
                  _( "Sound with description [ %1s ] at %i:%i with a volume %i too quiet for propagation." ),
-                 soundevent.description, soundevent.origin.x(), soundevent.origin.y(),
-                 soundevent.volume );
+                 temp_se.description, temp_se.origin.x(), temp_se.origin.y(),
+                 temp_se.volume );
 
         return;
     }
@@ -1840,29 +1842,27 @@ void sounds::sound( const sound_event &soundevent )
     // Dont propagate sounds that are too quiet to be heard.
     //return;
     //}
-    else if( soundevent.volume > mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ) ) {
+    else if( temp_se.volume > mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ) ) {
         add_msg( m_debug,
                  _( "Sound with description [ %1s ] at %i:%i attempted to propagate with a volume of %i dB which is louder than possible in atmosphere!" ),
-                 soundevent.description, soundevent.origin.x(), soundevent.origin.y(),
-                 soundevent.volume );
+                 temp_se.description, temp_se.origin.x(), temp_se.origin.y(),
+                 temp_se.volume );
     }
     // Description is not an optional parameter
-    if( soundevent.description.empty() ) {
-        debugmsg( "Sound at %i:%i has no description!", soundevent.origin.x(),
-                  soundevent.origin.y() );
+    if( temp_se.description.empty() ) {
+        debugmsg( "Sound at %i:%i has no description!", temp_se.origin.x(),
+                  temp_se.origin.y() );
         return;
     }
     // Check to see if more than one source has been set somehow.
     // More than one source entity will break alot of logic downstream.
-    if( ( soundevent.from_monster + soundevent.from_npc + soundevent.from_player ) >
+    if( ( temp_se.from_monster + temp_se.from_npc + temp_se.from_player ) >
         1 ) {
-        debugmsg( "Sound at %i:%i has too many source entity types!", soundevent.origin.x(),
-                  soundevent.origin.y() );
+        debugmsg( "Sound at %i:%i has too many source entity types!", temp_se.origin.x(),
+                  temp_se.origin.y() );
         return;
     }
-    sound_event temp_sound_event = soundevent;
-
-
+    auto &temp_sound_event = temp_se;
     // Maximum possible sound pressure level in atmosphere is 191 dB, cap our volume for sanity.
     // Sound volumes above 191dB are not sound pressure waves, they are supersonic blast/shock waves and should be modeled as damaging explosions.
     // Check above should catch any volumes that are too low or negative.
