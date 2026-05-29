@@ -362,7 +362,7 @@ static short vol_z_adjust( const tripoint_bub_ms &source, const tripoint_bub_ms 
 // If you feed this an invalid tripoint, there is a very good chance it explodes or gives you 0.
 static short svol_at( const sound_instance_cache &sound_inst, const tripoint_bub_ms &tri,
                       const short &t_absorp = SOUND_ABSORPTION_OPEN_FIELD, const bool &listener_indoors = false,
-                      const bool &lineofsight = false)
+                      const bool &lineofsight = false )
 {
     const auto &map = get_map();
     // Oddly enough everything should still work if we get asked for a noise outside of the bubble, with a simple check.
@@ -377,7 +377,8 @@ static short svol_at( const sound_instance_cache &sound_inst, const tripoint_bub
             // Return the loudest of either the tile vol or the vertical escape vol - vol_z_adjust, minimum 0.
             const auto &vertical_escape_vol = ( sound_inst.origin.z() > tri.z() ) ?
                                               sound_inst.base_distance_vol_by_dir[SDI_UP] : sound_inst.base_distance_vol_by_dir[SDI_DOWN];
-            return std::max( 0, ( std::max( sound_inst.vol_at_tri( tri ), vertical_escape_vol ) - vol_z_adjust( sound_inst.origin, tri, lineofsight ) ) );
+            return std::max( 0, ( std::max( sound_inst.vol_at_tri( tri ),
+                                            vertical_escape_vol ) - vol_z_adjust( sound_inst.origin, tri, lineofsight ) ) );
         }
     }
     // Thankfully rl_dist does not account for z differences.
@@ -393,29 +394,34 @@ static short svol_at( const sound_instance_cache &sound_inst, const tripoint_bub
                                       sound_inst.base_distance_vol_by_dir[SDI_UP] : sound_inst.base_distance_vol_by_dir[SDI_DOWN];
     // Determine if we can use the up escape.
     // Broken out for readability. If we are not on the same Z level we can use the vertical escape, or if we are outside, the sound is indoors and escaped.
-    const bool use_vert_escape = ( !samez ) ? true :( ( lineofsight &&
-                                  samez ) ? false : ( !listener_indoors && sound_inst.source_indoors &&
-                                          sound_inst.escaped_indoors ) );
+    const bool use_vert_escape = ( !samez ) ? true : ( ( lineofsight &&
+                                 samez ) ? false : ( !listener_indoors && sound_inst.source_indoors &&
+                                         sound_inst.escaped_indoors ) );
 
     const int vol_escape = ( use_vert_escape ) ? std::max( vertical_escape_vol,
-                             sound_inst.base_distance_vol_by_dir[san_dir] ) : sound_inst.base_distance_vol_by_dir[san_dir];
+                           sound_inst.base_distance_vol_by_dir[san_dir] ) : sound_inst.base_distance_vol_by_dir[san_dir];
 
-    if (vol_escape > MAXIMUM_VOLUME_ATMOSPHERE){
-        const uint8_t actualdir = (use_vert_escape && vertical_escape_vol >sound_inst.base_distance_vol_by_dir[san_dir] ) ? (( sound_inst.origin.z() <= tri.z() ) ? SDI_UP : SDI_DOWN ) : san_dir;
+    if( vol_escape > MAXIMUM_VOLUME_ATMOSPHERE ) {
+        const uint8_t actualdir = ( use_vert_escape &&
+                                    vertical_escape_vol > sound_inst.base_distance_vol_by_dir[san_dir] ) ? ( (
+                                                sound_inst.origin.z() <= tri.z() ) ? SDI_UP : SDI_DOWN ) : san_dir;
         add_msg( m_debug,
-                     _( "Error in sounds::svol:at(). Sound [ %1s ] from %i:%i:%i with origin volume of %i dB, has impossible escape vol in %i direction of %i mdB." ),
-                     sound_inst.sound.description, sound_inst.sound.origin.x(), sound_inst.sound.origin.y(),
-                     sound_inst.sound.origin.z(), sound_inst.sound.volume, actualdir, vol_escape );
+                 _( "Error in sounds::svol:at(). Sound [ %1s ] from %i:%i:%i with origin volume of %i dB, has impossible escape vol in %i direction of %i mdB." ),
+                 sound_inst.sound.description, sound_inst.sound.origin.x(), sound_inst.sound.origin.y(),
+                 sound_inst.sound.origin.z(), sound_inst.sound.volume, actualdir, vol_escape );
     }
     const int zadj = vol_z_adjust( sound_inst.origin, tri, lineofsight );
-    const int cumulative_dist_loss = get_cumulative_vol_dist_loss( sound_inst.flood_radius, distance, t_absorp );
-    if ( zadj < 0 || zadj > MAXIMUM_VOLUME_ATMOSPHERE || cumulative_dist_loss < 0 || cumulative_dist_loss > MAXIMUM_VOLUME_ATMOSPHERE){
+    const int cumulative_dist_loss = get_cumulative_vol_dist_loss( sound_inst.flood_radius, distance,
+                                     t_absorp );
+    if( zadj < 0 || zadj > MAXIMUM_VOLUME_ATMOSPHERE || cumulative_dist_loss < 0 ||
+        cumulative_dist_loss > MAXIMUM_VOLUME_ATMOSPHERE ) {
         add_msg( m_debug,
-                     _( "Error in sounds::svol:at(). Calced Escape Vol of %i mdB, Calced vol_z_adjust of %i mdB, Calced cumulative distance loss of %i mdB across %i tiles from heard sound [ %1s ] at %i:%i:%i to heard location %i:%i:%i" ),
-                     vol_escape, zadj, cumulative_dist_loss, distance, sound_inst.sound.description, sound_inst.sound.origin.x(), sound_inst.sound.origin.y(),
-                     sound_inst.sound.origin.z(), tri.x(), tri.y(), tri.z() );
+                 _( "Error in sounds::svol:at(). Calced Escape Vol of %i mdB, Calced vol_z_adjust of %i mdB, Calced cumulative distance loss of %i mdB across %i tiles from heard sound [ %1s ] at %i:%i:%i to heard location %i:%i:%i" ),
+                 vol_escape, zadj, cumulative_dist_loss, distance, sound_inst.sound.description,
+                 sound_inst.sound.origin.x(), sound_inst.sound.origin.y(),
+                 sound_inst.sound.origin.z(), tri.x(), tri.y(), tri.z() );
     }
-    const int heard_volume = std::max(0,(vol_escape  - (zadj + cumulative_dist_loss)));
+    const int heard_volume = std::max( 0, ( vol_escape  - ( zadj + cumulative_dist_loss ) ) );
     return heard_volume;
 }
 
@@ -582,7 +588,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         *   It is possible for all bits to be false, but not for all bits to be true.
         */
         std::bitset<8> checkvars[total_check_envelope_DEAFENING][total_check_envelope_DEAFENING] = {{0}};
-        
+
         // Our x/y zone is max +27
         // We now poll all of the relevant tiles in or adjacent to our envelope and encode the conditions in our bitset.
         // We are likely not filling out our entire checkvar array, just the entries that correlate to the relevant tiles.
@@ -625,7 +631,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         // We dont apply directional sound propagation penalties at the very start.
         // the volume vector in the sound instance IS NOT aligned with normal game tripoints, and uses a limited local "area"
         // The origin will always be located at (radius, radius), equivalent to and index position of (radius * (2 * radius) + radius) = r^2 + 3r
-        svol[temp_sound_cache.p_to_env_index(temp_sound_cache.origin)] =  origin_volume;
+        svol[temp_sound_cache.p_to_env_index( temp_sound_cache.origin )] =  origin_volume;
         auto &checkvars_origin = checkvars[total_check_radius_DEAFENING][total_check_radius_DEAFENING];
 
         // If we are not indoors and there is no floor on the tile above us, escape up.
@@ -797,29 +803,29 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         // 7   3    For the diagonals, we take the rms volume of the two adjacent cartesian directions.
         // 6 5 4
         auto &escape_direction_vol = temp_sound_cache.base_distance_vol_by_dir;
-        const int envelope_width = get_flood_envelope_by_enum(temp_sound_cache.dist_enum);
+        const int envelope_width = get_flood_envelope_by_enum( temp_sound_cache.dist_enum );
         const int env_2r = f_radius * 2;
         double vol_tally = 0;
         int non_zero = 0;
 
         auto comp_cart_escape = [&]( const uint8_t &cart_dir ) -> void{
-            escape_direction_vol[cart_dir] = ( non_zero == 0 ) ? 0 : static_cast<short>( std::round( sqrt(  vol_tally  / non_zero ) ) );
+            escape_direction_vol[cart_dir] = ( non_zero == 0 ) ? 0 : static_cast<short>( std::round( sqrt( vol_tally  / non_zero ) ) );
             vol_tally = 0;
             non_zero = 0;
         };
 
         for( int i = 0; i < envelope_width; i++ ) {
             // Starting with north escapes, so all of our desired volumes will be at envelope_y = radius * 2.
-            if( svol[ (i * envelope_width) + env_2r] > 0 ) {
+            if( svol[( i * envelope_width ) + env_2r] > 0 ) {
                 non_zero++;
-                vol_tally += pow( svol[ (i * envelope_width) + env_2r], 2 );
+                vol_tally += pow( svol[( i * envelope_width ) + env_2r], 2 );
             }
         }
         comp_cart_escape( SDI_N );
 
         for( int i = 0; i < envelope_width; i++ ) {
             // For east escapes all all of our desired volumes will be at envelope_x = radius * 2.
-            if( svol[( (env_2r) * envelope_width ) + i] > 0 ) {
+            if( svol[( ( env_2r ) * envelope_width ) + i] > 0 ) {
                 non_zero++;
                 vol_tally += pow( svol[( env_2r * envelope_width ) + i], 2 );
             }
@@ -890,16 +896,17 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
 
         // And from the maximum escape volume, approximate our minvol radius for easy distance filtering.
         vol_tally = 0;
-        for( uint8_t dir : sanitized_sound_direction_indexes_full) {
+        for( uint8_t dir : sanitized_sound_direction_indexes_full ) {
             auto &esc_vol = escape_direction_vol[dir];
-            if (esc_vol > origin_volume){
+            if( esc_vol > origin_volume ) {
                 const auto &sop = temp_sound_cache.origin;
-                debugmsg( "Sound with description [ %1s ] from %i:%i:%i at %i mdB has impossible escape volume in direction %i of %i mdB ", temp_sound_cache.sound.description, sop.x(), sop.y(), sop.z(), origin_volume, dir, esc_vol);
+                debugmsg( "Sound with description [ %1s ] from %i:%i:%i at %i mdB has impossible escape volume in direction %i of %i mdB ",
+                          temp_sound_cache.sound.description, sop.x(), sop.y(), sop.z(), origin_volume, dir, esc_vol );
                 esc_vol = origin_volume;
             }
             vol_tally = std::max( vol_tally, static_cast<double>( esc_vol ) );
         }
-        vol_tally = std::round(vol_tally);
+        vol_tally = std::round( vol_tally );
         // We use this for an easy distance check threshold when feeding monsters sound.
         temp_sound_cache.approximate_minvol_distance = average_minvol_distance(
                     temp_sound_cache.flood_radius, static_cast<short>( vol_tally ),
@@ -1095,7 +1102,7 @@ void map::batch_flood_fill_sounds()
                 // We dont apply directional sound propagation penalties at the very start.
                 // The center of our flood envelope is always (flood radius, flood radius). Index location math is (radius * ( ( 2 * radius ) + 1 ) + radius) = 2 * ( radius * radius ) + ( 2 * radius )
                 auto &origin_volume = svol[temp_sound_cache.p_to_env_index( temp_sound_cache.origin )];
-                origin_volume =  dBspl_to_mdBspl(temp_sound_cache.sound.volume );
+                origin_volume =  dBspl_to_mdBspl( temp_sound_cache.sound.volume );
                 adjacent_tiles = get_adjacent_tiles( temp_sound_cache.sound.origin.xy() );
 
                 const auto &orig_to_cv = temp_sound_cache.origin + cv_env_rel_ms_adj;
@@ -1204,7 +1211,7 @@ void map::batch_flood_fill_sounds()
                 // Probably a cleaner way to do this but oh well.
                 // Less total work than checking if we are at the edge of the envelope, figuring out which side of the envelope, and then incrimenting our bean count every time we propagate a tile.
                 // RMS is sqrt( (x1^2 + x2^2 + ... xn^2)/n )
-                const int envelope_width = get_flood_envelope_by_enum(flood_dist_enum_by_index[vol_enum_index]);
+                const int envelope_width = get_flood_envelope_by_enum( flood_dist_enum_by_index[vol_enum_index] );
                 const int env_2r = f_radius * 2;
                 double vol_tally = 0;
                 int non_zero = 0;
@@ -1216,9 +1223,9 @@ void map::batch_flood_fill_sounds()
                 };
                 for( int i = 0; i < envelope_width; i++ ) {
                     // Starting with north escapes, so all of our desired volumes will be at envelope_y = radius * 2.
-                    if( svol[ (i * envelope_width) + env_2r] > 0 ) {
+                    if( svol[( i * envelope_width ) + env_2r] > 0 ) {
                         non_zero++;
-                        vol_tally += pow( svol[ (i * envelope_width) + env_2r], 2 );
+                        vol_tally += pow( svol[( i * envelope_width ) + env_2r], 2 );
                     }
                 }
                 comp_cart_escape( SDI_N );
@@ -1257,7 +1264,8 @@ void map::batch_flood_fill_sounds()
                     const auto &cclockwise = wall_check_by_sdirection[i].first;
                     const auto &clockwise = wall_check_by_sdirection[i].second;
                     escape_vol[i] = ( escape_vol[clockwise] != 0 ||
-                                      escape_vol[cclockwise] != 0 ) ? std::round(sqrt( ( pow( escape_vol[cclockwise],2) + pow( escape_vol[clockwise], 2 ) ) / 2 )) : 0;
+                                      escape_vol[cclockwise] != 0 ) ? std::round( sqrt( ( pow( escape_vol[cclockwise],
+                                              2 ) + pow( escape_vol[clockwise], 2 ) ) / 2 ) ) : 0;
                 }
 
                 if( temp_sound_cache.source_indoors && escape_vol[SDI_UP] > 0 ) {
@@ -1266,11 +1274,12 @@ void map::batch_flood_fill_sounds()
 
                 // And from the maximum escape volume, approximate our minvol radius for easy distance filtering.
                 vol_tally = 0;
-                for(uint8_t dir : sanitized_sound_direction_indexes_full) {
+                for( uint8_t dir : sanitized_sound_direction_indexes_full ) {
                     auto &esc_vol = escape_vol[dir];
-                    if (esc_vol > origin_volume){
+                    if( esc_vol > origin_volume ) {
                         const auto &sop = temp_sound_cache.origin;
-                        debugmsg( "Sound with description [ %1s ] from %i:%i:%i at %i mdB has impossible escape volume in direction %i of %i mdB ", temp_sound_cache.sound.description, sop.x(), sop.y(), sop.z(), origin_volume, dir, esc_vol);
+                        debugmsg( "Sound with description [ %1s ] from %i:%i:%i at %i mdB has impossible escape volume in direction %i of %i mdB ",
+                                  temp_sound_cache.sound.description, sop.x(), sop.y(), sop.z(), origin_volume, dir, esc_vol );
                         esc_vol = origin_volume;
                     }
                     vol_tally = std::max( vol_tally, static_cast<double>( esc_vol ) );
@@ -1819,8 +1828,8 @@ void sounds::sound( const sound_event &soundevent )
     auto temp_se = soundevent;
     // Make sure our sound came from a valid inbounds location.
     auto &map = get_map();
-        // Make sure that we dont absolutely blast somebodies RAM/Processor during batch floodfill.
-        // 19100 attempted sound events in one turn is plenty.
+    // Make sure that we dont absolutely blast somebodies RAM/Processor during batch floodfill.
+    // 19100 attempted sound events in one turn is plenty.
     if( map.m_sound_cache.sounds_this_turn < MAXIMUM_VOLUME_ATMOSPHERE ) {
         map.m_sound_cache.sounds_this_turn++;
     } else {
@@ -1881,11 +1890,11 @@ void sounds::sound( const sound_event &soundevent )
     // Sound volumes above 191dB are not sound pressure waves, they are supersonic blast/shock waves and should be modeled as damaging explosions.
     // Check above should catch any volumes that are too low or negative.
     temp_se.volume = std::min( temp_se.volume,
-                                        mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ) );
-    if (temp_se.volume >= 120) {
+                               mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ) );
+    if( temp_se.volume >= 120 ) {
         map.m_sound_cache.attempted_potential_deafening_sounds++;
     }
-    if (temp_se.movement_noise){
+    if( temp_se.movement_noise ) {
         map.m_sound_cache.attempted_movement_sounds++;
     }
 
@@ -1893,14 +1902,14 @@ void sounds::sound( const sound_event &soundevent )
     // Along with any environmental sound with sufficient volume to be a horde signal.
     if( temp_se.from_monster || temp_se.from_npc || ( !temp_se.from_player &&
             temp_se.volume >= 120 ) ) {
-        if (temp_se.from_monster){
+        if( temp_se.from_monster ) {
             map.m_sound_cache.attempted_monster_sounds++;
-        }else if (temp_se.from_npc) {
+        } else if( temp_se.from_npc ) {
             map.m_sound_cache.attempted_NPC_sounds++;
         }
-        
+
         sound_batch_floodfill_que.push_back( temp_se );
-        
+
     } else {
         map.flood_fill_sound( temp_se, temp_se.origin.z() );
         map.m_sound_cache.attempted_non_batch_floodfills++;
@@ -2507,7 +2516,8 @@ void sounds::process_sound_markers( Character *who )
     auto &sound_vector = map.m_sound_cache.sound_instances;
     // We want constant ints for our x/y, makes the compiler happier when getting cache[x][y].
     // How far below ambient can this character hear? Default of 20dB, uncapped unlike NPCs.
-    const short below_ambient = std::min(19100, static_cast<int>(std::floor( 1500 + 500 * volume_multiplier )));
+    const short below_ambient = std::min( 19100,
+                                          static_cast<int>( std::floor( 1500 + 500 * volume_multiplier ) ) );
     // is the npc underground?
     const bool pcunderground = loc.z() < 0;
     const bool pcoutdoors = map.is_outside( loc.xy() );
@@ -2551,7 +2561,7 @@ void sounds::process_sound_markers( Character *who )
     // Cant hear noises that are significantly quieter than the loudest noise you are currently hearing,
     // Softer sounds just get drowned out in loud areas.
     const short vol_threshold = std::max( 0,
-                                          ( (passive_sound_dampening + ambient_vol) - below_ambient ) );
+                                          ( ( passive_sound_dampening + ambient_vol ) - below_ambient ) );
 
     for( auto &element : sound_vector ) {
         // Skip sounds the player has already heard.
@@ -2570,8 +2580,9 @@ void sounds::process_sound_markers( Character *who )
         }
 
         const short average_t_absorp = ( player_t_absorp == 0 &&
-                                         element.terrain_sound_absorbtion_at_source == 0 ) ? 0 : static_cast<short>(std::round( (( player_t_absorp +
-                                                 element.terrain_sound_absorbtion_at_source ) * 0.5 )));
+                                         element.terrain_sound_absorbtion_at_source == 0 ) ? 0 : static_cast<short>( std::round( ( (
+                                                 player_t_absorp +
+                                                 element.terrain_sound_absorbtion_at_source ) * 0.5 ) ) );
         const short tile_vol = svol_at( element, loc, average_t_absorp, player_indoors,
                                         who->sees( element.origin, true ) );
 
@@ -2765,11 +2776,14 @@ void sounds::clear_floodfill_que()
     auto &map = get_map();
     // Also kill our filtered sound lists, just in case.
     add_msg( m_debug,
-                     _( "Attempted to floodfill %i total sounds. Flooding attempted on %i deafening, %i movement, %i from NPCs, %i from monsters." ),
-                     map.m_sound_cache.sounds_this_turn, map.m_sound_cache.attempted_potential_deafening_sounds, map.m_sound_cache.attempted_movement_sounds, map.m_sound_cache.attempted_NPC_sounds, map.m_sound_cache.attempted_monster_sounds );
+             _( "Attempted to floodfill %i total sounds. Flooding attempted on %i deafening, %i movement, %i from NPCs, %i from monsters." ),
+             map.m_sound_cache.sounds_this_turn, map.m_sound_cache.attempted_potential_deafening_sounds,
+             map.m_sound_cache.attempted_movement_sounds, map.m_sound_cache.attempted_NPC_sounds,
+             map.m_sound_cache.attempted_monster_sounds );
     add_msg( m_debug,
-                     _( " %i Non-batch flood sounds attempted. Cleared %i sounds from the floodfill que and cleared %i sound filter lists." ),
-                     map.m_sound_cache.attempted_non_batch_floodfills, sound_batch_floodfill_que.size(), map.m_sound_cache.sound_list_filtered.size());
+             _( " %i Non-batch flood sounds attempted. Cleared %i sounds from the floodfill que and cleared %i sound filter lists." ),
+             map.m_sound_cache.attempted_non_batch_floodfills, sound_batch_floodfill_que.size(),
+             map.m_sound_cache.sound_list_filtered.size() );
     map.m_sound_cache.sounds_this_turn = 0;
     map.m_sound_cache.attempted_monster_sounds = 0;
     map.m_sound_cache.attempted_NPC_sounds = 0;

@@ -171,14 +171,17 @@ struct enum_traits<floodfill_checkvar_envelope_size> {
     static constexpr auto last = floodfill_checkvar_envelope_size::_LAST;
 };
 
-static constexpr auto flood_dist_enum_by_index = std::array<sound_vol_for_flood_dist, 7> {
-    {sound_vol_for_flood_dist::SILENT,
-    sound_vol_for_flood_dist::NEARLY_SILENT,
-    sound_vol_for_flood_dist::QUIET,
-    sound_vol_for_flood_dist::NORMAL,
-    sound_vol_for_flood_dist::LOUD,
-    sound_vol_for_flood_dist::VERY_LOUD,
-    sound_vol_for_flood_dist::DEAFENING}
+static constexpr auto flood_dist_enum_by_index = std::array<sound_vol_for_flood_dist, 7>
+{
+    {
+        sound_vol_for_flood_dist::SILENT,
+                                 sound_vol_for_flood_dist::NEARLY_SILENT,
+                                 sound_vol_for_flood_dist::QUIET,
+                                 sound_vol_for_flood_dist::NORMAL,
+                                 sound_vol_for_flood_dist::LOUD,
+                                 sound_vol_for_flood_dist::VERY_LOUD,
+                                 sound_vol_for_flood_dist::DEAFENING
+    }
 };
 
 static constexpr uint8_t get_flood_envelope_by_enum( const sound_vol_for_flood_dist &dist_enum )
@@ -866,8 +869,10 @@ static constexpr short get_cumulative_vol_dist_loss( const int &dist1, const int
     if( dist1 == dist2 ) {
         return 0;
     }
-    const int result = ( std::floor( SOUND_MINIMUM_VOLUME_FOR_PROPAGATION * log10( static_cast<float>( dist2 ) / static_cast<float>( dist1 ) ) ) + ( ( dist2 > dist1 ) ? ( ( dist2 - dist1 ) * t_absorp ) : 0 ) );
-    return std::min(static_cast<int>(MAXIMUM_VOLUME_ATMOSPHERE), result);
+    const int result = ( std::floor( SOUND_MINIMUM_VOLUME_FOR_PROPAGATION * log10( static_cast<float>
+                                     ( dist2 ) / static_cast<float>( dist1 ) ) ) + ( ( dist2 > dist1 ) ? ( (
+                                             dist2 - dist1 ) * t_absorp ) : 0 ) );
+    return std::min( static_cast<int>( MAXIMUM_VOLUME_ATMOSPHERE ), result );
 
 }
 
@@ -879,7 +884,8 @@ static constexpr short get_cumulative_vol_dist_loss( const int &dist1, const int
 
     If we ever get a dist2 that is less than dist1, we just return dist1.
 */
-static constexpr int average_minvol_distance( const int &dist1, const short &vol1, const short t_absorp = 0, const short &vol2 = SOUND_MINIMUM_VOLUME_FOR_PROPAGATION )
+static constexpr int average_minvol_distance( const int &dist1, const short &vol1,
+        const short t_absorp = 0, const short &vol2 = SOUND_MINIMUM_VOLUME_FOR_PROPAGATION )
 {
     // Deal with our undefined behavior.
     // if vol2 is greater than vol1, that is a very good indication that our sound failed to propagate to the boundary of its envelope.
@@ -887,14 +893,14 @@ static constexpr int average_minvol_distance( const int &dist1, const short &vol
     if( vol2 >= vol1 ) {
         return dist1 + 3;
     }
-    
+
     int delta_vol_req = vol1 - vol2;
     int approx_dist = dist1;
-    uint8_t check_dist = std::min(120,dist1);
-    while ( delta_vol_req > 0 && approx_dist < 250){
+    uint8_t check_dist = std::min( 120, dist1 );
+    while( delta_vol_req > 0 && approx_dist < 250 ) {
         approx_dist++;
-        check_dist = get_distance_for_volume_loss(check_dist,false);
-        delta_vol_req -= (dist_vol_loss[check_dist] + t_absorp );
+        check_dist = get_distance_for_volume_loss( check_dist, false );
+        delta_vol_req -= ( dist_vol_loss[check_dist] + t_absorp );
     }
     return approx_dist;
 }

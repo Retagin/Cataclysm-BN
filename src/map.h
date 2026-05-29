@@ -654,7 +654,7 @@ struct sound_cache {
     // Clear the filtered list so we dont try to grab an old sound.
     //auto clear_all_filtered_lists() -> void { sound_list_filtered.clear(); }
 
-    // For debug purposes. Is incremented every time a sound is flooded, and is cleared after sounds are done being flooded for the turn. 
+    // For debug purposes. Is incremented every time a sound is flooded, and is cleared after sounds are done being flooded for the turn.
     int sounds_this_turn = 0;
     int attempted_monster_sounds = 0;
     int attempted_NPC_sounds = 0;
