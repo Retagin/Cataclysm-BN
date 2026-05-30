@@ -2060,7 +2060,8 @@ bool game::do_turn()
         m.batch_flood_fill_sounds();
     }
     // We want to clear our floodfill que anyways, so that sounds dont accumulate in the que if soundperf is on.
-    sounds::clear_floodfill_que();
+    // This function will also print a debug sound diagnostic to the log if !soundperf.
+    sounds::clear_floodfill_que( soundperf );
 
     update_stair_monsters();
     mon_info_update();

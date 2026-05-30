@@ -654,13 +654,21 @@ struct sound_cache {
     // Clear the filtered list so we dont try to grab an old sound.
     //auto clear_all_filtered_lists() -> void { sound_list_filtered.clear(); }
 
-    // For debug purposes. Is incremented every time a sound is flooded, and is cleared after sounds are done being flooded for the turn.
-    int sounds_this_turn = 0;
-    int attempted_monster_sounds = 0;
-    int attempted_NPC_sounds = 0;
-    int attempted_movement_sounds = 0;
-    int attempted_potential_deafening_sounds = 0;
-    int attempted_non_batch_floodfills = 0;
+    // For debug purposes. These are incremented by their respective sound functions, and zero'ed during sounds::clear_floodfill_que()
+    // If soundperf during game::do_turn(), these will still be zeroed but the debug diagnostic message will not print.
+    short sounds_this_turn = 0;
+    short attempted_monster_sounds = 0;
+    short attempted_NPC_sounds = 0;
+    short attempted_movement_sounds = 0;
+    short attempted_potential_deafening_sounds = 0;
+    short attempted_non_batch_floodfills = 0;
+    short batch_flooded_monster_sounds = 0;
+    short batch_flooded_NPC_sounds = 0;
+    short invalidated_batch_sounds = 0;
+    short filtered_sound_lists_made = 0;
+    short filtered_sound_lists_cleared = 0;
+    short prior_turn_sound_vector_size = 0;
+    short sounds_culled_this_turn = 0;
 
 };
 

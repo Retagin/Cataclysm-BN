@@ -501,9 +501,8 @@ void map::cull_heard_sounds()
         return sound.heard_by_monsters && sound.heard_by_player && sound.heard_by_npcs;
     } );
     const int soundnumafter = m_sound_cache.sound_instances.size();
-    add_msg( m_debug,
-             _( " Culled %i sounds from the sounds vector and cleared %i sound filter lists." ),
-             soundnumbefore - soundnumafter, soundlistnum );
+    m_sound_cache.sounds_culled_this_turn += (std::max(0, soundnumbefore - soundnumafter));
+    m_sound_cache.filtered_sound_lists_cleared += soundlistnum;
 
 }
 // TODO: method for getting the escaped sounds per fascing side
@@ -637,7 +636,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         // Set our initial conditions. We want 100ths of a decibel for the volume
         // We dont apply directional sound propagation penalties at the very start.
         // the volume vector in the sound instance IS NOT aligned with normal game tripoints, and uses a limited local "area"
-        // The origin will always be located at (radius, radius), equivalent to and index position of (radius * (2 * radius) + radius) = r^2 + 3r
+        // The origin will always be located at (radius, radius), equivalent to and index position of (radius * ( (2 * radius) + 1 ) + radius)
         svol[temp_sound_cache.p_to_env_index( temp_sound_cache.origin )] =  origin_volume;
         auto &checkvars_origin = checkvars[total_check_radius_DEAFENING][total_check_radius_DEAFENING];
 
@@ -923,7 +922,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
         // Add our new sound cache to the games sound_caches vector.
         // add_msg(m_debug, _("Attempting to add sound_cache with origin %i x: %i y: %i z and source volume %i to sound_caches vector ."), temp_sound_cache.sound.origin.x, temp_sound_cache.sound.origin.y, temp_sound_cache.sound.origin.z, temp_sound_cache.sound.volume );
         m_sound_cache.sound_instances.push_back( temp_sound_cache );
-    }
+    } 
 
 }
 
@@ -940,8 +939,9 @@ void map::batch_flood_fill_sounds()
     const auto &snowbonus = ( is_winter ) ? SOUND_ABSORPTION_SNOW_BONUS : SOUND_ABSORPTION_OPEN_FIELD;
 
     // How many sounds did we actually process?
-    short num_processed_sounds = 0;
-    short num_invalidated_sounds = 0;
+    auto num_processed_mon_sounds = m_sound_cache.batch_flooded_monster_sounds;
+    auto num_processed_NPC_sounds = m_sound_cache.batch_flooded_NPC_sounds;
+    auto num_invalidated_sounds = m_sound_cache.invalidated_batch_sounds;
 
     //// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
     //// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
@@ -1302,7 +1302,11 @@ void map::batch_flood_fill_sounds()
                 // add_msg(m_debug, _("Attempting to add sound_cache with origin %i x: %i y: %i z and source volume %i to sound_caches vector ."), temp_sound_cache.sound.origin.x, temp_sound_cache.sound.origin.y, temp_sound_cache.sound.origin.z, temp_sound_cache.sound.volume );
                 m_sound_cache.sound_instances.push_back( temp_sound_cache );
                 // add_msg(m_debug, _("Sound cache added to vector"));
-                num_processed_sounds++;
+                if (temp_sound_cache.from_monster){
+                    num_processed_mon_sounds++;
+                } else if (temp_sound_cache.from_npc){
+                    num_processed_NPC_sounds++;
+                }
                 continue;
             }
             // If our sound was not loud enough, invalidate it.
@@ -1311,9 +1315,7 @@ void map::batch_flood_fill_sounds()
         }
     }
     batch_que.clear();
-    add_msg( m_debug,
-             _( "Batch flood filled %i sounds, %i sounds invalidated during batch processing." ),
-             num_processed_sounds, num_invalidated_sounds );
+
 }
 
 // Rebuild the sound absorption cache of a given submap
@@ -2086,6 +2088,7 @@ void sounds::process_sounds()
     }
     // Make sure this is empty before we get going. If its not, it is pretty much garunteed that all the entries will have jumbled iterators.
     if( !sound_cache.sound_list_filtered.empty() ) {
+        sound_cache.filtered_sound_lists_cleared += sound_cache.sound_list_filtered.size();
         sound_cache.sound_list_filtered.clear();
     }
 
@@ -2131,6 +2134,7 @@ void sounds::process_sounds()
         const sound_filter_key key_2_electric_boogalo = key;
         const std::vector<short> filt_list_2_electric_boogalo = filtered_list;
         filtered_sounds.insert( {key_2_electric_boogalo, filt_list_2_electric_boogalo} );
+        sound_cache.filtered_sound_lists_made++;
     };
 
     // Lets run through all the monsters and feed them sound info.
@@ -2167,12 +2171,16 @@ void sounds::process_sounds()
         }
         // We should have a fancy new filtered list by now. If we still dont, skip this monster because something funky happened.
         if( !filtered_sounds.contains( filter_key ) ) {
+            add_msg( m_debug,
+             _( "Monster %1s at %i:%i:%i attempted to make a filtered sound list but could not find it after generation!" ),
+             critter.disp_name(), critterloc.x(), critterloc.y(), critterloc.z() );
             continue;
         }
         // Lets get our shiny list.
         const auto &s_list = sound_cache.sound_list_filtered.at( filter_key );
 
-        // Make sure our list ist not empty, skip if it is.
+        // Make sure our sound list is not empty, skip if it is.
+        // Entirely possible for some creatures to not have any valid sounds in the list.
         if( s_list.empty() ) {
             continue;
         }
@@ -2549,6 +2557,8 @@ void sounds::process_sound_markers( Character *who )
 
     const short active_sound_dampening = dBspl_to_mdBspl( who->get_char_hearing_protection( true ) );
 
+    who->volume = std::max( static_cast<int>( mdBspl_to_dBspl( ambient_vol ) ), who->volume );
+
     // Deafening is based on the loudest volume at that tile.
     // hear the deafening sound but still suffer additional hearing loss.
     // The threshold for pain is generally taken as 140dB spl. The NIOSH daily safe exposure for 115dB sounds is ~28 seconds, 120dB sounds have a daily safe exposure of less than 2 seconds.
@@ -2559,11 +2569,18 @@ void sounds::process_sound_markers( Character *who )
     const short deafening_garuntee = std::max( 0.0f,
                                      std::floor( 17000 - ( 200 * ( volume_multiplier - 1 ) ) ) ) ;
 
-    // Lets figure out our loudest volume in tile.
-    // We dont actually really care about the details here, we just want to know what sound to set the players sound panel reading to and if we should deafen the player.
-    short loudest_vol = ambient_vol;
-
-
+    // Lets figure out our loudest volume in tile, and a few other bits of diagnostic information.
+    short loudest_vol = 0;
+    short num_sounds_checked = 0;
+    short num_sounds_in_minvol_dist = 0;
+    short num_sound_in_envelope = 0;
+    // We can make a copy of the much smaller sound event rather than the whole sound instance, and just record bits of relevant info. 
+    // We want these so we can figure out if anything is wrong with hearing sounds / terrain interaction.
+    sound_event loudest_sound_dummy;
+    int loudest_sound_minvol_radius = 0;
+    uint8_t loudest_sound_flood_radius = 0;
+    short loudest_sound_escape_vol = 0;
+    uint8_t loudest_sound_escape_dir = SDI_UP;
 
     // Cant hear noises that are significantly quieter than the loudest noise you are currently hearing,
     // Softer sounds just get drowned out in loud areas.
@@ -2575,13 +2592,21 @@ void sounds::process_sound_markers( Character *who )
         if( element.heard_by_player ) {
             continue;
         }
+        num_sounds_checked++;
+        const int distance_to_sound = rl_dist(loc,element.origin);
+        if (element.approximate_minvol_distance >= distance_to_sound){
+            num_sounds_in_minvol_dist++;
+        }
+        if (element.in_envelope(loc.xy())){
+            num_sound_in_envelope++;
+        }
         // And set the sound as having been heard by the player, before we potentially skip it for volume reasons.
         element.heard_by_player = true;
         if( element.sound.volume >= mdBspl_to_dBspl( MAXIMUM_VOLUME_ATMOSPHERE ) ) {
             // Dont count impossibly loud sounds.
             add_msg( m_debug,
-                     _( "Player given sound louder than possible in Atmosphere! Sound with description [ %1s ] from %i:%i with an origin volume of %i dB is louder than possible." ),
-                     element.sound.description, element.sound.origin.x(), element.sound.origin.y(),
+                     _( "Player given sound louder than possible in Atmosphere! Sound with description [ %1s ] from %i:%i:%i with an origin volume of %i dB is louder than possible." ),
+                     element.sound.description, element.sound.origin.x(), element.sound.origin.y(),element.sound.origin.z(),
                      element.sound.volume );
             continue;
         }
@@ -2593,6 +2618,15 @@ void sounds::process_sound_markers( Character *who )
         const short tile_vol = svol_at( element, loc, average_t_absorp, player_indoors,
                                         who->sees( element.origin, true ) );
 
+        // Set our dummy sound event. This is just the sound event (description, origin, etc), not the full flooded sound instance.
+        // Also set a few relevant bits of info instead of recording the whole 
+        if (tile_vol > loudest_vol){
+            loudest_sound_dummy = element.sound;
+            loudest_sound_minvol_radius = element.approximate_minvol_distance;
+            loudest_sound_flood_radius = element.flood_radius;
+            loudest_sound_escape_dir = dir_index_to_sound_source(loc, element.sound.origin);
+            loudest_sound_escape_vol = element.base_distance_vol_by_dir[get_sound_direction_index(loudest_sound_escape_dir)];
+        }
         loudest_vol = std::max( loudest_vol, tile_vol );
 
         if( tile_vol >= MAXIMUM_VOLUME_ATMOSPHERE ) {
@@ -2767,6 +2801,22 @@ void sounds::process_sound_markers( Character *who )
     // Volume gets reset to zero later in the turn order after the player has acted.
     // Keep the volume at the maximum to prevent the volume in the UI from being repeatedly reset to the ambient volume whenever the UI is refreshed.
     who->volume = std::max( static_cast<int>( mdBspl_to_dBspl( loudest_vol ) ), who->volume );
+
+    // Do our diagnostic blurb.
+    // We can make a copy of the much smaller sound event rather than the whole sound instance, and just record bits of relevant info. 
+    // We want these so we can figure out if anything is wrong with hearing sounds / terrain interaction.
+    add_msg( m_debug,
+             _( "Avatar sound processing diagnostic: Checked:%i, Within minvol distance:%i, Within flood envelope:%i, Ambient Vol:%i mdB" ),
+             num_sounds_checked, num_sounds_in_minvol_dist, num_sound_in_envelope, ambient_vol );
+    if ( loudest_vol > 0 ) {
+        add_msg( m_debug,
+             _( "Loudest Sound: Description:[%1s], Origin vol:%i dB at [%i:%i:%i], Minvol distance:%i, Floodfill radius:%i" ),
+             loudest_sound_dummy.description, loudest_sound_dummy.volume, loudest_sound_dummy.origin.x(), loudest_sound_dummy.origin.y(), loudest_sound_dummy.origin.z(), loudest_sound_minvol_radius, loudest_sound_flood_radius);
+        add_msg( m_debug,
+             _( "Heard vol:%i mdB at [%i:%i:%i], Distance:%i, SDI from sound to Avatar:%i, with envelope escape vol in that SDI:%i mdB" ),
+             loudest_vol, loc.x(),loc.y(),loc.z(), rl_dist(loc,loudest_sound_dummy.origin), loudest_sound_escape_dir, loudest_sound_escape_vol);
+    }
+
 }
 // Use map::cull_sound_instance_caches for managing the sound_instance_caches vector during play.
 void sounds::reset_sounds()
@@ -2778,27 +2828,47 @@ void sounds::reset_sounds()
     sound_batch_floodfill_que.clear();
 }
 
-void sounds::clear_floodfill_que()
+void sounds::clear_floodfill_que( const bool &soundperf )
 {
     auto &map = get_map();
-    // Also kill our filtered sound lists, just in case.
+    
+    if (!soundperf){
     add_msg( m_debug,
-             _( "Attempted to floodfill %i total sounds. Flooding attempted on %i deafening, %i movement, %i from NPCs, %i from monsters." ),
+             _( "Attempted to floodfill %i total sounds. Flooding attempted on %i deafening, %i movement, %i from NPCs, %i from monsters, %i non-batch floods." ),
              map.m_sound_cache.sounds_this_turn, map.m_sound_cache.attempted_potential_deafening_sounds,
              map.m_sound_cache.attempted_movement_sounds, map.m_sound_cache.attempted_NPC_sounds,
-             map.m_sound_cache.attempted_monster_sounds );
+             map.m_sound_cache.attempted_monster_sounds,map.m_sound_cache.attempted_non_batch_floodfills );
     add_msg( m_debug,
-             _( " %i Non-batch flood sounds attempted. Cleared %i sounds from the floodfill que and cleared %i sound filter lists." ),
-             map.m_sound_cache.attempted_non_batch_floodfills, sound_batch_floodfill_que.size(),
-             map.m_sound_cache.sound_list_filtered.size() );
+             _( "Batch flooded %i sounds from monsters and %i sounds from NPCs. %i sounds invalidated during batch flooding." ),
+             map.m_sound_cache.batch_flooded_monster_sounds, map.m_sound_cache.batch_flooded_NPC_sounds, map.m_sound_cache.invalidated_batch_sounds );
+    add_msg( m_debug,
+             _( "Caught %i sounds still in floodfill que. Cleared %i sound filter lists out of %i sound filter lists made." ),
+             sound_batch_floodfill_que.size(),
+             map.m_sound_cache.filtered_sound_lists_cleared, map.m_sound_cache.filtered_sound_lists_made );
+    add_msg( m_debug,
+             _( "Culled %i sounds this turn. Sounds vector size %i end of turn. Prior turn sound vector size %i" ),
+             map.m_sound_cache.sounds_culled_this_turn, sound_batch_floodfill_que.size(),
+             map.m_sound_cache.filtered_sound_lists_cleared, map.m_sound_cache.filtered_sound_lists_made );
+    }
+    map.m_sound_cache.prior_turn_sound_vector_size = (soundperf) ? 0 : map.m_sound_cache.sound_instances.size();
     map.m_sound_cache.sounds_this_turn = 0;
     map.m_sound_cache.attempted_monster_sounds = 0;
     map.m_sound_cache.attempted_NPC_sounds = 0;
     map.m_sound_cache.attempted_movement_sounds = 0;
     map.m_sound_cache.attempted_potential_deafening_sounds = 0;
     map.m_sound_cache.attempted_non_batch_floodfills = 0;
+    map.m_sound_cache.batch_flooded_monster_sounds = 0;
+    map.m_sound_cache.batch_flooded_NPC_sounds = 0;
+    map.m_sound_cache.invalidated_batch_sounds = 0;
+    map.m_sound_cache.filtered_sound_lists_made = 0;
+    map.m_sound_cache.filtered_sound_lists_cleared = 0;
+    // Also kill our filtered sound lists, just in case.
     map.m_sound_cache.sound_list_filtered.clear();
     sound_batch_floodfill_que.clear();
+    if (soundperf){
+        // If we are on sound performance mode, wipe any sounds that slipped through.
+        map.m_sound_cache.sound_instances.clear();
+    }
 }
 
 void sounds::reset_markers()
