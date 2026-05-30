@@ -2853,7 +2853,7 @@ bool game::handle_action()
                 }
                 display_outside();
                 break;
-            
+
             case ACTION_DISPLAY_SOUND_ABSORPTION:
                 if( MAP_SHARING::isCompetitive() && !MAP_SHARING::isDebugger() ) {
                     break;    //don't do anything when sharing and not debugger

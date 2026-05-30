@@ -3326,16 +3326,16 @@ void cata_tiles::draw( point dest, const tripoint_bub_ms &center, int width, int
                     SDL_Color block_color;
 
                     // Step through our most likely options.
-                    if(absorption == SOUND_ABSORPTION_OPEN_FIELD){
+                    if( absorption == SOUND_ABSORPTION_OPEN_FIELD ) {
                         block_color = { 0, 255, 0, 100 };   // Light Green - Open, no sound absorption
                         col = catacurses::black;
-                    } else if ( absorption == SOUND_ABSORPTION_LIGHT_VEGITATION ) {
+                    } else if( absorption == SOUND_ABSORPTION_LIGHT_VEGITATION ) {
                         block_color = { 0, 200, 0, 100 };    // Green - Light Vegitation/Farmland
                         col = catacurses::white;
-                    } else if ( absorption == SOUND_ABSORPTION_FOREST_FALL ) {
+                    } else if( absorption == SOUND_ABSORPTION_FOREST_FALL ) {
                         block_color = { 150, 150, 0, 100 };    // Yellow - Forest-Fall
                         col = catacurses::red;
-                    } else if ( absorption == SOUND_ABSORPTION_FOREST ) {
+                    } else if( absorption == SOUND_ABSORPTION_FOREST ) {
                         block_color = { 0, 150, 0, 100 };    // Dark Green - Forest
                         col = catacurses::white;
                     } else if( absorption > SOUND_ABSORPTION_WALL ) {
@@ -3344,16 +3344,16 @@ void cata_tiles::draw( point dest, const tripoint_bub_ms &center, int width, int
                     } else if( absorption == SOUND_ABSORPTION_WALL ) {
                         block_color = { 200, 0, 0, 100 };  // Red - Wall
                         col = catacurses::blue;
-                    } else if ( absorption > SOUND_ABSORPTION_THICK_BARRIER ) {
+                    } else if( absorption > SOUND_ABSORPTION_THICK_BARRIER ) {
                         block_color = { 200, 80, 0, 100 };    // Orange - Thick Barrier +
                         col = catacurses::red;
-                    } else if ( absorption == SOUND_ABSORPTION_THICK_BARRIER ) {
+                    } else if( absorption == SOUND_ABSORPTION_THICK_BARRIER ) {
                         block_color = { 255, 130, 0, 100 };    // Light Orange - Thick Barrier
                         col = catacurses::white;
-                    } else if ( absorption > SOUND_ABSORPTION_BARRIER ) {
+                    } else if( absorption > SOUND_ABSORPTION_BARRIER ) {
                         block_color = { 0, 0, 255, 100 };    // Blue - Barrier +
                         col = catacurses::red;
-                    } else if ( absorption == SOUND_ABSORPTION_BARRIER ) {
+                    } else if( absorption == SOUND_ABSORPTION_BARRIER ) {
                         block_color = { 0, 0, 150, 100 };    // Light Blue - Barrier
                         col = catacurses::white;
                     } else {
@@ -3365,7 +3365,7 @@ void cata_tiles::draw( point dest, const tripoint_bub_ms &center, int width, int
                     color_blocks.second.emplace( player_to_screen( point_bub_ms( temp_x, temp_y ) ), block_color );
                     overlay_strings.emplace(
                         player_to_screen( point_bub_ms( temp_x, temp_y ) ) + point( tile_width / 4, tile_height / 4 ),
-                        formatted_text( std::to_string( absorption ),8 + col, direction::NORTH ) );
+                        formatted_text( std::to_string( absorption ), 8 + col, direction::NORTH ) );
                 }
             }
 
