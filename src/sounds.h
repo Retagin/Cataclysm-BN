@@ -548,9 +548,41 @@ struct sound_event {
 // Maximum mdB spl value a sound can have in atmosphere.
 static constexpr short MAXIMUM_VOLUME_ATMOSPHERE = 19100;
 // Sounds are not valid to be properly flood filled below this threshold.
-// The sound will be only flooded to the adjacent tiles if below this threshold.
-// We also take this as our average minimum audible volume for filtering purposes.
+// The sound will be only flooded to the adjacent tiles if below this threshold, and no further.
+// We also take this as our approximate minimum audible volume for filtering purposes.
 static constexpr short SOUND_MINIMUM_VOLUME_FOR_PROPAGATION = 2000;
+// Volume loss in mdB spl per underground zlevel difference.
+// Cache this because we call it every time we check a sound to see if a monster hears it, which adds up quickly.
+static constexpr short SOUND_ABSORPTION_PER_ZLEV = 4200;
+// The base ambient volume above ground in mdB spl. Called frequently enough to warrant caching, and to avoid magic number usage.
+static constexpr short AMBIENT_VOLUME_ABOVEGROUND = 4500;
+// The base ambient volume underground in mdB spl. Called frequently enough to warrant caching, and to avoid magic number usage.
+static constexpr short AMBIENT_VOLUME_UNDERGROUND = 3500;
+
+// Well made residential walls with sound proofing materials can have transmission loss values of upwards of 63 dB.
+// STC ratings (in dB of sound reduction) range from 25 to 55+
+// We dont have a good way of differentiating walls, so we take an average of 40dB
+// Applies to more than just walls, applies to any terrain with the block_wind flag.
+// Only applies when sound is being cast if it has at least two adjacent terrain of equivalent sound absorption, and all have a roof.
+// In mdB spl, 100ths of a dB spl
+static constexpr short SOUND_ABSORPTION_WALL = 4000;
+// This is equivalent to a well designed highway sound barrier. 20dB spl, 2000mdB spl
+// If a wind blocking wall does not have a roof, it gets this.
+static constexpr short SOUND_ABSORPTION_THICK_BARRIER = 2000;
+// This is what sealed connect_to_wall terrain offers. 5dB spl, 500mdB spl
+static constexpr short SOUND_ABSORPTION_BARRIER = 500;
+// If a block_wind terrain is completely alone, it does nothing to block sound.
+// This is the default for most terrain.
+// Maybe silly to cache this, but we call this frequently.
+static constexpr short SOUND_ABSORPTION_OPEN_FIELD = 0;
+// Per tile sound attenuation in mdB spl of light vegitation tiles such as farmland and swamps
+static constexpr short SOUND_ABSORPTION_LIGHT_VEGITATION = 6;
+// Per tile sound attenuation in mdB spl of forests during the autumn/fall season.
+static constexpr short SOUND_ABSORPTION_FOREST_FALL = 9;
+// Per tile sound attenuation in mdB spl of forests or other heavy vegitation tiles
+static constexpr short SOUND_ABSORPTION_FOREST = 20;
+// Per tile sound attenuation bonus in mdB spl provided by snow.
+static constexpr short SOUND_ABSORPTION_SNOW_BONUS = 128;
 
 // Volume loss for moving to a new distance, in 100ths of dB (mdB). Nominal calc is 100 * (20 * Log10( dist / ( dist - 1 )))
 // dist_vol_loss[2] provides the dB loss moving from 1m to 2m, dist_vol_loss[5] provides the dB loss moving from 4m to 5m, etc.

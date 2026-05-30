@@ -99,30 +99,6 @@ static const itype_id fuel_type_battery( "battery" );
 
 static const itype_id itype_weapon_fire_suppressed( "weapon_fire_suppressed" );
 
-// Well made residential walls with sound proofing materials can have transmission loss values of upwards of 63 dB.
-// STC ratings (in dB of sound reduction) range from 25 to 55+
-// We dont have a good way of differentiating walls, so we take an average of 40dB
-// Applies to more than just walls, applies to any terrain with the block_wind flag.
-// Only applies when sound is being cast if it has at least two adjacent terrain of equivalent sound absorption, and all have a roof.
-// In mdB spl, 100ths of a dB spl
-static constexpr short SOUND_ABSORPTION_WALL = 4000;
-// This is equivalent to a well designed highway sound barrier. 20dB spl, 2000mdB spl
-// If a wind blocking wall does not have a roof, it gets this.
-static constexpr short SOUND_ABSORPTION_THICK_BARRIER = 2000;
-// This is what sealed connect_to_wall terrain offers. 5dB spl, 500mdB spl
-static constexpr short SOUND_ABSORPTION_BARRIER = 500;
-// If a block_wind terrain is completely alone, it does nothing to block sound.
-// This is the default for most terrain.
-// Maybe silly to cache this, but we call this frequently.
-static constexpr short SOUND_ABSORPTION_OPEN_FIELD = 0;
-// Per tile sound attenuation in mdB spl of light vegitation tiles such as farmland and swamps
-static constexpr short SOUND_ABSORPTION_LIGHT_VEGITATION = 6;
-// Per tile sound attenuation in mdB spl of forests during the autumn/fall season.
-static constexpr short SOUND_ABSORPTION_FOREST_FALL = 9;
-// Per tile sound attenuation in mdB spl of forests or other heavy vegitation tiles
-static constexpr short SOUND_ABSORPTION_FOREST = 20;
-// Per tile sound attenuation bonus in mdB spl provided by snow.
-static constexpr short SOUND_ABSORPTION_SNOW_BONUS = 128;
 // For use with the floodfill logic.
 static constexpr auto tile_structure_sound_absorption_tier = std::array<short, 4>
 {
@@ -132,14 +108,7 @@ static constexpr auto tile_base_sound_absorption_tier = std::array<short, 4>
 {
     {SOUND_ABSORPTION_OPEN_FIELD, SOUND_ABSORPTION_LIGHT_VEGITATION, SOUND_ABSORPTION_FOREST_FALL, SOUND_ABSORPTION_FOREST}
 };
-// Volume loss in mdB spl per underground zlevel difference.
-// Cache this because we call it every time we check a sound to see if a monster hears it, which adds up quickly.
-static constexpr short SOUND_ABSORPTION_PER_ZLEV = 4200;
-// The base ambient volume above ground in mdB spl. Called frequently enough to warrant caching, and to avoid magic number usage.
-static constexpr short AMBIENT_VOLUME_ABOVEGROUND = 4500;
-// The base ambient volume underground in mdB spl. Called frequently enough to warrant caching, and to avoid magic number usage.
-static constexpr short AMBIENT_VOLUME_UNDERGROUND = 3500;
-// The base "unit" is the Bel, 10 decibels to the bel, 100 centibels to the bell, 1000 millibels to the belm and finially 100 millibels to the decibel.
+// The base "unit" is the Bel, 10 deciBels to the Bel, 100 centibels to the Bel, 1000 milliBels to the Bel and finially 100 millibels to the deciBel.
 static constexpr short dBspl_to_mdBspl_coeff = 100;
 static constexpr double mdBspl_to_dBspl_coeff = 0.01;
 
@@ -870,7 +839,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
             if( listing.first > 0 ) {
                 short vol = listing.first;
                 if( listing.second < temp_sound_cache.flood_radius ) {
-                    for( uint8_t i = listing.second; listing.second < temp_sound_cache.flood_radius; i++ ) {
+                    for( uint8_t i = listing.second; i < temp_sound_cache.flood_radius; i++ ) {
                         vol -= dist_vol_loss[i + 1];
                     }
                 }
@@ -887,7 +856,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
             if( listing.first > 0 ) {
                 short vol = listing.first;
                 if( listing.second < temp_sound_cache.flood_radius ) {
-                    for( uint8_t i = listing.second; listing.second < temp_sound_cache.flood_radius; i++ ) {
+                    for( uint8_t i = listing.second; i < temp_sound_cache.flood_radius; i++ ) {
                         vol -= dist_vol_loss[i + 1];
                     }
                 }

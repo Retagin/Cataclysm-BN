@@ -2113,8 +2113,9 @@ bool game::do_turn()
     }
     // We want to clear our floodfill que anyways, so that sounds dont accumulate in the que if soundperf is on.
     // This function will also print a debug sound diagnostic to the log if !soundperf.
-    sounds::clear_floodfill_que( soundperf );
-
+    {
+        sounds::clear_floodfill_que( soundperf );
+    }
     update_stair_monsters();
     mon_info_update();
     {
@@ -2883,6 +2884,8 @@ input_context get_default_mode_input_context()
     ctxt.register_action( "debug_radiation" );
     ctxt.register_action( "debug_outside" );
     ctxt.register_action( "debug_submap_grid" );
+    ctxt.register_action( "debug_sound_absorption" );
+    ctxt.register_action( "debug_sound_walls" );
     ctxt.register_action( "debug_hour_timer" );
     ctxt.register_action( "debug_mode" );
     if( use_tiles ) {
@@ -8922,6 +8925,8 @@ look_around_result game::look_around( bool show_window, tripoint_bub_ms &center,
     ctxt.register_action( "debug_lighting" );
     ctxt.register_action( "debug_radiation" );
     ctxt.register_action( "debug_outside" );
+    ctxt.register_action( "debug_sound_absorption" );
+    ctxt.register_action( "debug_sound_walls" );
     ctxt.register_action( "debug_submap_grid" );
     ctxt.register_action( "debug_hour_timer" );
     ctxt.register_action( "CONFIRM" );
@@ -9114,6 +9119,14 @@ look_around_result game::look_around( bool show_window, tripoint_bub_ms &center,
         } else if( action == "debug_outside" ) {
             if( !MAP_SHARING::isCompetitive() || MAP_SHARING::isDebugger() ) {
                 display_outside();
+            }
+        } else if( action == "debug_sound_absoprtion" ) {
+            if( !MAP_SHARING::isCompetitive() || MAP_SHARING::isDebugger() ) {
+                display_sound_absorption();
+            }
+        } else if( action == "debug_sound_walls" ) {
+            if( !MAP_SHARING::isCompetitive() || MAP_SHARING::isDebugger() ) {
+                display_sound_walls();
             }
         } else if( action == "debug_radiation" ) {
             if( !MAP_SHARING::isCompetitive() || MAP_SHARING::isDebugger() ) {
@@ -15042,6 +15055,20 @@ void game::display_outside()
 {
     if( use_tiles ) {
         display_toggle_overlay( ACTION_DISPLAY_OUTSIDE );
+    }
+}
+
+void game::display_sound_absorption()
+{
+    if( use_tiles ) {
+        display_toggle_overlay( ACTION_DISPLAY_SOUND_ABSORPTION );
+    }
+}
+
+void game::display_sound_walls()
+{
+    if( use_tiles ) {
+        display_toggle_overlay( ACTION_DISPLAY_SOUND_WALLS );
     }
 }
 
