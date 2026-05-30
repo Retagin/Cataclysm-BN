@@ -939,9 +939,9 @@ void map::batch_flood_fill_sounds()
     const auto &snowbonus = ( is_winter ) ? SOUND_ABSORPTION_SNOW_BONUS : SOUND_ABSORPTION_OPEN_FIELD;
 
     // How many sounds did we actually process?
-    auto num_processed_mon_sounds = m_sound_cache.batch_flooded_monster_sounds;
-    auto num_processed_NPC_sounds = m_sound_cache.batch_flooded_NPC_sounds;
-    auto num_invalidated_sounds = m_sound_cache.invalidated_batch_sounds;
+    auto &num_processed_mon_sounds = m_sound_cache.batch_flooded_monster_sounds;
+    auto &num_processed_NPC_sounds = m_sound_cache.batch_flooded_NPC_sounds;
+    auto &num_invalidated_sounds = m_sound_cache.invalidated_batch_sounds;
 
     //// [-1 , 1 ] [ 0 , 1 ] [ 1 , 1 ]   [ 0 ] [ 1 ] [ 2 ]
     //// [-1 , 0 ] [ 0 , 0 ] [ 1 , 0 ] = [ 7 ] [ 8 ] [ 3 ]
