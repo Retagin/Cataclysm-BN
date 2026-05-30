@@ -2083,7 +2083,7 @@ bool game::do_turn()
         // Process sounds marks all sounds in the sound_caches vector as heard by monsters.
         sounds::process_sounds();
     }
-  
+
     if( !monperf ) {
         monmove();
     }
