@@ -320,8 +320,8 @@ static short vol_z_adjust( const tripoint_bub_ms &source, const tripoint_bub_ms 
                 vol_adjust += SOUND_ABSORPTION_BARRIER;
             }
         }
-        vol_adjust = std::min(vol_adjust, static_cast<int>(MAXIMUM_VOLUME_ATMOSPHERE));
-        return ( for_horde_signal ) ? mdBspl_to_dBspl(vol_adjust) : vol_adjust;
+        vol_adjust = std::min( vol_adjust, static_cast<int>( MAXIMUM_VOLUME_ATMOSPHERE ) );
+        return ( for_horde_signal ) ? mdBspl_to_dBspl( vol_adjust ) : vol_adjust;
     } else {
         //Well, the listener is out of bounds. Just assign a 1dB penalty per zlevel difference.
         return ( for_horde_signal ) ? std::abs( source.z() - listener.z() ) : ( dBspl_to_mdBspl( std::abs(
@@ -349,10 +349,10 @@ static short svol_at( const sound_instance_cache &sound_inst, const tripoint_bub
             const auto &vertical_escape_vol = ( sound_inst.origin.z() > tri.z() ) ?
                                               sound_inst.base_distance_vol_by_dir[SDI_UP] : sound_inst.base_distance_vol_by_dir[SDI_DOWN];
             const short zadj = vol_z_adjust( sound_inst.origin, tri, lineofsight );
-            if (zadj >= std::max( sound_inst.vol_at_tri( tri ), vertical_escape_vol )){
+            if( zadj >= std::max( sound_inst.vol_at_tri( tri ), vertical_escape_vol ) ) {
                 return 0;
             }
-            return (std::max( sound_inst.vol_at_tri( tri ), vertical_escape_vol ) - zadj);
+            return ( std::max( sound_inst.vol_at_tri( tri ), vertical_escape_vol ) - zadj );
         }
     }
     // Use manhattan distance as our flood envelopes are actually squares, not circles.
@@ -375,7 +375,8 @@ static short svol_at( const sound_instance_cache &sound_inst, const tripoint_bub
     const int vol_escape = ( use_vert_escape ) ? std::max( vertical_escape_vol,
                            sound_inst.base_distance_vol_by_dir[san_dir] ) : sound_inst.base_distance_vol_by_dir[san_dir];
 
-    if( vol_escape > MAXIMUM_VOLUME_ATMOSPHERE || vol_escape > dBspl_to_mdBspl(sound_inst.sound.volume) ) {
+    if( vol_escape > MAXIMUM_VOLUME_ATMOSPHERE ||
+        vol_escape > dBspl_to_mdBspl( sound_inst.sound.volume ) ) {
         const uint8_t actualdir = ( use_vert_escape &&
                                     vertical_escape_vol > sound_inst.base_distance_vol_by_dir[san_dir] ) ? ( (
                                                 sound_inst.origin.z() <= tri.z() ) ? SDI_UP : SDI_DOWN ) : san_dir;
@@ -387,7 +388,7 @@ static short svol_at( const sound_instance_cache &sound_inst, const tripoint_bub
     const int zadj = vol_z_adjust( sound_inst.origin, tri, lineofsight );
     const int cumulative_dist_loss = get_cumulative_vol_dist_loss( sound_inst.flood_radius, distance,
                                      t_absorp );
-    if ( (zadj + cumulative_dist_loss ) > MAXIMUM_VOLUME_ATMOSPHERE ){
+    if( ( zadj + cumulative_dist_loss ) > MAXIMUM_VOLUME_ATMOSPHERE ) {
         return 0;
     }
     if( zadj < 0 || zadj > MAXIMUM_VOLUME_ATMOSPHERE || cumulative_dist_loss < 0 ||
@@ -399,7 +400,8 @@ static short svol_at( const sound_instance_cache &sound_inst, const tripoint_bub
                  sound_inst.sound.origin.z(), tri.x(), tri.y(), tri.z() );
     }
     const int heard_volume = std::max( 0, ( vol_escape  - ( zadj + cumulative_dist_loss ) ) );
-    if( heard_volume > MAXIMUM_VOLUME_ATMOSPHERE || heard_volume > dBspl_to_mdBspl(sound_inst.sound.volume) ) {
+    if( heard_volume > MAXIMUM_VOLUME_ATMOSPHERE ||
+        heard_volume > dBspl_to_mdBspl( sound_inst.sound.volume ) ) {
         const uint8_t actualdir = ( use_vert_escape &&
                                     vertical_escape_vol > sound_inst.base_distance_vol_by_dir[san_dir] ) ? ( (
                                                 sound_inst.origin.z() <= tri.z() ) ? SDI_UP : SDI_DOWN ) : san_dir;
@@ -2679,7 +2681,7 @@ void sounds::process_sound_markers( Character *who )
                                                  player_t_absorp +
                                                  element.terrain_sound_absorbtion_at_source ) * 0.5 ) ) );
         const short tile_vol = svol_at( element, loc, average_t_absorp, player_indoors,
-                                        who->sees( element.origin) );
+                                        who->sees( element.origin ) );
 
         // Set our dummy sound event. This is just the sound event (description, origin, etc), not the full flooded sound instance.
         // Also set a few relevant bits of info instead of recording the whole
@@ -2693,11 +2695,12 @@ void sounds::process_sound_markers( Character *who )
         }
         loudest_vol = std::max( loudest_vol, tile_vol );
 
-        if( tile_vol >= MAXIMUM_VOLUME_ATMOSPHERE || tile_vol > dBspl_to_mdBspl(element.sound.volume) ) {
+        if( tile_vol >= MAXIMUM_VOLUME_ATMOSPHERE || tile_vol > dBspl_to_mdBspl( element.sound.volume ) ) {
             // Dont count impossibly loud sounds.
-            debugmsg("Player given impossibly loud sound! Sound with description [ %1s ] from %i:%i:%i with an origin volume of %i dB, tile volume of %i mdB, distance %i at %i:%i:%i is louder than possible.",
-                     element.sound.description, element.sound.origin.x(), element.sound.origin.y(),
-                     element.sound.origin.z(), element.sound.volume, tile_vol, distance_to_sound, loc.x(), loc.y(), loc.z() );
+            debugmsg( "Player given impossibly loud sound! Sound with description [ %1s ] from %i:%i:%i with an origin volume of %i dB, tile volume of %i mdB, distance %i at %i:%i:%i is louder than possible.",
+                      element.sound.description, element.sound.origin.x(), element.sound.origin.y(),
+                      element.sound.origin.z(), element.sound.volume, tile_vol, distance_to_sound, loc.x(), loc.y(),
+                      loc.z() );
             continue;
         }
         // If the sound is loud enough, inform the player of it.
