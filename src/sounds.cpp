@@ -247,16 +247,19 @@ static constexpr float RADIAN_THRESHOLD_WEST = ( ( 7.0 * M_PI ) / 8.0 );
 static constexpr uint8_t dir_index_to_sound_source( const tripoint_bub_ms &source,
         const tripoint_bub_ms &listener )
 {
-    if( source.x() == listener.x() && source.y() == listener.y() ) {
+    const auto &xdist = listener.x() - source.x();
+    const auto &ydist = listener.y() - source.y();
+    if( xdist == 0 && ydist == 0 ) {
         if( source.z() > listener.z() ) {
             return SDI_DOWN;
         } else {
             return SDI_UP;
         }
     }
+    
     // We take our source at 0,0, and adjust our listener z/y accordingly.
     // We could use the units::angle atan2, but this is easier and allows us to directly compare against some static constexpr
-    const float radians = std::atan2( listener.x() - source.x(), listener.y() - source.y() );
+    const float radians = std::atan2( ydist, xdist );
     // We have 8 directions, at 45 degrees or pi/4 radians each. Because our result ranges from -pi to pi east for example is a result of pi/8 > angle > -pi/8
     if( radians == 0 ) {
         return SDI_E;
@@ -1321,19 +1324,16 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
     // We are by neccesity rebuilding the sound wall cache as well, so lets zero that out.
     std::ranges::fill( std::span( &sound_wall_cache[0][0], SEEX * SEEY ), false );
 
-    const point_bub_ms abs_p = project_to<coords::ms>( grid_pos ).xy();
+    // const point_bub_ms abs_p = project_to<coords::ms>( grid_pos ).xy();
     // For use when checking the vehicle cache.
     const tripoint_bub_ms abs_trip = project_to<coords::ms>( grid_pos );
-    const int checkvars_boundary_max_x = SEEX + 1;
-    const int checkvars_boundary_max_y = SEEY + 1;
-    const int checkvars_envelope_max_x = SEEX + 2;
-    const int checkvars_envelope_max_y = SEEY + 2;
-
-    // So we can use constexpr array values
+    // If somebody increases the size of submaps beyond what a uint8_t can handle I will beat them to death with a dull rusty spoon.
+    constexpr uint8_t checkvars_boundary_max_x = SEEX + 1;
+    constexpr uint8_t checkvars_boundary_max_y = SEEY + 1;
+    constexpr uint8_t checkvars_envelope_max_x = SEEX + 2;
+    constexpr uint8_t checkvars_envelope_max_y = SEEY + 2;
+    // So we can use constexpr array values where needed
     const auto &san_sdir = sanitized_sound_direction_indexes;
-
-    //
-
     /** Instead of repeatedly checking for properties on all sm tiles upwards of 9 time each,
     *   just do it once for the whole submap and store the results as a std::bitset<8> we decode later.
     *   Because we need to check adjacent tiles, our total checkvars envelope is +2 the size of a submap.
@@ -1349,7 +1349,6 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
     *   If a tile is out of bounds, we set all bits to true to indicate this.
     */
     std::bitset<8> checkvars[checkvars_envelope_max_x][checkvars_envelope_max_y] = { { 0 } };
-
     // We need to make sure that we are not attempting to check outside the submap with submap points.
     // If this returns true, we will check will bubble tripoints instead when filling out our checkvars.
     // As our total envelope is SEEX/Y + 2, our out of bounds is at X/Y == 0, X/Y == SEEX/Y + 1.
@@ -1360,13 +1359,11 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
     auto cv_to_sm_ms_rel_adj = point{-1, -1};
     // Apply this to a submap point to get an equivalent checkvars point.
     auto sm_ms_to_cv_rel_adj = point{1, 1};
-    // The bubble point location of 0,0 in our cv envelope.
-    const point_bub_ms cv_abs_p = abs_p + cv_to_sm_ms_rel_adj;
     // The bubble tripoint location of 0,0 in our cv envelope, which is -1,-1 from our submap 0,0.
     const tripoint_bub_ms cv_abs_trip = abs_trip + cv_to_sm_ms_rel_adj;
 
     for( uint8_t x = 0; x < checkvars_envelope_max_x; x++ ) {
-        for( uint8_t y = 0; x < checkvars_envelope_max_y; x++ ) {
+        for( uint8_t y = 0; y < checkvars_envelope_max_y; y++ ) {
             auto &cv = checkvars[x][y];
             if( outside_submap( x, y ) ) {
                 // We are not in our submap, so we have to check tripoints and queary map.
@@ -1429,13 +1426,13 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
                 // We are inside our submap We know we are inbounds, and can poll freely.
                 const point_sm_ms sm_tile = point_sm_ms{x - 1, y - 1};
                 const auto tile = cv_abs_trip + point{x, y};
-                const auto &tidx = lev_cache.idx( tile.x(), tile.y() );
-                const auto ter = get_ter( sm_tile ).obj();
-                const auto furn = get_furn( sm_tile ).obj();
+                const auto tidx = lev_cache.idx( tile.x(), tile.y() );
+                const auto &ter = get_ter( sm_tile ).obj();
+                const auto &furn = get_furn( sm_tile ).obj();
                 // Rather common for tents, standalone curtains, and other such oddities to have one of these. These will count for adjacency purposes, so long as they are not permeable.
                 cv[7] = furn.has_flag( TFLAG_NO_SCENT ) || furn.has_flag( TFLAG_BLOCK_WIND );
                 cv[2] = m.is_outside( tile );
-                cv[3] = ( !at_max_zlev ) ? above->floor_cache[tidx] > 0 : false;
+                cv[3] = ( !at_max_zlev ) ? (above->floor_cache[tidx] != 0) : false;
                 // There are something like 5 pieces of furniture with the reduce scent flag, and most of them are cardboard walls that are also permeable. Fine to not check that.
                 cv[4] = ter.has_flag( TFLAG_PERMEABLE ) || ter.has_flag( TFLAG_REDUCE_SCENT ) ||
                         furn.has_flag( TFLAG_PERMEABLE );
@@ -1481,30 +1478,11 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
         }
 
     }
-
     std::array<point_sm_ms, 8> points_to_check;
     std::array<bool, 8> point_valid = { {false, false, false, false, false, false, false, false} };
     std::array<bool, 8> roof_cover = { {false, false, false, false, false, false, false, false} };
     std::array<bool, 8> out_of_bounds = { {false, false, false, false, false, false, false, false} };
     std::array<bool, 8> indoors = { {false, false, false, false, false, false, false, false} };
-
-    auto check_contiguous_roof = [&]( const uint8_t &dir, const bool &OOB = false ) -> bool {
-        const auto &indexes_to_check = roof_to_check_by_sdir[dir];
-        // If we are checking an out of bounds tile, we dont check the first member of our roof cover.
-        // We use the static constexpr values for our requests.
-        // SDI_NW = 0, SDI_N = 1, SDI_NE = 2
-        if( OOB )
-        {
-            return ( roof_cover[indexes_to_check[SDI_N]] && roof_cover[indexes_to_check[SDI_NE]] ) ||
-            ( indoors[indexes_to_check[SDI_N]] && indoors[indexes_to_check[SDI_NE]] );
-        } else
-        {
-            return ( roof_cover[indexes_to_check[SDI_NW]] && roof_cover[indexes_to_check[SDI_N]] &&
-                     roof_cover[indexes_to_check[SDI_NE]] ) || ( indoors[indexes_to_check[SDI_NW]] &&
-                             indoors[indexes_to_check[SDI_N]] &&
-                             indoors[indexes_to_check[SDI_NE]] );
-        }
-    };
 
     // Dont call this at max Z, no tiles would be valid anyways.
     auto pol_adjacent = [&]( const point_sm_ms & sp ) -> void {
@@ -1551,15 +1529,23 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
         // center_check_vars
         const auto &ccv = checkvars[cv_env_tile.x()][cv_env_tile.y()];
 
+        const bool case3 = ccv[0] && ccv[1];
+        const auto &blockswind = ccv[6];
+        const auto &noscent = ccv[5];
+        // If we are not case 3, we need to deal with the annoying possibility
+        // that windows/doors/damaged walls may be block_wind/no_scent but paradoxically have reduced scent or permeable
+        const bool case2_full = (case3) ? false : (ccv[1] && !ccv[0]) && ( ( blockswind || noscent ) && !ccv[4] );
+        const bool case1 = ( case3 || case2_full ) ? false : (ccv[0] && !ccv[1]);
         // If we have furniture that is valid, apply a barrier absorption and move on.
         // For whatever it is worth, it gets to count as a sound wall.
         if( ccv[7] ) {
             absorption_cache[sp.x()][sp.y()] += SOUND_ABSORPTION_BARRIER;
             sound_wall_cache[sp.x()][sp.y()] = !ccv[4];
             continue;
-        } else if( ccv[0] && !ccv[1] ) {
+        } else if( case1 ) {
             // If we have case 1 for our terrain absorption its an open door or window equivalent. It gets no absorption.
             absorption_cache[sp.x()][sp.y()] += SOUND_ABSORPTION_OPEN_FIELD;
+            continue;
         } else if( !ccv[0] && !ccv[1] ) {
             // If we are not cases 1 2 or 3, then we are an "empty" tile. Outdoors gets the default.
             // The tile may still have checkvars[5] or [6], which count for (some) sound reduction
@@ -1617,13 +1603,20 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
                 }
             }
         }
-        // We know by this point that the center tile is either case 2 or case 3 for terrain sound absorption.
-        const bool case3 = ccv[0] && ccv[1];
-        const auto &blockswind = ccv[6];
-        const auto &noscent = ccv[5];
-        // If we are not case 3, we need to deal with the annoying possibility
-        // that windows/doors/damaged walls may be block_wind/no_scent but paradoxically have reduced scent or permeable
-        const bool case2_full = ( ( blockswind || noscent ) && !ccv[4] );
+        // This is for the contiguous/corner wall check. If all roof_check_by_sdir indexes come back true from this, we count it for being a contiguous/corner wall.
+        auto tile_cw_check = [&](const uint8_t &dir) -> bool {
+            const auto &sdi = sanitized_sound_direction_indexes[dir];
+            return (indoors[sdi] || roof_cover[sdi] || out_of_bounds[sdi] || point_valid[sdi]);
+        };
+        auto opp_invert_corner = [&](const uint8_t &dir) -> bool {
+            // This is explicitly to catch inverted corners inside buildings.
+            const auto &opp = opposite_tile_by_sdir[sanitized_sound_direction_indexes[dir]];
+            const auto &rcheck = spropagation_tiles_by_sdirection[opp];
+            return (tile_cw_check(rcheck[0]) && tile_cw_check(rcheck[1]) && tile_cw_check(rcheck[2]) && tile_cw_check(rcheck[3]) && tile_cw_check(rcheck[4]));
+        };
+        // If we get a valid result, set this to true and exit so we dont reset it accidentally.
+        bool terminate_checks = false;
+        // We know by this point that the center tile is either case 2 or case 3 for terrain sound absorption.  
         // At one or zero buddies sound dampening is reduced.
         if( buddynumber < 2 ) {
             if( case3 ) {
@@ -1642,74 +1635,66 @@ auto submap::rebuild_absorption_cache( const map &m, const tripoint_bub_sm &grid
             // We have 3 or more buddies. Case3 and case2_full valid for max value.
             // Case2_full gets wall absorption here, as it is likely surrounded by other walls.
             absorption_cache[sp.x()][sp.y()] = ( case3 ||
-                                                 case2_full ) ? SOUND_ABSORPTION_WALL : SOUND_ABSORPTION_THICK_BARRIER ;
+                                                 case2_full ) ? SOUND_ABSORPTION_WALL : SOUND_ABSORPTION_THICK_BARRIER;
             // If we have a windblocking tile, declare it a sound wall.
             sound_wall_cache[sp.x()][sp.y()] = true;
             continue;
-        }
-        //checkvars[][][0] = Valid blocker cases 1 & 3. If cv[0] and cv[1] are both false, the tile is not valid for adjacency.
-        //checkvars[][][1] = Valid blocker cases 2 & 3
-        //checkvars[][][2] = Is the tile outside? Different from the roof check, if a tile is indoors, with no valid furniture or wall etc it gets no base absorption.
-        //checkvars[][][3] = True if there is a roof above us.
-        //checkvars[][][4] = Does the tile/furn have the permeable or reduced scent flag?
-        //checkvars[][][5] = Does the tile have the no scent flag?
-        //checkvars[][][6] = Does the tile have the blocks-wind flag?
-        //checkvars[][][7] = Does the tile have furniture with the no scent or blocks-wind flags?
-
-        // At this point we have explicitly two buddies. We need to check for straight walls and corners.
-        else {
-            for( uint8_t i : sanitized_sound_direction_indexes_cartesian ) {
+        } else {    
+            // At this point we have explicitly two buddies. We need to check for straight walls and corners.
+            for( const uint8_t &i : sanitized_sound_direction_indexes_cartesian ) {
                 if( point_valid[i] ) {
-                    // This gives us the direction indexes to check for a roof or out of bounds.
+                    // Lets run through our straight wall condition, and check for an opposite valid or OOB tile.
                     const auto &opp_dir = opposite_tile_by_sdir[i];
-                    if( point_valid[opp_dir] || out_of_bounds[opp_dir] ) {
-                        // We have a potential straight wall. Lets see if we have a contiguous roof.
-                        // We count either a full roof, or all checked tiles being indoors to account for multi z-level rooms
-                        if( point_valid[opp_dir] ) {
-                            if( check_contiguous_roof( i ) || check_contiguous_roof( opp_dir ) ) {
-                                absorption_cache[sp.x()][sp.y()] = ( case3 ) ? SOUND_ABSORPTION_WALL :
-                                                                   ( case2_full ) ? SOUND_ABSORPTION_THICK_BARRIER : SOUND_ABSORPTION_BARRIER;
-                                // Case2 partial does not get to be a sound wall.
-                                sound_wall_cache[sp.x()][sp.y()] = case3 || case2_full;
-                                continue;
-                            }
-                        } else if( out_of_bounds[opp_dir] ) {
-                            // If the far tile is out of bounds, we only care about the near and middle roof
-                            if( check_contiguous_roof( i, true ) || check_contiguous_roof( opp_dir, true ) ) {
-                                absorption_cache[sp.x()][sp.y()] = ( case3 ) ? SOUND_ABSORPTION_WALL :
-                                                                   ( case2_full ) ? SOUND_ABSORPTION_THICK_BARRIER : SOUND_ABSORPTION_BARRIER;
-                                sound_wall_cache[sp.x()][sp.y()] = case3 || case2_full;
-                                continue;
-                            }
+                    // corner wall, this will provide the indexes to check for walls when doing our corner condition.
+                    const auto &c_wall = wall_check_by_sdirection[i];
+                    if (point_valid[opp_dir] || out_of_bounds[opp_dir]){
+                        // We have a valid or OOB tile on the other side. 
+                        // Now we need to see if we have a contiguous roof or indoors condition on either side.
+                        // We also count an OOB condition or valid condition for this.
+                        const auto &rc = roof_to_check_by_sdir[i];
+                        const auto &opp_rc = roof_to_check_by_sdir[i];
+                        const auto &roofcheck = tile_cw_check(rc[0]) && tile_cw_check(rc[1]) && tile_cw_check(rc[2]);
+                        const auto &opp_roofcheck = tile_cw_check(opp_rc[0]) && tile_cw_check(opp_rc[1]) && tile_cw_check(opp_rc[2]);
+                        if (roofcheck || opp_roofcheck){
+                            absorption_cache[sp.x()][sp.y()] = ( case3 ) ? SOUND_ABSORPTION_WALL : ((case2_full)? SOUND_ABSORPTION_BARRIER:SOUND_ABSORPTION_OPEN_FIELD );
+                            sound_wall_cache[sp.x()][sp.y()] = case3 || case2_full;
+                            terminate_checks = true;
+                            break;
+                        }        
+                    } else if ( point_valid[c_wall.first] || out_of_bounds[c_wall.first] || point_valid[c_wall.second] || out_of_bounds[c_wall.second]  ) {
+                        // Now lets handle our corner condition. 
+                        const auto &diag_tile = wall_sdir_invalidation[i];
+                        // now we just have to check if the tile between these two is indoors/ has a roof/ has a wall/ is OOB. 
+                        if ( (point_valid[c_wall.first] || out_of_bounds[c_wall.first] ) && (tile_cw_check(diag_tile.first) || opp_invert_corner(diag_tile.first)) ){
+                            absorption_cache[sp.x()][sp.y()] = ( case3 ) ? SOUND_ABSORPTION_WALL : ((case2_full)?SOUND_ABSORPTION_BARRIER:SOUND_ABSORPTION_OPEN_FIELD );
+                            sound_wall_cache[sp.x()][sp.y()] = case3 || case2_full;
+                            terminate_checks = true;
+                            break;
+                        } else if ( (point_valid[c_wall.second] || out_of_bounds[c_wall.second] ) && (tile_cw_check(diag_tile.second) || opp_invert_corner(diag_tile.second))  ){
+                            absorption_cache[sp.x()][sp.y()] = ( case3 ) ? SOUND_ABSORPTION_WALL : ((case2_full)?SOUND_ABSORPTION_BARRIER:SOUND_ABSORPTION_OPEN_FIELD );
+                            sound_wall_cache[sp.x()][sp.y()] = case3 || case2_full;
+                            terminate_checks = true;
+                            break;
                         }
-                    }
-                    // If we dont have a valid opposite wall, lets check to see if we have a valid corner.
-                    const auto &cclockwise_wall = point_valid[wall_check_by_sdirection[i].first];
-                    const auto &clockwise_wall = point_valid[wall_check_by_sdirection[i].second];
-                    const auto &cclockwise_roof = roof_cover[wall_sdir_invalidation[i].first] ||
-                                                  indoors[wall_sdir_invalidation[i].first];
-                    const auto &clockwise_roof = roof_cover[wall_sdir_invalidation[i].second] ||
-                                                 indoors[wall_sdir_invalidation[i].second];
-                    if( ( cclockwise_wall && cclockwise_roof ) || ( clockwise_wall && clockwise_roof ) ) {
-                        absorption_cache[sp.x()][sp.y()] = ( case3 ) ? SOUND_ABSORPTION_WALL :
-                                                           ( case2_full ) ? SOUND_ABSORPTION_THICK_BARRIER : SOUND_ABSORPTION_BARRIER;
-                        sound_wall_cache[sp.x()][sp.y()] = case3 || case2_full;
-                        continue;
-                    }
+                    } 
                 }
+            } 
+            if (!terminate_checks) {
+                // At this point we have run through all our possible valid outcomes. This means that there are holes or other gaps.
+                if( case3 ) {
+                    absorption_cache[sp.x()][sp.y()] = SOUND_ABSORPTION_THICK_BARRIER;
+                    sound_wall_cache[sp.x()][sp.y()] = true;
+                    continue;
+                } else if( case2_full ) {
+                    absorption_cache[sp.x()][sp.y()] = SOUND_ABSORPTION_BARRIER;
+                    sound_wall_cache[sp.x()][sp.y()] = true;
+                    continue;
+                }
+                // Only remaining case is a case2 partial, which gets no absorption in this case.
+                absorption_cache[sp.x()][sp.y()] = SOUND_ABSORPTION_OPEN_FIELD;
+                continue;
             }
-            // At this point we have run through all our possible valid outcomes. This means that there are holes or other gaps.
-            if( case3 ) {
-                absorption_cache[sp.x()][sp.y()] = SOUND_ABSORPTION_THICK_BARRIER;
-                sound_wall_cache[sp.x()][sp.y()] = true;
-            } else if( case2_full ) {
-                absorption_cache[sp.x()][sp.y()] = SOUND_ABSORPTION_BARRIER;
-                sound_wall_cache[sp.x()][sp.y()] = true;
-            }
-            // Only remaining case is a case2 partial, which gets no absorption.
-            continue;
         }
-
     }
     // Mark our cache clean.
     absorption_dirty = false;
