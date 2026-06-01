@@ -1134,7 +1134,7 @@ void map::batch_flood_fill_sounds()
                             // as the change in distance loss values past this point are negligible for gameplay scale.
                             const uint8_t dist_for_vol_loss = get_distance_for_volume_loss( ptile.dist,
                                                               ( adj_tile_dir == dirs_to_check.front() ||
-                                                                      adj_tile_dir == dirs_to_check.back() ) );
+                                                                adj_tile_dir == dirs_to_check.back() ) );
                             const short vol_to_check = std::max( 0,
                                                                  ( ptile.vol - absorption_from_checkvar_bitset( adjt_checkvars ) -
                                                                    ( dist_vol_loss[dist_for_vol_loss] ) - snowbonus ) );
