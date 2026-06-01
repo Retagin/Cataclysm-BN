@@ -595,6 +595,7 @@ struct sound_filter_key {
                  monfaction == other.monfaction &&
                  horde_monster == other.horde_monster &&
                  ignore_movement == other.ignore_movement &&
+                 noise_fear == other.noise_fear &&
                  noise_angers == other.noise_angers );
     }
 
@@ -614,6 +615,7 @@ struct std::hash<sound_filter_key> {
         hash_combine( seed, stringfac );
         hash_combine( seed, key.horde_monster );
         hash_combine( seed, key.ignore_movement );
+        hash_combine( seed, key.noise_fear );
         hash_combine( seed, key.noise_angers );
         return seed;
     }

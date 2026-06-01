@@ -227,29 +227,15 @@ static constexpr bool skip_due_to_wall( const std::pair<bool, bool> &wall,
     return false;
 }
 
-// Direction angle threshold coefficients for use with dir_index_to_sound_source.
-// Or anything else that you want to pull direction from atan2 with.
-
-// +/- Threshold for east from an atan2 result.
-static constexpr float RADIAN_THRESHOLD_EAST = M_PI / 8;
-// +/- Threshold for North or South from an atan2 result.
-static constexpr float RADIAN_THRESHOLD_NORTH_SOUTH = ( 3.0 * M_PI ) / 8.0;
-// +/- Threshold for North West or South West from an atan2 result.
-static constexpr float RADIAN_THRESHOLD_NORTHW_SOUTHW = ( ( 5.0 * M_PI ) / 8.0 );
-// +/- Threshold for West from an atan2 result.
-static constexpr float RADIAN_THRESHOLD_WEST = ( ( 7.0 * M_PI ) / 8.0 );
-
 // Returns the direction index to use for checking sound volume at a distance.
 // Returns a uint8_t value between 0 and 9. If we are given two points at the same x/y, returns 8 for down or 9 for up/in same tile.
 // [NW] [ N] [NE]   [ 0 ] [ 1 ] [ 2 ]
 // [W ] [ @] [ E] = [ 7 ] [8/9] [ 3 ]
 // [SW] [ S] [SE]   [ 6 ] [ 5 ] [ 4 ]
-static constexpr uint8_t dir_index_to_sound_source( const tripoint_bub_ms &source,
-        const tripoint_bub_ms &listener )
+auto sounds::direction_index_to_sound_source( const tripoint_bub_ms &source,
+        const tripoint_bub_ms &listener ) -> uint8_t
 {
-    const auto &xdist = listener.x() - source.x();
-    const auto &ydist = listener.y() - source.y();
-    if( xdist == 0 && ydist == 0 ) {
+    if( source.x() == listener.x() && source.y() == listener.y() ) {
         if( source.z() > listener.z() ) {
             return SDI_DOWN;
         } else {
@@ -257,38 +243,25 @@ static constexpr uint8_t dir_index_to_sound_source( const tripoint_bub_ms &sourc
         }
     }
 
-    // We take our source at 0,0, and adjust our listener z/y accordingly.
-    // We could use the units::angle atan2, but this is easier and allows us to directly compare against some static constexpr
-    const float radians = std::atan2( ydist, xdist );
-    // We have 8 directions, at 45 degrees or pi/4 radians each. Because our result ranges from -pi to pi east for example is a result of pi/8 > angle > -pi/8
-    if( radians == 0 ) {
-        return SDI_E;
-    } else if( radians > 0 ) {
-        //Some variety of north.
-        if( radians >= RADIAN_THRESHOLD_WEST ) {
-            return SDI_W;
-        } else if( radians > RADIAN_THRESHOLD_NORTHW_SOUTHW ) {
+    switch( direction_from( source.xy(), listener.xy() ) ) {
+        case direction::NORTHWEST:
             return SDI_NW;
-        } else if( radians >= RADIAN_THRESHOLD_NORTH_SOUTH ) {
+        case direction::NORTH:
             return SDI_N;
-        } else if( radians > RADIAN_THRESHOLD_EAST ) {
+        case direction::NORTHEAST:
             return SDI_NE;
-        } else {
-            return SDI_W;
-        }
-    } else {
-        //Some variety of south.
-        if( radians <= -RADIAN_THRESHOLD_WEST ) {
-            return SDI_W;
-        } else if( radians < -RADIAN_THRESHOLD_NORTHW_SOUTHW ) {
-            return SDI_SW;
-        } else if( radians <= RADIAN_THRESHOLD_NORTH_SOUTH ) {
-            return SDI_S;
-        } else if( radians < RADIAN_THRESHOLD_EAST ) {
-            return SDI_SE;
-        } else {
+        case direction::EAST:
             return SDI_E;
-        }
+        case direction::SOUTHEAST:
+            return SDI_SE;
+        case direction::SOUTH:
+            return SDI_S;
+        case direction::SOUTHWEST:
+            return SDI_SW;
+        case direction::WEST:
+            return SDI_W;
+        default:
+            return SDI_UP;
     }
 }
 
@@ -357,7 +330,7 @@ static short svol_at( const sound_instance_cache &sound_inst, const tripoint_bub
     }
     // Use manhattan distance as our flood envelopes are actually squares, not circles.
     const int distance = manhattan_dist( sound_inst.origin.xy(), tri.xy() );
-    const uint8_t dir_index = dir_index_to_sound_source( sound_inst.origin, tri );
+    const auto dir_index = sounds::direction_index_to_sound_source( sound_inst.origin, tri );
     const auto &san_dir = get_sound_direction_index( dir_index );
     // We know at this point that we are out of the envelope so our distance is greater than our flood radius.
     // We use a different escape volume depending upon a couple of factors.
@@ -770,7 +743,7 @@ void map::flood_fill_sound( const sound_event soundevent, const int zlev )
                             // Dont break the laws of physics
                             continue;
                         }
-                        check_escape( adj_tile_cv_env.x(), adj_tile_cv_env.y(), adj_tile_vol, dist_for_vol_loss );
+                        check_escape( adj_tile_cv_env.x(), adj_tile_cv_env.y(), vol_to_check, dist_for_vol_loss );
 
                         adj_tile_vol = vol_to_check;
                         if( adj_tile_vol > SOUND_ABSORPTION_OPEN_FIELD ) {
@@ -1160,7 +1133,7 @@ void map::batch_flood_fill_sounds()
                             // Cap our tile distance between 1 and 121 to prevent overflow. We dont have or need distance loss values past dist_vol_loss[121]
                             // as the change in distance loss values past this point are negligible for gameplay scale.
                             const uint8_t dist_for_vol_loss = get_distance_for_volume_loss( ptile.dist,
-                                                              ( adj_tile_dir = dirs_to_check.front() ||
+                                                              ( adj_tile_dir == dirs_to_check.front() ||
                                                                       adj_tile_dir == dirs_to_check.back() ) );
                             const short vol_to_check = std::max( 0,
                                                                  ( ptile.vol - absorption_from_checkvar_bitset( adjt_checkvars ) -
@@ -2136,7 +2109,8 @@ void sounds::process_sounds()
         // Sounds louder than 110dB are potentially valid for horde signal.
         const auto &s_origin = sound.sound.origin;
         // We assume that we dont have a direct line of sight so we actually check for floors and walls.
-        const short alt_adjust = vol_z_adjust( s_origin, s_origin, false, true );
+        const auto surface_origin = tripoint_bub_ms( s_origin.x(), s_origin.y(), 0 );
+        const auto alt_adjust = vol_z_adjust( s_origin, surface_origin, false, true );
         if( ( ( sound.sound.volume ) - alt_adjust ) >= 110 ) {
             const auto abs_omt = project_to<coords::omt>( bub_to_abs( s_origin ) );
             const short default_terrain_absorption = terrain_sound_attenuation( abs_omt, season, true );
@@ -2493,14 +2467,14 @@ void sounds::process_sounds_npc()
             const short below_ambient = std::min( 3000.0f,
                                                   ( std::floor( 1500 + 500 * volume_multiplier ) ) );
 
-            const short ambient_vol = ambient( loc.z(), map.is_outside( loc.xy() ) );
+            const auto charx = loc.x();
+            const auto chary = loc.y();
+            const auto npc_indoors = !level_cache.outside_cache[level_cache.idx( charx, chary )];
+            const auto ambient_vol = ambient( loc.z(), npc_indoors );
             // Passive sound dampening reduces all heard volume by a set amount, but protects against hearing loss by 2x this amount.
             const short passive_sound_dampening = dBspl_to_mdBspl( who.get_char_hearing_protection() );
             // Active dampening does not reduce heard volume and directly protects against hearing loss.
             const short active_sound_dampening = dBspl_to_mdBspl( who.get_char_hearing_protection( true ) );
-            // We want constant ints for our x/y, makes the compiler happier when getting volume[x][y].
-            const int charx = loc.x();
-            const int chary = loc.y();
             // Sounds quieter than this are inaudible and are skipped.
             // Passive sound dampening reduces the "heard" volume of all sounds, including ambient volume.
             // In a perfect simulation most hearing protection absorbs high frequency sounds much more than low frequency sounds.
@@ -2522,8 +2496,8 @@ void sounds::process_sounds_npc()
                                                          element.terrain_sound_absorbtion_at_source ) / 2 );
                 // Do an early filter for sounds that would always be indaudible.
                 // Check to see if the NPC is deaf here as well, as we may deafen them part way through the process.
-                const short tile_vol = svol_at( element, who.bub_pos(), average_t_absorp,
-                                                !level_cache.outside_cache[level_cache.idx( charx, chary )], who.sees( element.origin ) );
+                const auto tile_vol = svol_at( element, who.bub_pos(), average_t_absorp,
+                                               npc_indoors, who.sees( element.origin ) );
 
                 if( tile_vol <= min_vol ) {
                     continue;
@@ -2689,7 +2663,7 @@ void sounds::process_sound_markers( Character *who )
             loudest_sound_dummy = element.sound;
             loudest_sound_minvol_radius = element.approximate_minvol_distance;
             loudest_sound_flood_radius = element.flood_radius;
-            loudest_sound_escape_dir = dir_index_to_sound_source( loc, element.sound.origin );
+            loudest_sound_escape_dir = sounds::direction_index_to_sound_source( loc, element.sound.origin );
             loudest_sound_escape_vol = element.base_distance_vol_by_dir[get_sound_direction_index(
                                            loudest_sound_escape_dir )];
         }
@@ -2740,6 +2714,9 @@ void sounds::process_sound_markers( Character *who )
                         continue;
                     }
                 }
+            }
+            if( is_deaf ) {
+                continue;
             }
             // Secure the flag before wake_up() clears the effect
             bool slept_through = who->has_effect( effect_slept_through_alarm );

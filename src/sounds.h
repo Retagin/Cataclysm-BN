@@ -72,6 +72,9 @@ void process_sounds();
 void process_sounds_npc();
 // process_sound_markers applies sound events to the player and records them for display.
 void process_sound_markers( Character *who );
+// Returns the sound direction index from source to listener.
+auto direction_index_to_sound_source( const tripoint_bub_ms &source,
+                                      const tripoint_bub_ms &listener ) -> uint8_t;
 
 // Return list of points that have sound events the player can hear.
 std::vector<tripoint_bub_ms> get_footstep_markers();
