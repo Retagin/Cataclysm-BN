@@ -3991,7 +3991,7 @@ int sfx::get_heard_volume( const tripoint_bub_ms &source, const short &origin_vo
     // We need to scale our sfx volume output based upon the ratio of the heard sound to its origin volume
     // If a sound is supposed to be played at 100 sfx vol at 60dB, if we hear it at 54dB we want to hear it at close to 90 sfx vol
     // But if a sound is supposed to play at 100sfx vol at 180dB, if we hear it at 60dB we should be hearing it at a sfx vol of ~33
-    const float vol_ratio = ( static_cast<float>( o_vol ) / heard_volume );
+    const auto vol_ratio = static_cast<float>( heard_volume ) / static_cast<float>( o_vol );
     // Convert our volume and bound it to 1-100. It was loud enough to be heard, but our conversions might round it to 0 and we want it to be played.
     heard_volume = std::min( 100, std::max( 1, static_cast<int>( std::round( 100 * vol_ratio ) ) ) );
     heard_volume *= g_sfx_volume_multiplier;

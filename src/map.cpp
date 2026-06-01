@@ -10063,7 +10063,7 @@ void map::build_map_cache( const int zlev, bool skip_lightmap )
     }
 
     {
-        ZoneScopedN( "Phase3_sound_absorption" )
+        ZoneScopedN( "Phase3_sound_absorption" );
         // Absorption cache relies upon the floor, outside, and vehicle caches all being completed.
         for( int z = minz; z <= maxz; z++ ) {
             build_absorption_cache( z );
